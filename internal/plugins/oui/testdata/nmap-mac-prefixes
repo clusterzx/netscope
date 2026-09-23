@@ -1,0 +1,33 @@
+# $Id: nmap-mac-prefixes 39086 2025-02-27 16:42:04Z dmiller $ generated with make-mac-prefixes.pl
+# Original data comes from https://regauth.standards.ieee.org/
+# These values are known as Organizationally Unique Identifiers (OUIs)
+# See https://standards.ieee.org/products-programs/regauth/
+# Nmap additions to this file:
+001122 Cimsys
+0050C2 Ieee Registration Authority
+080027 Oracle VirtualBox virtual NIC
+244CAB Espressif
+343EA4 Ring
+525400 QEMU virtual NIC
+54E019 Ring
+5C415A Amazon.com
+70B3D5 Ieee Registration Authority
+741AE0 Ieee Registration Authority
+74ECB2 Amazon Technologies
+782288 Shenzhen Bilian Electronic，LTD
+8C1F64 Ieee Registration Authority
+9483C4 GL Technologies (Hong Kong) Limited
+9C9C1F Espressif
+A8A159 ASRock Incorporation
+AC15A2 TP-Link Limited
+B009DA Ring Solutions
+BC2411 Proxmox Server Solutions GmbH
+C85CE2 Ieee Registration Authority
+C89E43 Netgear
+D4910F Amazon Technologies
+DC15C8 AVM Audiovisuelles Marketing und Computersysteme GmbH
+DCA632 Raspberry Pi Trading
+ECB5FA Philips Lighting BV
+C85CE27 Synergy Systems AND Solutions
+70B3D5F2F Teleplatforms
+8C1F64AFA Data Electronic Devices

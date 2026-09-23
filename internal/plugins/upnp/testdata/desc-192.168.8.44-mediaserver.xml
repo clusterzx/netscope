@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+ <specVersion>
+   <major>1</major>
+   <minor>0</minor>
+ </specVersion>
+<device>
+<dlna:X_DLNADOC xmlns:dlna="urn:schemas-dlna-org:device-1-0">DMS-1.50</dlna:X_DLNADOC>
+<dlna:X_DLNADOC xmlns:dlna="urn:schemas-dlna-org:device-1-0">M-DMS-1.50</dlna:X_DLNADOC>
+<deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>
+<friendlyName>AVM FRITZ!Mediaserver</friendlyName>
+<manufacturer>FRITZ! GmbH</manufacturer>
+<manufacturerURL>https://fritz.com</manufacturerURL>
+<modelDescription>FRITZ!Box 7590</modelDescription>
+<modelName>FRITZ!Box 7590</modelName>
+<modelNumber>7590avm</modelNumber>
+<modelURL>http://fritz.box</modelURL>
+<UDN>uuid:fa095ecc-e13e-40e7-8e6c-DC15C822C6B3</UDN>
+<iconList>
+<icon>
+<mimetype>image/bmp</mimetype>
+<height>32</height>
+<width>32</width>
+<depth>24</depth>
+<url>/FRITZ-Logo-32x32.bmp</url>
+</icon>
+<icon>
+<mimetype>image/jpeg</mimetype>
+<height>32</height>
+<width>32</width>
+<depth>24</depth>
+<url>/FRITZ-Logo-32x32.jpg</url>
+</icon>
+<icon>
+<mimetype>image/bmp</mimetype>
+<height>48</height>
+<width>48</width>
+<depth>24</depth>
+<url>/FRITZ-Logo-48x48.bmp</url>
+</icon>
+<icon>
+<mimetype>image/jpeg</mimetype>
+<height>48</height>
+<width>48</width>
+<depth>24</depth>
+<url>/FRITZ-Logo-48x48.jpg</url>
+</icon>
+<icon>
+<mimetype>image/png</mimetype>
+<height>48</height>
+<width>48</width>
+<depth>24</depth>
+<url>/FRITZ-Logo-48x48.png</url>
+</icon>
+<icon>
+<mimetype>image/jpeg</mimetype>
+<height>120</height>
+<width>120</width>
+<depth>24</depth>
+<url>/FRITZ-Logo-120x120.jpg</url>
+</icon>
+<icon>
+<mimetype>image/png</mimetype>
+<height>120</height>
+<width>120</width>
+<depth>24</depth>
+<url>/FRITZ-Logo-120x120.png</url>
+</icon>
+</iconList>
+<serviceList>
+<service>
+<serviceType>urn:schemas-upnp-org:service:ContentDirectory:1</serviceType>
+<serviceId>urn:upnp-org:serviceId:ContentDirectory</serviceId>
+<controlURL>/MediaServer/ContentDirectory/Control</controlURL>
+<eventSubURL>/MediaServer/ContentDirectory/Event</eventSubURL>
+<SCPDURL>/MediaServerContentDirectory.xml</SCPDURL>
+</service>
+<service>
+<serviceType>urn:schemas-upnp-org:service:ConnectionManager:1</serviceType>
+<serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId>
+<controlURL>/MediaServer/ConnectionManager/Control</controlURL>
+<eventSubURL>/MediaServer/ConnectionManager/Event</eventSubURL>
+<SCPDURL>/MediaServerConnectionManager.xml</SCPDURL>
+</service>
+<service>
+<serviceType>urn:microsoft.com:service:X_MS_MediaReceiverRegistrar:1</serviceType>
+<serviceId>urn:microsoft.com:serviceId:X_MS_MediaReceiverRegistrar</serviceId>
+<controlURL>/MediaServer/MediaReceiverRegistrar/Control</controlURL>
+<eventSubURL>/MediaServer/MediaReceiverRegistrar/Event</eventSubURL>
+<SCPDURL>/MediaReceiverRegistrar.xml</SCPDURL>
+</service>
+<service>
+<serviceType>urn:avm.de:service:AVM_ServerStatus:1</serviceType>
+<serviceId>urn:avm.de:serviceId:AVM_ServerStatus</serviceId>
+<controlURL>/MediaServer/ServerStatus/Control</controlURL>
+<eventSubURL>/MediaServer/ServerStatus/Event</eventSubURL>
+<SCPDURL>/ServerStatus.xml</SCPDURL>
+</service>
+</serviceList>
+<presentationURL>http://fritz.box</presentationURL>
+</device>
+</root>

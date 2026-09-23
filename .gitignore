@@ -1,0 +1,9 @@
+/data/
+/.devdata/
+/bin/
+*.test
+*.exe
+/web/node_modules/
+/web/.svelte-kit/
+/internal/webui/dist/*
+!/internal/webui/dist/.keep

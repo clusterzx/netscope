@@ -1,0 +1,1 @@
+{"data":{"arch":"amd64","cores":4,"digest":"6d2f8a1c4e7b0d3f9a5c2e8b1d4f7a0c3e6b9d2f","features":"nesting=1,keyctl=1","hostname":"netscope","memory":2048,"net0":"name=eth0,bridge=vmbr0,firewall=1,hwaddr=BC:24:11:27:22:B5,ip=dhcp,type=veth","onboot":1,"ostype":"ubuntu","rootfs":"local-lvm:vm-105-disk-0,size=16G","swap":512,"tags":"netscope","unprivileged":1}}

@@ -1,0 +1,6 @@
+# LF everywhere: shell scripts, Go (gofmt) and the Docker build run on Linux
+* text=auto eol=lf
+# test fixtures stay byte-exact (SSDP answers and Excel CSV use CRLF on purpose)
+**/testdata/** -text
+*.png binary
+*.gz binary

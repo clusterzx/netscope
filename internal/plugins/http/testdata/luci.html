@@ -1,0 +1,78 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>GL-MT6000 - Overview - LuCI</title>
+		
+			<script type="text/javascript">
+				var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)'),
+				    rootElement = document.querySelector(':root'),
+				    setDarkMode = function(match) { rootElement.setAttribute('data-darkmode', match.matches) };
+
+				mediaQuery.addEventListener('change', setDarkMode);
+				setDarkMode(mediaQuery);
+			</script>
+		
+		<meta name="viewport" content="initial-scale=1.0">
+		<link rel="stylesheet" href="/luci-static/bootstrap/cascade.css?v=git-22.288.45155-afd0012">
+		<link rel="stylesheet" media="only screen and (max-device-width: 854px)" href="/luci-static/bootstrap/mobile.css?v=git-22.288.45155-afd0012" type="text/css" />
+		<link rel="shortcut icon" href="/luci-static/bootstrap/favicon.png">
+		<script src="/cgi-bin/luci/admin/translations/en?v=git-22.288.45155-afd0012"></script>
+		<script src="/luci-static/resources/cbi.js?v=git-22.288.45155-afd0012"></script>
+	</head>
+
+	<body class="lang_en Overview" data-page="">
+		
+
+
+<script type="text/javascript" src="/luci-static/resources/promis.min.js?v=git-22.335.71649-0ecaf74"></script>
+<script type="text/javascript" src="/luci-static/resources/luci.js?v=git-22.335.71649-0ecaf74"></script>
+<script type="text/javascript">
+	L = new LuCI({"apply_rollback":90,"resource":"\/luci-static\/resources","media":"\/luci-static\/bootstrap","documentroot":"\/www","pollinterval":5,"apply_display":1.5,"requestpath":[],"ubuspath":"\/ubus\/","scriptname":"\/cgi-bin\/luci","dispatchpath":[],"apply_timeout":5,"apply_holdoff":4,"nodespec":{"satisfied":true,"action":{"type":"template","path":"admin_status\/index"},"order":1,"depends":{"acl":["luci-mod-status-index"]},"title":"Overview"}});
+</script>
+
+
+<section hidden>
+	<form method="post" class="cbi-map">
+		<div class="cbi-section">
+			<div class="cbi-section-node">
+				<div class="cbi-value">
+					<label class="cbi-value-title" for="luci_username">Username</label>
+					<div class="cbi-value-field">
+						<input name="luci_username" id="luci_username" type="text" autocomplete="username"  value="root">
+					</div>
+				</div>
+				<div class="cbi-value">
+					<label class="cbi-value-title" for="luci_password">Password</label>
+					<div class="cbi-value-field">
+						<input name="luci_password" id="luci_password" type="password" autocomplete="current-password">
+					</div>
+				</div>
+			</div>
+		</div>
+	</form>
+
+	<hr>
+
+	
+
+	<button class="btn cbi-button-positive important">Login</button>
+</section>
+
+<div id="view">
+	<div class="spinning">Loading view…</div>
+	<script type="text/javascript">
+		L.require('ui').then(function(ui) {
+			ui.instantiateView('bootstrap.sysauth');
+		});
+	</script>
+</div>
+
+
+	</body>
+</html>
+
+
+

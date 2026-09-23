@@ -1,0 +1,51 @@
+@@NETSCOPE@@ date -
+@@NETSCOPE@@ os_release -
+cat: can't open '/usr/lib/os-release': No such file or directory
+@@NETSCOPE@@ uname -
+@@NETSCOPE@@ hostname -
+@@NETSCOPE@@ cpuinfo -
+@@NETSCOPE@@ nproc -
+@@NETSCOPE@@ meminfo -
+@@NETSCOPE@@ uptime -
+@@NETSCOPE@@ df -
+@@NETSCOPE@@ lsblk -
+@@NETSCOPE@@ ip_addr ip
+@@NETSCOPE@@ pkg_dpkg -
+@@NETSCOPE@@ pkg_rpm -
+rpm: invalid option -- 'a'
+BusyBox v1.37.0 (2024-09-26 21:31:42 UTC) multi-call binary.
+
+Usage: rpm -i PACKAGE.rpm; rpm -qp[ildc] PACKAGE.rpm
+
+Manipulate RPM packages
+
+Commands:
+	-i	Install package
+	-qp	Query package
+	-qpi	Show information
+	-qpl	List contents
+	-qpd	List documents
+	-qpc	List config files
+@@NETSCOPE@@ pkg_apk -
+@@NETSCOPE@@ last_dpkg -
+@@NETSCOPE@@ last_apt -
+@@NETSCOPE@@ last_rpm -
+rpm: invalid option -- 'a'
+BusyBox v1.37.0 (2024-09-26 21:31:42 UTC) multi-call binary.
+
+Usage: rpm -i PACKAGE.rpm; rpm -qp[ildc] PACKAGE.rpm
+
+Manipulate RPM packages
+
+Commands:
+	-i	Install package
+	-qp	Query package
+	-qpi	Show information
+	-qpl	List contents
+	-qpd	List documents
+	-qpc	List config files
+@@NETSCOPE@@ last_apk -
+@@NETSCOPE@@ services -
+@@NETSCOPE@@ sockets netstat
+@@NETSCOPE@@ docker_ps -
+@@NETSCOPE@@ docker_images -

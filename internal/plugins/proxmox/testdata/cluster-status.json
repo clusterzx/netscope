@@ -1,0 +1,1 @@
+{"data":[{"quorate":1,"nodes":2,"name":"homelab","id":"cluster","type":"cluster","version":4},{"type":"node","id":"node/pve1","name":"pve1","nodeid":1,"level":"","local":1,"online":1,"ip":"192.168.8.20"},{"level":"","nodeid":2,"local":0,"online":0,"ip":"192.168.8.21","name":"pve2","id":"node/pve2","type":"node"}]}

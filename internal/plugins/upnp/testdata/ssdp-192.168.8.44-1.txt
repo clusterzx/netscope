@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+Cache-Control: max-age=1800
+Location: http://192.168.8.44:49000/MediaServerDevDesc.xml
+Server: FRITZ!Box 7590 UPnP/1.0 AVM FRITZ!Box 7590 154.08.25
+Ext: 
+ST: upnp:rootdevice
+USN: uuid:fa095ecc-e13e-40e7-8e6c-DC15C822C6B3::upnp:rootdevice
+

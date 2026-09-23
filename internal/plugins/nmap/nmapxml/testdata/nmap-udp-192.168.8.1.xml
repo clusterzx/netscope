@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.97 scan initiated Tue Sep 22 20:15:56 2026 as: nmap -sU -&#45;top-ports 50 -n -oX - -T4 -&#45;host-timeout 1200s 192.168.8.1 -->
+<nmaprun scanner="nmap" args="nmap -sU -&#45;top-ports 50 -n -oX - -T4 -&#45;host-timeout 1200s 192.168.8.1" start="1790108156" startstr="Tue Sep 22 20:15:56 2026" version="7.97" xmloutputversion="1.05">
+<scaninfo type="udp" protocol="udp" numservices="50" services="7,53,67-69,80,111,123,135-139,161-162,445,500,514,518,520,593,626,631,996-999,1025-1027,1433-1434,1645-1646,1701,1812,1900,2048-2049,2222,3283,3456,4500,5060,5353,20031,32768,49152-49154"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.1" addrtype="ipv4"/>
+<address addr="94:83:C4:A8:A4:0A" addrtype="mac" vendor="GL Technologies (Hong Kong) Limited"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1790108157" endtime="1790108163"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.1" addrtype="ipv4"/>
+<address addr="94:83:C4:A8:A4:0A" addrtype="mac" vendor="GL Technologies (Hong Kong) Limited"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="open|filtered" count="34">
+<extrareasons reason="no-response" count="34" proto="udp" ports="68-69,135-139,161-162,445,500,514,518,631,996-998,1026-1027,1433,1645-1646,1701,1812,1900,2048,2222,3283,3456,4500,5060,5353,20031,32768"/>
+</extraports>
+<port protocol="udp" portid="7"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="echo" method="table" conf="3"/></port>
+<port protocol="udp" portid="53"><state state="open" reason="udp-response" reason_ttl="64"/><service name="domain" method="table" conf="3"/></port>
+<port protocol="udp" portid="67"><state state="open" reason="udp-response" reason_ttl="64"/><service name="dhcps" method="table" conf="3"/></port>
+<port protocol="udp" portid="80"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="http" method="table" conf="3"/></port>
+<port protocol="udp" portid="111"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="rpcbind" method="table" conf="3"/></port>
+<port protocol="udp" portid="123"><state state="open" reason="udp-response" reason_ttl="64"/><service name="ntp" method="table" conf="3"/></port>
+<port protocol="udp" portid="520"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="route" method="table" conf="3"/></port>
+<port protocol="udp" portid="593"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="http-rpc-epmap" method="table" conf="3"/></port>
+<port protocol="udp" portid="626"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="serialnumberd" method="table" conf="3"/></port>
+<port protocol="udp" portid="999"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="applix" method="table" conf="3"/></port>
+<port protocol="udp" portid="1025"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="blackjack" method="table" conf="3"/></port>
+<port protocol="udp" portid="1434"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="ms-sql-m" method="table" conf="3"/></port>
+<port protocol="udp" portid="2049"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="nfs" method="table" conf="3"/></port>
+<port protocol="udp" portid="49152"><state state="closed" reason="port-unreach" reason_ttl="64"/></port>
+<port protocol="udp" portid="49153"><state state="closed" reason="port-unreach" reason_ttl="64"/></port>
+<port protocol="udp" portid="49154"><state state="closed" reason="port-unreach" reason_ttl="64"/></port>
+</ports>
+<times srtt="589" rttvar="175" to="100000"/>
+</host>
+<runstats><finished time="1790108163" timestr="Tue Sep 22 20:16:03 2026" summary="Nmap done at Tue Sep 22 20:16:03 2026; 1 IP address (1 host up) scanned in 7.10 seconds" elapsed="7.10" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

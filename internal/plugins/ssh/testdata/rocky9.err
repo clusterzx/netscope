@@ -1,0 +1,31 @@
+Unable to find image 'rockylinux:9' locally
+9: Pulling from library/rockylinux
+446f83f14b23: Pulling fs layer
+049b56715175: Download complete
+49e4a7573a19: Download complete
+446f83f14b23: Download complete
+446f83f14b23: Pull complete
+Digest: sha256:d7be1c094cc5845ee815d4632fe377514ee6ebcf8efaed6892889657e5ddaaa6
+Status: Downloaded newer image for rockylinux:9
+@@NETSCOPE@@ date -
+@@NETSCOPE@@ os_release -
+@@NETSCOPE@@ uname -
+@@NETSCOPE@@ hostname -
+@@NETSCOPE@@ cpuinfo -
+@@NETSCOPE@@ nproc -
+@@NETSCOPE@@ meminfo -
+@@NETSCOPE@@ uptime -
+@@NETSCOPE@@ df -
+@@NETSCOPE@@ lsblk -
+@@NETSCOPE@@ ip_addr -
+@@NETSCOPE@@ pkg_dpkg -
+@@NETSCOPE@@ pkg_rpm -
+@@NETSCOPE@@ pkg_apk -
+@@NETSCOPE@@ last_dpkg -
+@@NETSCOPE@@ last_apt -
+@@NETSCOPE@@ last_rpm -
+@@NETSCOPE@@ last_apk -
+@@NETSCOPE@@ services -
+@@NETSCOPE@@ sockets -
+@@NETSCOPE@@ docker_ps -
+@@NETSCOPE@@ docker_images -

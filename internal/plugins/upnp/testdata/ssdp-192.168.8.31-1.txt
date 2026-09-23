@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+CACHE-CONTROL: max-age=1800
+EXT:
+SERVER: Linux/2.6 UPnp/1.0 AMI-Stack/1.0
+LOCATION: http://192.168.8.31:50000/
+ST: upnp:rootdevice
+USN: uuid:a09d156b-debf-0010-e603-0011223344e4::upnp:rootdevice
+

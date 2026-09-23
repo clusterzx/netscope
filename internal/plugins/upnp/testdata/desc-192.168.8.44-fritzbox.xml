@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+<specVersion>
+<major>1</major>
+<minor>0</minor>
+</specVersion>
+<device>
+<deviceType>urn:schemas-upnp-org:device:fritzbox:1</deviceType>
+<friendlyName>FRITZ!Box 7590</friendlyName>
+<manufacturer>FRITZ! GmbH</manufacturer>
+<manufacturerURL>https://fritz.com</manufacturerURL>
+<modelDescription>FRITZ!Box 7590</modelDescription>
+<modelName>FRITZ!Box 7590</modelName>
+<modelNumber>7590avm</modelNumber>
+<modelURL>https://fritz.com</modelURL>
+<UDN>uuid:123402409-bccb-40e7-8e6c-DC15C822C6B3</UDN>
+<iconList>
+<icon>
+<mimetype>image/gif</mimetype>
+<width>118</width>
+<height>119</height>
+<depth>8</depth>
+<url>/ligd.gif</url>
+</icon>
+</iconList>
+<serviceList>
+<service>
+<serviceType>urn:schemas-any-com:service:fritzbox:1</serviceType>
+<serviceId>urn:any-com:serviceId:fritzbox</serviceId>
+<controlURL>/upnp/control/fritzbox</controlURL>
+<eventSubURL>/upnp/control/fritzbox</eventSubURL>
+<SCPDURL>/fboxSCPD.xml</SCPDURL>
+</service>
+</serviceList>
+<presentationURL>http://192.168.8.44</presentationURL>
+</device>
+</root>

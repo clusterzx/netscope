@@ -1,0 +1,2 @@
+pcap_activate: eth0: You don't have permission to perform this capture on that device
+(Attempt to create packet socket failed - CAP_NET_RAW may be required)

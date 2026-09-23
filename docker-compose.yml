@@ -1,0 +1,24 @@
+services:
+  netscope:
+    image: netscope:latest
+    build:
+      context: .
+      args:
+        VERSION: ${NETSCOPE_VERSION:-dev}
+    container_name: netscope
+    # Host networking: ARP/mDNS/SSDP/WOL need direct access to the LAN.
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - ./data:/data
+      # Optional: lets the docker importer read the local Docker host (unix:///var/run/docker.sock).
+      # Note: access to the Docker socket is equivalent to root on the host.
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      TZ: Europe/Berlin
+      NETSCOPE_LISTEN: ":8080"
+      # NETSCOPE_ADMIN_PASSWORD: "only used on the very first start"
+      # NETSCOPE_MASTER_KEY: "base64 key; otherwise /data/master.key is generated"
+    restart: unless-stopped

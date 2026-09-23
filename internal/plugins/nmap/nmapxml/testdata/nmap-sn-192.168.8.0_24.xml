@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.97 scan initiated Tue Sep 22 20:12:08 2026 as: nmap -sn -n -oX - -T4 192.168.8.0/24 -->
+<nmaprun scanner="nmap" args="nmap -sn -n -oX - -T4 192.168.8.0/24" start="1790107928" startstr="Tue Sep 22 20:12:08 2026" version="7.97" xmloutputversion="1.05">
+<verbose level="0"/>
+<debugging level="0"/>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.1" addrtype="ipv4"/>
+<address addr="94:83:C4:A8:A4:0A" addrtype="mac" vendor="GL Technologies (Hong Kong) Limited"/>
+<hostnames>
+</hostnames>
+<times srtt="534" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.11" addrtype="ipv4"/>
+<address addr="A8:A1:59:77:91:0E" addrtype="mac" vendor="ASRock Incorporation"/>
+<hostnames>
+</hostnames>
+<times srtt="149" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.25" addrtype="ipv4"/>
+<address addr="12:D5:C5:C7:A3:40" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<times srtt="31243" rttvar="31243" to="156215"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.31" addrtype="ipv4"/>
+<address addr="00:11:22:33:44:E4" addrtype="mac" vendor="Cimsys"/>
+<hostnames>
+</hostnames>
+<times srtt="179" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.32" addrtype="ipv4"/>
+<address addr="BC:24:11:13:CE:CE" addrtype="mac" vendor="Proxmox Server Solutions GmbH"/>
+<hostnames>
+</hostnames>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.33" addrtype="ipv4"/>
+<address addr="70:AF:09:E3:38:08" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<times srtt="62980" rttvar="62980" to="314900"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.39" addrtype="ipv4"/>
+<address addr="BC:2A:33:0A:16:52" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<times srtt="25228" rttvar="25228" to="126140"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.40" addrtype="ipv4"/>
+<address addr="24:4C:AB:43:64:69" addrtype="mac" vendor="Espressif"/>
+<hostnames>
+</hostnames>
+<times srtt="25804" rttvar="25804" to="129020"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.44" addrtype="ipv4"/>
+<address addr="DC:15:C8:22:C6:B3" addrtype="mac" vendor="AVM Audiovisuelles Marketing und Computersysteme GmbH"/>
+<hostnames>
+</hostnames>
+<times srtt="718" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.61" addrtype="ipv4"/>
+<address addr="B0:09:DA:32:8E:C4" addrtype="mac" vendor="Ring Solutions"/>
+<hostnames>
+</hostnames>
+<times srtt="1229" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.62" addrtype="ipv4"/>
+<address addr="B0:09:DA:32:8E:C5" addrtype="mac" vendor="Ring Solutions"/>
+<hostnames>
+</hostnames>
+<times srtt="1707" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.63" addrtype="ipv4"/>
+<address addr="54:E0:19:B2:DB:50" addrtype="mac" vendor="Ring"/>
+<hostnames>
+</hostnames>
+<times srtt="105913" rttvar="105913" to="529565"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.65" addrtype="ipv4"/>
+<address addr="D4:91:0F:9B:35:82" addrtype="mac" vendor="Amazon Technologies"/>
+<hostnames>
+</hostnames>
+<times srtt="37738" rttvar="37738" to="188690"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.70" addrtype="ipv4"/>
+<address addr="78:22:88:6D:2A:6A" addrtype="mac" vendor="Shenzhen Bilian Electronic&#xef;&#xbc;&#x8c;LTD"/>
+<hostnames>
+</hostnames>
+<times srtt="99586" rttvar="99586" to="497930"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.71" addrtype="ipv4"/>
+<address addr="5C:41:5A:76:DC:A0" addrtype="mac" vendor="Amazon.com"/>
+<hostnames>
+</hostnames>
+<times srtt="149923" rttvar="149923" to="749615"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.75" addrtype="ipv4"/>
+<address addr="EC:B5:FA:BC:C7:53" addrtype="mac" vendor="Philips Lighting BV"/>
+<hostnames>
+</hostnames>
+<times srtt="197" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.79" addrtype="ipv4"/>
+<address addr="9C:9C:1F:AF:7B:3F" addrtype="mac" vendor="Espressif"/>
+<hostnames>
+</hostnames>
+<times srtt="52600" rttvar="35789" to="195756"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.87" addrtype="ipv4"/>
+<address addr="34:3E:A4:04:01:2E" addrtype="mac" vendor="Ring"/>
+<hostnames>
+</hostnames>
+<times srtt="42666" rttvar="42666" to="213330"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.96" addrtype="ipv4"/>
+<address addr="C2:46:44:F3:77:7E" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<times srtt="21" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.98" addrtype="ipv4"/>
+<address addr="AC:15:A2:AC:12:68" addrtype="mac" vendor="TP-Link Limited"/>
+<hostnames>
+</hostnames>
+<times srtt="386" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.105" addrtype="ipv4"/>
+<address addr="C8:9E:43:83:96:E3" addrtype="mac" vendor="Netgear"/>
+<hostnames>
+</hostnames>
+<times srtt="19011" rttvar="19011" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.135" addrtype="ipv4"/>
+<address addr="DC:A6:32:BA:1F:C4" addrtype="mac" vendor="Raspberry Pi Trading"/>
+<hostnames>
+</hostnames>
+<times srtt="96" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.178" addrtype="ipv4"/>
+<address addr="74:EC:B2:26:EB:E7" addrtype="mac" vendor="Amazon Technologies"/>
+<hostnames>
+</hostnames>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.202" addrtype="ipv4"/>
+<address addr="BC:24:11:F8:4A:61" addrtype="mac" vendor="Proxmox Server Solutions GmbH"/>
+<hostnames>
+</hostnames>
+<times srtt="33" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.204" addrtype="ipv4"/>
+<address addr="BC:24:11:84:D2:0E" addrtype="mac" vendor="Proxmox Server Solutions GmbH"/>
+<hostnames>
+</hostnames>
+<times srtt="31" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="localhost-response" reason_ttl="0"/>
+<address addr="192.168.8.123" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</host>
+<runstats><finished time="1790107930" timestr="Tue Sep 22 20:12:10 2026" summary="Nmap done at Tue Sep 22 20:12:10 2026; 256 IP addresses (26 hosts up) scanned in 2.15 seconds" elapsed="2.15" exit="success"/><hosts up="26" down="230" total="256"/>
+</runstats>
+</nmaprun>

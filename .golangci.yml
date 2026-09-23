@@ -1,0 +1,53 @@
+version: "2"
+
+run:
+  timeout: 10m
+  tests: true
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - errorlint
+    - misspell
+    - unconvert
+  # nilerr is not enabled on purpose: plugins log per-host errors and continue with the
+  # next host ("return nil" after handling an error) by design.
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -ST1000 # package comments are present where useful
+        - -ST1003 # naming: ID/URL style is followed, generated names excluded
+        - -ST1005 # user-facing error messages are German sentences (capitalised nouns)
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - -QF1001 # De Morgan rewrites are a matter of taste
+        - -QF1008 # explicit embedded field selectors are kept for readability
+    errorlint:
+      errorf: false
+    misspell:
+      # German UI texts and product names
+      ignore-rules:
+        - konfiguration
+        - routeros
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - bodyclose
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt

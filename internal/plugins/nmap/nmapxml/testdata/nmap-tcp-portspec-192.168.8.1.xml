@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.97 scan initiated Tue Sep 22 20:15:40 2026 as: nmap -oX - -n -Pn -T4 -sV -p 22,53,80,443,8000-8100 -&#45;host-timeout 900s 192.168.8.1 -->
+<nmaprun scanner="nmap" args="nmap -oX - -n -Pn -T4 -sV -p 22,53,80,443,8000-8100 -&#45;host-timeout 900s 192.168.8.1" start="1790108140" startstr="Tue Sep 22 20:15:40 2026" version="7.97" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="105" services="22,53,80,443,8000-8100"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.1" addrtype="ipv4"/>
+<address addr="94:83:C4:A8:A4:0A" addrtype="mac" vendor="GL Technologies (Hong Kong) Limited"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1790108140" endtime="1790108156"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.8.1" addrtype="ipv4"/>
+<address addr="94:83:C4:A8:A4:0A" addrtype="mac" vendor="GL Technologies (Hong Kong) Limited"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="100">
+<extrareasons reason="reset" count="100" proto="tcp" ports="8000-8079,8081-8100"/>
+</extraports>
+<port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ssh" product="Dropbear sshd" extrainfo="protocol 2.0" ostype="Linux" method="probed" conf="10"><cpe>cpe:/a:matt_johnston:dropbear_ssh_server</cpe><cpe>cpe:/o:linux:linux_kernel</cpe></service></port>
+<port protocol="tcp" portid="53"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="domain" product="Cloudflare public DNS" method="probed" conf="10"/></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" product="nginx" version="1.26.1" method="probed" conf="10"><cpe>cpe:/a:igor_sysoev:nginx:1.26.1</cpe></service></port>
+<port protocol="tcp" portid="443"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" product="nginx" version="1.26.1" tunnel="ssl" method="probed" conf="10"><cpe>cpe:/a:igor_sysoev:nginx:1.26.1</cpe></service></port>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" product="OpenWrt uHTTPd" ostype="Linux" devicetype="WAP" method="probed" conf="10"><cpe>cpe:/a:openwrt:uhttpd</cpe><cpe>cpe:/o:linux:linux_kernel</cpe></service></port>
+</ports>
+<times srtt="572" rttvar="124" to="100000"/>
+</host>
+<runstats><finished time="1790108156" timestr="Tue Sep 22 20:15:56 2026" summary="Nmap done at Tue Sep 22 20:15:56 2026; 1 IP address (1 host up) scanned in 16.34 seconds" elapsed="16.34" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

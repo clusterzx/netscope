@@ -1,0 +1,4 @@
+172.17.0.1	7e:3f:ab:f0:4d:80	(Unknown: locally administered)
+172.17.0.2	fa:0b:61:fb:42:cf	(Unknown: locally administered)
+172.17.0.2	de:5a:70:0c:33:e4	(Unknown: locally administered) (DUP: 2)
+172.17.0.3	fa:0b:61:fb:42:cf	(Unknown: locally administered)

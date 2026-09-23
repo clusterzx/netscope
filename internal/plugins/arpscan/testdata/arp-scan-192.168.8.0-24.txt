@@ -1,0 +1,25 @@
+192.168.8.1	94:83:c4:a8:a4:0a	GL Technologies (Hong Kong) Limited
+192.168.8.11	a8:a1:59:77:91:0e	ASRock Incorporation
+192.168.8.31	00:11:22:33:44:e4	CIMSYS Inc
+192.168.8.32	bc:24:11:13:ce:ce	(Unknown)
+192.168.8.44	dc:15:c8:22:c6:b3	AVM Audiovisuelles Marketing und Computersysteme GmbH
+192.168.8.33	70:af:09:e3:38:08	(Unknown)
+192.168.8.25	12:d5:c5:c7:a3:40	(Unknown: locally administered)
+192.168.8.40	24:4c:ab:43:64:69	Espressif Inc.
+192.168.8.61	b0:09:da:32:8e:c4	Ring Solutions
+192.168.8.62	b0:09:da:32:8e:c5	Ring Solutions
+192.168.8.63	54:e0:19:b2:db:50	Ring LLC
+192.168.8.70	78:22:88:6d:2a:6a	(Unknown)
+192.168.8.75	ec:b5:fa:bc:c7:53	Philips Lighting BV
+192.168.8.71	5c:41:5a:76:dc:a0	Amazon.com, LLC
+192.168.8.79	9c:9c:1f:af:7b:3f	Espressif Inc.
+192.168.8.87	34:3e:a4:04:01:2e	Ring LLC
+192.168.8.96	c2:46:44:f3:77:7e	(Unknown: locally administered)
+192.168.8.98	ac:15:a2:ac:12:68	TP-Link Corporation Limited
+192.168.8.105	c8:9e:43:83:96:e3	NETGEAR
+192.168.8.135	dc:a6:32:ba:1f:c4	Raspberry Pi Trading Ltd
+192.168.8.178	74:ec:b2:26:eb:e7	Amazon Technologies Inc.
+192.168.8.88	2a:8c:a6:00:94:dc	(Unknown: locally administered)
+192.168.8.202	bc:24:11:f8:4a:61	(Unknown)
+192.168.8.204	bc:24:11:84:d2:0e	(Unknown)
+192.168.8.39	bc:2a:33:0a:16:52	(Unknown)

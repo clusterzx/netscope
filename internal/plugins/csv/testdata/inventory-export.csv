@@ -1,0 +1,9 @@
+id,name,hostname,ip,ips,mac,macs,vendor,model,type,os,location,owner,state,criticality,online,first_seen,last_seen,tags,notes,cf.seriennummer,cf.garantie_bis,cf.backup
+1,GL-MT6000 Router,console.gl-inet.com,192.168.8.1,192.168.8.1,94:83:c4:1a:2b:3c,94:83:c4:1a:2b:3c,GL Technologies (Hong Kong) Limited,GL-MT6000,router,OpenWrt 23.05,Flur,Tobias,known,critical,true,2026-09-01T10:00:00+02:00,2026-09-22T22:40:00+02:00,infrastruktur;netzwerk,"Hauptrouter, Firmware 4.6",SN-7F3A92,2027-05-31,false
+2,NAS,nas,192.168.8.5,192.168.8.5,00:11:32:ab:cd:ef,00:11:32:ab:cd:ef,Synology Incorporated,DS920+,nas,DSM 7.2,Keller,Tobias,known,high,true,2026-09-01T10:00:05+02:00,2026-09-22T22:40:00+02:00,backup;storage,"RAID 5
+Backups jede Nacht um 02:00",2089QVR123456,2026-12-31,true
+3,,pve1,192.168.8.20,192.168.8.20 10.20.0.1,a8:a1:59:3c:7e:10,a8:a1:59:3c:7e:10 a8:a1:59:3c:7e:11,ASRock Incorporation,,hypervisor,Proxmox VE 8.2.4,Keller,,known,high,true,2026-09-01T10:01:12+02:00,2026-09-22T22:40:00+02:00,infrastruktur,,,,
+4,docker-host,docker-host,192.168.8.30,192.168.8.30 10.20.0.30,bc:24:11:2e:c5:6a,bc:24:11:2e:c5:6a bc:24:11:d0:0b:4e,Proxmox Server Solutions GmbH,,vm,Ubuntu 24.04 LTS,,Tobias,known,normal,true,2026-09-01T10:02:40+02:00,2026-09-22T22:40:00+02:00,docker,,,,
+5,Kamera Garage,,192.168.9.20,192.168.9.20,,,,,camera,,Garage,Tobias,known,normal,false,2026-09-02T08:00:00+02:00,2026-09-22T21:10:00+02:00,,Im Kamera-VLAN,,,
+6,,,192.168.8.188,192.168.8.188,da:a1:19:6e:33:07,da:a1:19:6e:33:07,,,,,,,unknown,normal,true,2026-09-22T20:12:57+02:00,2026-09-22T22:40:00+02:00,,,,,
+7,Drucker alt,,192.168.8.40,192.168.8.40,30:05:5c:8a:19:b2,30:05:5c:8a:19:b2,"Brother Industries, LTD.",HL-L2350DW,printer,,Arbeitszimmer,Tobias,ignored,low,false,2026-09-01T10:04:00+02:00,2026-09-10T18:00:00+02:00,,,E78123K9N654321,,

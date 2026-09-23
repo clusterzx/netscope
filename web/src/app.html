@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light dark" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		<title>NetScope</title>
+		<script>
+			// Apply the stored theme before the first paint (see src/lib/stores/theme.svelte.ts).
+			(function () {
+				var t = 'system';
+				try {
+					t = localStorage.getItem('netscope.theme') || 'system';
+				} catch (e) {}
+				var dark = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+				document.documentElement.classList.toggle('dark', dark);
+			})();
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

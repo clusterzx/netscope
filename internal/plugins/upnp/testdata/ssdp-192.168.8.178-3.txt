@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+Ext: 
+St: urn:schemas-upnp-org:device:MediaRenderer:1
+Cache-control: max-age=1800
+Location: http://192.168.8.178:36762/dev/bb439eec-5188-f343-0000-000038b27980/desc.xml
+Server: Linux/4.4.120 UPnP/1.0 Teleal-Cling/1.0
+Usn: uuid:bb439eec-5188-f343-0000-000038b27980::urn:schemas-upnp-org:device:MediaRenderer:1
+

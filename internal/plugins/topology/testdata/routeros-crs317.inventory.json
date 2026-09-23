@@ -1,0 +1,736 @@
+{
+  "system": {
+    "descr": "RouterOS CRS317-1G-16S+",
+    "objectId": ".1.3.6.1.4.1.14988.1",
+    "enterprise": 14988,
+    "vendor": "MikroTik",
+    "uptimeSeconds": 3113733,
+    "contact": "\u003cprivate\u003e",
+    "name": "\u003cprivate\u003e",
+    "location": "\u003cprivate\u003e"
+  },
+  "interfaces": [
+    {
+      "index": 1,
+      "name": "sfp-sfpplus1",
+      "descr": "sfp-sfpplus1",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:d5",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 2,
+      "name": "sfp-sfpplus2",
+      "descr": "sfp-sfpplus2",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:d6",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 3,
+      "name": "sfp-sfpplus3",
+      "descr": "sfp-sfpplus3",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:d7",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 4,
+      "name": "sfp-sfpplus4",
+      "descr": "sfp-sfpplus4",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:d8",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 5,
+      "name": "sfp-sfpplus5",
+      "descr": "sfp-sfpplus5",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:d9",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 6,
+      "name": "sfp-sfpplus6",
+      "descr": "sfp-sfpplus6",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:da",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 7,
+      "name": "sfp-sfpplus7",
+      "descr": "sfp-sfpplus7",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:db",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 8,
+      "name": "sfp-sfpplus8",
+      "descr": "sfp-sfpplus8",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:dc",
+      "adminStatus": "up",
+      "operStatus": "down"
+    },
+    {
+      "index": 9,
+      "name": "sfp-sfpplus9",
+      "descr": "sfp-sfpplus9",
+      "alias": "esxi2.jason.corp.local",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:dd",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 10,
+      "name": "sfp-sfpplus10",
+      "descr": "sfp-sfpplus10",
+      "alias": "esxi2.jason.corp.local - iSCSI",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:de",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 11,
+      "name": "sfp-sfpplus11",
+      "descr": "sfp-sfpplus11",
+      "alias": "nas.jason.corp.local - iSCSI",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:df",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 12,
+      "name": "sfp-sfpplus12",
+      "descr": "sfp-sfpplus12",
+      "alias": "nas.jason.corp.local - iSCSI",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:e0",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 13,
+      "name": "sfp-sfpplus13",
+      "descr": "sfp-sfpplus13",
+      "alias": "shop-sw.jason.corp.local - SFP+1",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:e1",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 14,
+      "name": "sfp-sfpplus14",
+      "descr": "sfp-sfpplus14",
+      "alias": "shop-sw.jason.corp.local - SFP+2",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:e1",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 15,
+      "name": "sfp-sfpplus15",
+      "descr": "sfp-sfpplus15",
+      "alias": "server-sw.jason.corp.local - SFP+1",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:e3",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 16,
+      "name": "sfp-sfpplus16",
+      "descr": "sfp-sfpplus16",
+      "alias": "server-sw.jason.corp.local - SFP+2",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:e3",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 17,
+      "name": "ether1",
+      "descr": "ether1",
+      "alias": "to port 8 on router.jason.corp.local",
+      "type": 6,
+      "mac": "cc:2d:e0:a3:3d:e5",
+      "speedMbps": 1000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 18,
+      "name": "bridge1",
+      "descr": "bridge1",
+      "type": 209,
+      "mac": "cc:2d:e0:a3:3d:d5",
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 21,
+      "name": "shop-trunk",
+      "descr": "shop-trunk",
+      "type": 161,
+      "mac": "cc:2d:e0:a3:3d:e1",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    },
+    {
+      "index": 22,
+      "name": "server-trunk",
+      "descr": "server-trunk",
+      "type": 161,
+      "mac": "cc:2d:e0:a3:3d:e3",
+      "speedMbps": 10000,
+      "adminStatus": "up",
+      "operStatus": "up"
+    }
+  ],
+  "arp": [
+    {
+      "ifIndex": 18,
+      "ifName": "bridge1",
+      "ip": "10.10.12.1",
+      "mac": "64:d1:54:f2:a4:16"
+    },
+    {
+      "ifIndex": 18,
+      "ifName": "bridge1",
+      "ip": "10.10.12.28",
+      "mac": "00:0c:29:17:b9:65"
+    },
+    {
+      "ifIndex": 18,
+      "ifName": "bridge1",
+      "ip": "10.10.12.70",
+      "mac": "00:50:56:8f:d6:77"
+    }
+  ],
+  "fdb": [
+    {
+      "mac": "00:50:56:8f:32:19",
+      "bridgePort": 9,
+      "ifIndex": 9,
+      "ifName": "sfp-sfpplus9"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:dd",
+      "bridgePort": 9,
+      "ifIndex": 9,
+      "ifName": "sfp-sfpplus9"
+    },
+    {
+      "mac": "00:50:56:6e:8c:20",
+      "bridgePort": 10,
+      "ifIndex": 10,
+      "ifName": "sfp-sfpplus10"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:de",
+      "bridgePort": 10,
+      "ifIndex": 10,
+      "ifName": "sfp-sfpplus10"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:df",
+      "bridgePort": 11,
+      "ifIndex": 11,
+      "ifName": "sfp-sfpplus11"
+    },
+    {
+      "mac": "00:1b:21:98:eb:5c",
+      "bridgePort": 12,
+      "ifIndex": 12,
+      "ifName": "sfp-sfpplus12"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:e0",
+      "bridgePort": 12,
+      "ifIndex": 12,
+      "ifName": "sfp-sfpplus12"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:e5",
+      "bridgePort": 17,
+      "ifIndex": 17,
+      "ifName": "ether1"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:d5",
+      "bridgePort": 18,
+      "ifIndex": 18,
+      "ifName": "bridge1"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:e1",
+      "bridgePort": 21,
+      "ifIndex": 21,
+      "ifName": "shop-trunk"
+    },
+    {
+      "mac": "00:0c:29:17:b9:65",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:0c:29:80:73:de",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:15:fa:fe:48:06",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:17:95:b0:f3:81",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:19:30:d4:a0:25",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:24:01:0f:65:62",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:50:56:16:7e:cc",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:50:56:16:7e:ce",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:50:56:8f:5d:db",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:50:56:8f:74:3c",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:50:56:8f:d6:77",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:50:56:8f:fa:ed",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:50:56:8f:fe:66",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:a0:98:60:85:da",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "00:a0:de:d1:19:c1",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "08:2e:5f:08:c1:70",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "08:f6:9c:5d:34:60",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "0c:9d:92:b2:a5:14",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "10:1f:74:3b:fb:58",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "54:88:0e:87:a2:18",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "64:d1:54:f2:a4:12",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "64:d1:54:f2:a4:16",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "6c:3b:6b:e4:e8:a8",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "6c:3b:6b:e4:e8:c0",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "6c:3b:6b:e4:e8:c1",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "6c:3b:6b:e5:2a:5e",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "a0:2b:b8:6b:4a:07",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "a4:77:33:6e:96:44",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "b4:99:ba:06:7e:d4",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "cc:2d:e0:a3:3d:e3",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    },
+    {
+      "mac": "e4:8d:8c:e1:4e:28",
+      "bridgePort": 22,
+      "ifIndex": 22,
+      "ifName": "server-trunk"
+    }
+  ],
+  "lldp": [
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus13",
+      "localIfIndex": 13,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "00:24:01:0f:65:62",
+      "chassisMac": "00:24:01:0f:65:62",
+      "portIdSubtype": "interfaceName"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus13",
+      "localIfIndex": 13,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:10",
+      "chassisMac": "64:d1:54:f2:a4:10",
+      "portIdSubtype": "interfaceName",
+      "portId": "bridge1/shop-trunk/ether4",
+      "sysName": "router.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.44.2 (stable) RB3011UiAS",
+      "capabilities": [
+        "bridge",
+        "router"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus13",
+      "localIfIndex": 13,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:16",
+      "chassisMac": "64:d1:54:f2:a4:16",
+      "portIdSubtype": "interfaceName",
+      "portId": "Phones",
+      "sysName": "router.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.44.2 (stable) RB3011UiAS",
+      "capabilities": [
+        "bridge",
+        "router"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus13",
+      "localIfIndex": 13,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "e4:8d:8c:e1:4e:28",
+      "chassisMac": "e4:8d:8c:e1:4e:28",
+      "portIdSubtype": "interfaceName",
+      "portId": "bridge",
+      "sysName": "ap.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.43 (stable) RB941-2nD",
+      "capabilities": [
+        "bridge",
+        "wlanAccessPoint",
+        "router"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus14",
+      "localIfIndex": 14,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "00:17:95:b0:f3:81",
+      "chassisMac": "00:17:95:b0:f3:81",
+      "portIdSubtype": "interfaceName",
+      "portId": "SW PORT",
+      "sysName": "SEP001795B0F381.jason.corp.local",
+      "sysDesc": "Cisco IP Phone 7941G,V, SCCP41.9-2-1S",
+      "capabilities": [
+        "bridge",
+        "telephone"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus14",
+      "localIfIndex": 14,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "00:19:30:d4:a0:25",
+      "chassisMac": "00:19:30:d4:a0:25",
+      "portIdSubtype": "interfaceName",
+      "portId": "SW PORT",
+      "sysName": "SEP001930D4A025.jason.corp.local",
+      "sysDesc": "Cisco IP Phone 7941G,V1, SCCP41.9-2-1S",
+      "capabilities": [
+        "bridge",
+        "telephone"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus14",
+      "localIfIndex": 14,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:16",
+      "chassisMac": "64:d1:54:f2:a4:16",
+      "portIdSubtype": "interfaceName",
+      "portId": "Guest",
+      "sysName": "router.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.44.2 (stable) RB3011UiAS",
+      "capabilities": [
+        "bridge",
+        "router"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "00:15:fa:fe:48:06",
+      "chassisMac": "00:15:fa:fe:48:06",
+      "portIdSubtype": "interfaceName",
+      "portId": "Port 1",
+      "sysName": "SEP0015FAFE4806"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:12",
+      "chassisMac": "64:d1:54:f2:a4:12",
+      "portIdSubtype": "interfaceName",
+      "portId": "bridge1/server-trunk/ether6",
+      "sysName": "router.jason.corp.local"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:16",
+      "chassisMac": "64:d1:54:f2:a4:16",
+      "portIdSubtype": "interfaceName",
+      "portId": "Guest",
+      "sysName": "router.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.44.2 (stable) RB3011UiAS",
+      "capabilities": [
+        "bridge",
+        "router"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "6c:3b:6b:e4:e8:a8",
+      "chassisMac": "6c:3b:6b:e4:e8:a8",
+      "portIdSubtype": "interfaceName",
+      "sysName": "server-sw"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "6c:3b:6b:e5:2a:5e",
+      "chassisMac": "6c:3b:6b:e5:2a:5e",
+      "portIdSubtype": "interfaceName",
+      "sysName": "shop-sw"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "cc:2d:e0:a3:3d:e1",
+      "chassisMac": "cc:2d:e0:a3:3d:e1",
+      "portIdSubtype": "interfaceName",
+      "portId": "bridge1/shop-trunk/sfp-sfpplus14",
+      "sysName": "core-sw.jason.corp.local"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "cc:2d:e0:a3:3d:e5",
+      "chassisMac": "cc:2d:e0:a3:3d:e5",
+      "portIdSubtype": "interfaceName",
+      "portId": "bridge1/ether1",
+      "sysName": "core-sw.jason.corp.local"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus15",
+      "localIfIndex": 15,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "e4:8d:8c:e1:4e:28",
+      "chassisMac": "e4:8d:8c:e1:4e:28",
+      "portIdSubtype": "interfaceName",
+      "portId": "bridge",
+      "sysName": "ap.jason.corp.local"
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus16",
+      "localIfIndex": 16,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:12",
+      "chassisMac": "64:d1:54:f2:a4:12",
+      "portIdSubtype": "interfaceName",
+      "portId": "bridge1/server-trunk/ether6",
+      "sysName": "router.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.44.2 (stable) RB3011UiAS",
+      "capabilities": [
+        "bridge",
+        "router"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "sfp-sfpplus16",
+      "localIfIndex": 16,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:16",
+      "chassisMac": "64:d1:54:f2:a4:16",
+      "portIdSubtype": "interfaceName",
+      "portId": "Phones",
+      "sysName": "router.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.44.2 (stable) RB3011UiAS",
+      "capabilities": [
+        "bridge",
+        "router"
+      ]
+    },
+    {
+      "localPortNum": 0,
+      "localPort": "ether1",
+      "localIfIndex": 17,
+      "chassisIdSubtype": "macAddress",
+      "chassisId": "64:d1:54:f2:a4:16",
+      "chassisMac": "64:d1:54:f2:a4:16",
+      "portIdSubtype": "interfaceName",
+      "portId": "Phones",
+      "sysName": "router.jason.corp.local",
+      "sysDesc": "MikroTik RouterOS 6.44.2 (stable) RB3011UiAS",
+      "capabilities": [
+        "bridge",
+        "router"
+      ]
+    }
+  ],
+  "walked": [
+    "system",
+    "interfaces",
+    "arp",
+    "fdb",
+    "lldp"
+  ]
+}

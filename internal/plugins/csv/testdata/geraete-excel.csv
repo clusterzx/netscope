@@ -1,0 +1,6 @@
+MAC-Adresse;IP-Adresse;Anzeigename;Typ;Hersteller;Standort;Besitzer;Tags;Zustand;Kritikalität;Notizen;cf.inventarnummer;Garantie
+00:11:32:AB:CD:EF;192.168.8.5;NAS Keller;NAS;Synology;Keller;Tobias;backup|storage;bekannt;hoch;Größe: 4x8 TB;INV-0042;2027
+B8-27-EB-5D-12-A0;192.168.8.101;OctoPi;Server;Raspberry Pi;Werkstatt;Tobias;3d-druck;bekannt;niedrig;;INV-0043;
+;;Ohne Adresse;Drucker;;Büro;;;;;;;
+zz:zz:zz:zz:zz:zz;192.168.8.41;Laserdrucker;Drucker;Brother;Büro;Anna;;bekannt;normal;Toner je 89,90 €;INV-0044;
+F4:7B:09:12:34:56;;Fernseher;Fernseher;LG;Wohnzimmer;;;vielleicht;wichtig;;;

@@ -1,0 +1,9 @@
+.git
+data
+bin
+.devdata
+web/node_modules
+web/.svelte-kit
+internal/webui/dist
+*.test
+*.exe

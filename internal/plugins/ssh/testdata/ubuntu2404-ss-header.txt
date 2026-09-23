@@ -1,0 +1,13 @@
+Netid State  Recv-Q Send-Q      Local Address:Port  Peer Address:PortProcess                                   
+udp   UNCONN 0      0              127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=135,fd=16))
+udp   UNCONN 0      0           127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=135,fd=14))
+udp   UNCONN 0      0      192.168.8.123%eth0:68         0.0.0.0:*    users:(("systemd-network",pid=115,fd=21))
+udp   UNCONN 0      0               127.0.0.1:18082      0.0.0.0:*    users:(("docker-proxy",pid=7188,fd=8))   
+udp   UNCONN 0      0               127.0.0.1:18083      0.0.0.0:*    users:(("docker-proxy",pid=7206,fd=8))   
+tcp   LISTEN 0      4096           127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=135,fd=17))
+tcp   LISTEN 0      4096        127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=135,fd=15))
+tcp   LISTEN 0      100             127.0.0.1:25         0.0.0.0:*    users:(("master",pid=619,fd=13))         
+tcp   LISTEN 0      4096            127.0.0.1:13003      0.0.0.0:*    users:(("docker-proxy",pid=8564,fd=8))   
+tcp   LISTEN 0      4096            127.0.0.1:18081      0.0.0.0:*    users:(("docker-proxy",pid=7169,fd=8))   
+tcp   LISTEN 0      100                 [::1]:25            [::]:*    users:(("master",pid=619,fd=14))         
+tcp   LISTEN 0      4096                    *:22               *:*    users:(("sshd",pid=1166,fd=3),("systemd",pid=1,fd=47))

@@ -1,0 +1,9 @@
+HTTP/1.1 200 OK
+CACHE-CONTROL: max-age=100
+DATE: Tue, 22 Sep 2026 20:12:04 GMT
+EXT:
+LOCATION: http://192.168.8.98:1900/igd.xml
+SERVER: TPOS/V1.0.0 UPnP/1.0 Archer C80/2.20
+ST: upnp:rootdevice
+USN: uuid:upnp-InternetGatewayDevice-05BC0B05BBC1::upnp:rootdevice
+

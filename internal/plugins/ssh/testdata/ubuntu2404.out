@@ -1,0 +1,864 @@
+
+@@NETSCOPE@@ date -
+1790108554 +0000
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ os_release -
+PRETTY_NAME="Ubuntu 24.04 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ uname -
+Linux 7.0.14-8-pve x86_64 GNU/Linux
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ hostname -
+netscope
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ cpuinfo -
+processor	: 0
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 79
+model name	: Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz
+stepping	: 1
+microcode	: 0xb000040
+cpu MHz		: 1197.242
+cache size	: 40960 KB
+physical id	: 0
+siblings	: 32
+core id		: 8
+cpu cores	: 16
+apicid		: 16
+initial apicid	: 16
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 20
+wp		: yes
+flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts vnmi md_clear flush_l1d
+vmx flags	: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid ple shadow_vmcs pml ept_violation_ve
+bugs		: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit mmio_stale_data spectre_v2_user vmscape
+bogomips	: 5188.07
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 46 bits physical, 48 bits virtual
+power management:
+
+processor	: 1
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 79
+model name	: Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz
+stepping	: 1
+microcode	: 0xb000040
+cpu MHz		: 1197.262
+cache size	: 40960 KB
+physical id	: 0
+siblings	: 32
+core id		: 15
+cpu cores	: 16
+apicid		: 30
+initial apicid	: 30
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 20
+wp		: yes
+flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts vnmi md_clear flush_l1d
+vmx flags	: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid ple shadow_vmcs pml ept_violation_ve
+bugs		: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit mmio_stale_data spectre_v2_user vmscape
+bogomips	: 5188.07
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 46 bits physical, 48 bits virtual
+power management:
+
+processor	: 2
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 79
+model name	: Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz
+stepping	: 1
+microcode	: 0xb000040
+cpu MHz		: 1197.275
+cache size	: 40960 KB
+physical id	: 0
+siblings	: 32
+core id		: 8
+cpu cores	: 16
+apicid		: 17
+initial apicid	: 17
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 20
+wp		: yes
+flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts vnmi md_clear flush_l1d
+vmx flags	: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid ple shadow_vmcs pml ept_violation_ve
+bugs		: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit mmio_stale_data spectre_v2_user vmscape
+bogomips	: 5188.07
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 46 bits physical, 48 bits virtual
+power management:
+
+processor	: 3
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 79
+model name	: Intel(R) Xeon(R) CPU E5-2697A v4 @ 2.60GHz
+stepping	: 1
+microcode	: 0xb000040
+cpu MHz		: 1197.219
+cache size	: 40960 KB
+physical id	: 0
+siblings	: 32
+core id		: 15
+cpu cores	: 16
+apicid		: 31
+initial apicid	: 31
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 20
+wp		: yes
+flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts vnmi md_clear flush_l1d
+vmx flags	: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid ple shadow_vmcs pml ept_violation_ve
+bugs		: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit mmio_stale_data spectre_v2_user vmscape
+bogomips	: 5188.07
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 46 bits physical, 48 bits virtual
+power management:
+
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ nproc -
+4
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ meminfo -
+MemTotal:        2097152 kB
+MemFree:          893096 kB
+MemAvailable:    1923125 kB
+Buffers:               0 kB
+Cached:           959908 kB
+SwapCached:            0 kB
+Active:           259476 kB
+Inactive:         852116 kB
+Active(anon):      93696 kB
+Inactive(anon):    58328 kB
+Active(file):     165780 kB
+Inactive(file):   793788 kB
+Unevictable:           0 kB
+Mlocked:           22280 kB
+SwapTotal:        524288 kB
+SwapFree:         524280 kB
+Zswap:                0 kB
+Zswapped:              0 kB
+Dirty:                 0 kB
+Writeback:             0 kB
+AnonPages:        151772 kB
+Mapped:                0 kB
+Shmem:               252 kB
+KReclaimable:     891548 kB
+Slab:              75498 kB
+SReclaimable:      70461 kB
+SUnreclaim:         5036 kB
+KernelStack:       37840 kB
+PageTables:        92936 kB
+SecPageTables:      1072 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:    74274472 kB
+Committed_AS:   51523056 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:      990496 kB
+VmallocChunk:          0 kB
+Percpu:            58752 kB
+HardwareCorrupted:    56 kB
+AnonHugePages:         0 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:     47104 kB
+FilePmdMapped:         0 kB
+CmaTotal:              0 kB
+CmaFree:         9340928 kB
+Unaccepted:            0 kB
+Balloon:               0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+DirectMap4k:     1926672 kB
+DirectMap2M:    21016576 kB
+DirectMap1G:    113246208 kB
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ uptime -
+4303.37 4303.37
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ df -
+Filesystem                       Type     1024-blocks    Used Available Capacity Mounted on
+/dev/mapper/pve-vm--105--disk--0 ext4        15375304 1893172  12679316      13% /
+none                             tmpfs            492       4       488       1% /dev
+efivarfs                         efivarfs         256      81       171      32% /sys/firmware/efi/efivars
+tmpfs                            tmpfs       65885868       0  65885868       0% /dev/shm
+tmpfs                            tmpfs       26354348     248  26354100       1% /run
+tmpfs                            tmpfs           5120       0      5120       0% /run/lock
+tmpfs                            tmpfs       13177172       8  13177164       1% /run/user/0
+overlay                          overlay     15375304 1893176  12679312      13% /var/lib/docker/rootfs/overlayfs/6431e200eb73c56520ae8704ced9bf41b117af37778fa4a5fabde0cb5209f67a
+overlay                          overlay     15375304 1893176  12679312      13% /var/lib/containerd/tmpmounts/containerd-mount4287139537
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ lsblk -
+{
+   "blockdevices": [
+      {
+         "name": "loop0",
+         "type": "loop",
+         "size": 246960619520,
+         "model": null,
+         "serial": null,
+         "rota": false,
+         "tran": null,
+         "fstype": null,
+         "mountpoint": null
+      },{
+         "name": "sda",
+         "type": "disk",
+         "size": 250059350016,
+         "model": "Crucial_CT250MX2",
+         "serial": null,
+         "rota": false,
+         "tran": "sata",
+         "fstype": null,
+         "mountpoint": null,
+         "children": [
+            {
+               "name": "sda1",
+               "type": "part",
+               "size": 250049724416,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": null,
+               "fstype": null,
+               "mountpoint": null
+            },{
+               "name": "sda9",
+               "type": "part",
+               "size": 8388608,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": null,
+               "fstype": null,
+               "mountpoint": null
+            }
+         ]
+      },{
+         "name": "sdb",
+         "type": "disk",
+         "size": 256060514304,
+         "model": "Intenso SSD Sata",
+         "serial": null,
+         "rota": false,
+         "tran": "sata",
+         "fstype": null,
+         "mountpoint": null,
+         "children": [
+            {
+               "name": "sdb1",
+               "type": "part",
+               "size": 256059448832,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": null,
+               "fstype": null,
+               "mountpoint": null
+            }
+         ]
+      },{
+         "name": "sdc",
+         "type": "disk",
+         "size": 0,
+         "model": "Virtual HDisk0  ",
+         "serial": null,
+         "rota": false,
+         "tran": "usb",
+         "fstype": null,
+         "mountpoint": null
+      },{
+         "name": "sr0",
+         "type": "rom",
+         "size": 1073741312,
+         "model": "Virtual CDROM0  ",
+         "serial": null,
+         "rota": false,
+         "tran": "usb",
+         "fstype": null,
+         "mountpoint": null
+      },{
+         "name": "zd0",
+         "type": "disk",
+         "size": 128849018880,
+         "model": null,
+         "serial": null,
+         "rota": false,
+         "tran": null,
+         "fstype": null,
+         "mountpoint": null,
+         "children": [
+            {
+               "name": "zd0p1",
+               "type": "part",
+               "size": 1048576,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": null,
+               "fstype": null,
+               "mountpoint": null
+            },{
+               "name": "zd0p2",
+               "type": "part",
+               "size": 2147483648,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": null,
+               "fstype": null,
+               "mountpoint": null
+            },{
+               "name": "zd0p3",
+               "type": "part",
+               "size": 126698389504,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": null,
+               "fstype": null,
+               "mountpoint": null
+            }
+         ]
+      },{
+         "name": "nvme0n1",
+         "type": "disk",
+         "size": 500107862016,
+         "model": "SanDisk Extreme Pro 500GB               ",
+         "serial": "190456800335        ",
+         "rota": false,
+         "tran": "nvme",
+         "fstype": null,
+         "mountpoint": null,
+         "children": [
+            {
+               "name": "nvme0n1p1",
+               "type": "part",
+               "size": 1031168,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": "nvme",
+               "fstype": null,
+               "mountpoint": null
+            },{
+               "name": "nvme0n1p2",
+               "type": "part",
+               "size": 1073741824,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": "nvme",
+               "fstype": null,
+               "mountpoint": null
+            },{
+               "name": "nvme0n1p3",
+               "type": "part",
+               "size": 498215158272,
+               "model": null,
+               "serial": null,
+               "rota": false,
+               "tran": "nvme",
+               "fstype": null,
+               "mountpoint": null
+            }
+         ]
+      }
+   ]
+}
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ ip_addr ip
+[{"ifindex":1,"ifname":"lo","flags":["LOOPBACK","UP","LOWER_UP"],"mtu":65536,"qdisc":"noqueue","operstate":"UNKNOWN","group":"default","txqlen":1000,"link_type":"loopback","address":"00:00:00:00:00:00","broadcast":"00:00:00:00:00:00","addr_info":[{"family":"inet","local":"127.0.0.1","prefixlen":8,"scope":"host","label":"lo","valid_life_time":4294967295,"preferred_life_time":4294967295},{"family":"inet6","local":"::1","prefixlen":128,"scope":"host","noprefixroute":true,"valid_life_time":4294967295,"preferred_life_time":4294967295}]},{"ifindex":2,"link_index":26,"ifname":"eth0","flags":["BROADCAST","MULTICAST","UP","LOWER_UP"],"mtu":1500,"qdisc":"noqueue","operstate":"UP","group":"default","txqlen":1000,"link_type":"ether","address":"bc:24:11:27:22:b5","broadcast":"ff:ff:ff:ff:ff:ff","link_netnsid":0,"addr_info":[{"family":"inet","local":"192.168.8.123","prefixlen":24,"metric":1024,"broadcast":"192.168.8.255","scope":"global","dynamic":true,"label":"eth0","valid_life_time":48,"preferred_life_time":48},{"family":"inet6","local":"fe80::be24:11ff:fe27:22b5","prefixlen":64,"scope":"link","valid_life_time":4294967295,"preferred_life_time":4294967295}]},{"ifindex":3,"ifname":"docker0","flags":["BROADCAST","MULTICAST","UP","LOWER_UP"],"mtu":1500,"qdisc":"noqueue","operstate":"UP","group":"default","link_type":"ether","address":"7e:3f:ab:f0:4d:80","broadcast":"ff:ff:ff:ff:ff:ff","addr_info":[{"family":"inet","local":"172.17.0.1","prefixlen":16,"broadcast":"172.17.255.255","scope":"global","label":"docker0","valid_life_time":4294967295,"preferred_life_time":4294967295},{"family":"inet6","local":"fe80::7c3f:abff:fef0:4d80","prefixlen":64,"scope":"link","valid_life_time":4294967295,"preferred_life_time":4294967295}]},{"ifindex":34,"ifname":"br-d4fe203ea715","flags":["NO-CARRIER","BROADCAST","MULTICAST","UP"],"mtu":1500,"qdisc":"noqueue","operstate":"DOWN","group":"default","link_type":"ether","address":"a2:dd:db:2b:ed:70","broadcast":"ff:ff:ff:ff:ff:ff","addr_info":[{"family":"inet","local":"172.18.0.1","prefixlen":16,"broadcast":"172.18.255.255","scope":"global","label":"br-d4fe203ea715","valid_life_time":4294967295,"preferred_life_time":4294967295},{"family":"inet6","local":"fe80::a0dd:dbff:fe2b:ed70","prefixlen":64,"scope":"link","valid_life_time":4294967295,"preferred_life_time":4294967295}]},{"ifindex":39,"link_index":2,"ifname":"veth9ba14f9","flags":["BROADCAST","MULTICAST","UP","LOWER_UP"],"mtu":1500,"qdisc":"noqueue","master":"docker0","operstate":"UP","group":"default","link_type":"ether","address":"96:a8:8b:27:6b:0e","broadcast":"ff:ff:ff:ff:ff:ff","link_netnsid":2,"addr_info":[{"family":"inet6","local":"fe80::94a8:8bff:fe27:6b0e","prefixlen":64,"scope":"link","valid_life_time":4294967295,"preferred_life_time":4294967295}]}]
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ pkg_dpkg -
+adduser	3.137ubuntu1	all	ii 
+apparmor	4.0.0-beta3-0ubuntu3	amd64	ii 
+apt	2.7.14build2	amd64	ii 
+apt-utils	2.7.14build2	amd64	ii 
+base-files	13ubuntu10	amd64	ii 
+base-passwd	3.6.3build1	amd64	ii 
+bash	5.2.21-2ubuntu4	amd64	ii 
+bash-completion	1:2.11-8	all	ii 
+bind9-dnsutils	1:9.18.24-0ubuntu5	amd64	ii 
+bind9-host	1:9.18.24-0ubuntu5	amd64	ii 
+bind9-libs	1:9.18.24-0ubuntu5	amd64	ii 
+bsdextrautils	2.39.3-9ubuntu6	amd64	ii 
+bsdutils	1:2.39.3-9ubuntu6	amd64	ii 
+busybox-static	1:1.36.1-6ubuntu3	amd64	ii 
+ca-certificates	20260601~24.04.1	all	ii 
+command-not-found	23.04.0	all	ii 
+console-setup	1.226ubuntu1	all	ii 
+console-setup-linux	1.226ubuntu1	all	ii 
+containerd.io	2.3.5-1~ubuntu.24.04~noble	amd64	ii 
+coreutils	9.4-3ubuntu6	amd64	ii 
+cpio	2.15+dfsg-1ubuntu2	amd64	ii 
+cron	3.0pl1-184ubuntu2	amd64	ii 
+cron-daemon-common	3.0pl1-184ubuntu2	all	ii 
+curl	8.5.0-2ubuntu10.13	amd64	ii 
+dash	0.5.12-6ubuntu5	amd64	ii 
+dbus	1.14.10-4ubuntu4	amd64	ii 
+dbus-bin	1.14.10-4ubuntu4	amd64	ii 
+dbus-daemon	1.14.10-4ubuntu4	amd64	ii 
+dbus-session-bus-common	1.14.10-4ubuntu4	all	ii 
+dbus-system-bus-common	1.14.10-4ubuntu4	all	ii 
+dbus-user-session	1.14.10-4ubuntu4	amd64	ii 
+debconf	1.5.86ubuntu1	all	ii 
+debconf-i18n	1.5.86ubuntu1	all	ii 
+debianutils	5.17build1	amd64	ii 
+dhcpcd-base	1:10.0.6-1ubuntu3	amd64	ii 
+diffutils	1:3.10-1build1	amd64	ii 
+distro-info	1.7build1	amd64	ii 
+distro-info-data	0.60ubuntu0.1	all	ii 
+dmidecode	3.5-3build1	amd64	ii 
+dmsetup	2:1.02.185-3ubuntu3	amd64	ii 
+docker-buildx-plugin	0.37.1-1~ubuntu.24.04~noble	amd64	ii 
+docker-ce	5:29.8.1-1~ubuntu.24.04~noble	amd64	ii 
+docker-ce-cli	5:29.8.1-1~ubuntu.24.04~noble	amd64	ii 
+docker-ce-rootless-extras	5:29.8.1-1~ubuntu.24.04~noble	amd64	ii 
+docker-compose-plugin	5.5.1-1~ubuntu.24.04~noble	amd64	ii 
+dosfstools	4.2-1.1build1	amd64	ii 
+dpkg	1.22.6ubuntu6	amd64	ii 
+e2fsprogs	1.47.0-2.4~exp1ubuntu4	amd64	ii 
+ed	1.20.1-1	amd64	ii 
+eject	2.39.3-9ubuntu6	amd64	ii 
+ethtool	1:6.7-1build1	amd64	ii 
+file	1:5.45-3build1	amd64	ii 
+findutils	4.9.0-5build1	amd64	ii 
+friendly-recovery	0.2.42	all	ii 
+ftp	20230507-2build3	all	ii 
+fuse3	3.14.0-5build1	amd64	ii 
+gcc-14-base	14-20240412-0ubuntu1	amd64	ii 
+gettext-base	0.21-14ubuntu2	amd64	ii 
+gir1.2-girepository-2.0	1.80.1-1	amd64	ii 
+gir1.2-glib-2.0	2.80.0-6ubuntu1	amd64	ii 
+git	1:2.43.0-1ubuntu7.3	amd64	ii 
+git-man	1:2.43.0-1ubuntu7.3	all	ii 
+gpgv	2.4.4-2ubuntu17	amd64	ii 
+grep	3.11-4build1	amd64	ii 
+groff-base	1.23.0-3build2	amd64	ii 
+gzip	1.12-1ubuntu3	amd64	ii 
+hdparm	9.65+ds-1build1	amd64	ii 
+hostname	3.23+nmu2ubuntu2	amd64	ii 
+ibverbs-providers	50.0-2build2	amd64	ii 
+inetutils-telnet	2:2.5-3ubuntu4	amd64	ii 
+info	7.1-3build2	amd64	ii 
+init	1.66ubuntu1	amd64	ii 
+init-system-helpers	1.66ubuntu1	all	ii 
+install-info	7.1-3build2	amd64	ii 
+iproute2	6.1.0-1ubuntu6	amd64	ii 
+iptables	1.8.10-3ubuntu2	amd64	ii 
+iputils-ping	3:20240117-1build1	amd64	ii 
+iputils-tracepath	3:20240117-1build1	amd64	ii 
+isc-dhcp-client	4.4.3-P1-4ubuntu2	amd64	ii 
+iso-codes	4.16.0-1	all	ii 
+jq	1.7.1-3ubuntu0.24.04.2	amd64	ii 
+kbd	2.6.4-2ubuntu2	amd64	ii 
+keyboard-configuration	1.226ubuntu1	all	ii 
+kmod	31+20240202-2ubuntu7	amd64	ii 
+krb5-locales	1.20.1-6ubuntu2	all	ii 
+less	590-2ubuntu2.1	amd64	ii 
+libacl1	2.3.2-1build1	amd64	ii 
+libapparmor1	4.0.0-beta3-0ubuntu3	amd64	ii 
+libapt-pkg6.0t64	2.7.14build2	amd64	ii 
+libargon2-1	0~20190702+dfsg-4build1	amd64	ii 
+libassuan0	2.5.6-1build1	amd64	ii 
+libatm1t64	1:2.5.1-5.1build1	amd64	ii 
+libattr1	1:2.5.2-1build1	amd64	ii 
+libaudit-common	1:3.1.2-2.1build1	all	ii 
+libaudit1	1:3.1.2-2.1build1	amd64	ii 
+libblkid1	2.39.3-9ubuntu6	amd64	ii 
+libbpf1	1:1.3.0-2build2	amd64	ii 
+libbrotli1	1.1.0-2build2	amd64	ii 
+libbsd0	0.12.1-1build1	amd64	ii 
+libbz2-1.0	1.0.8-5.1	amd64	ii 
+libc-bin	2.39-0ubuntu8.1	amd64	ii 
+libc6	2.39-0ubuntu8.1	amd64	ii 
+libcap-ng0	0.8.4-2build2	amd64	ii 
+libcap2	1:2.66-5ubuntu2	amd64	ii 
+libcap2-bin	1:2.66-5ubuntu2	amd64	ii 
+libcbor0.10	0.10.2-1.2ubuntu2	amd64	ii 
+libcom-err2	1.47.0-2.4~exp1ubuntu4	amd64	ii 
+libcrypt1	1:4.4.36-4build1	amd64	ii 
+libcryptsetup12	2:2.7.0-1ubuntu4	amd64	ii 
+libcurl3t64-gnutls	8.5.0-2ubuntu10.13	amd64	ii 
+libcurl4t64	8.5.0-2ubuntu10.13	amd64	ii 
+libdb5.3t64	5.3.28+dfsg2-7	amd64	ii 
+libdbus-1-3	1.14.10-4ubuntu4	amd64	ii 
+libdebconfclient0	0.271ubuntu3	amd64	ii 
+libdevmapper1.02.1	2:1.02.185-3ubuntu3	amd64	ii 
+libedit2	3.1-20230828-1build1	amd64	ii 
+libelf1t64	0.190-1.1build4	amd64	ii 
+liberror-perl	0.17029-2	all	ii 
+libestr0	0.1.11-1build1	amd64	ii 
+libevdev2	1.13.1+dfsg-1build1	amd64	ii 
+libexpat1	2.6.1-2build1	amd64	ii 
+libext2fs2t64	1.47.0-2.4~exp1ubuntu4	amd64	ii 
+libfastjson4	1.2304.0-1build1	amd64	ii 
+libfdisk1	2.39.3-9ubuntu6	amd64	ii 
+libffi8	3.4.6-1build1	amd64	ii 
+libfido2-1	1.14.0-1build3	amd64	ii 
+libfribidi0	1.0.13-3build1	amd64	ii 
+libfuse3-3	3.14.0-5build1	amd64	ii 
+libgcc-s1	14-20240412-0ubuntu1	amd64	ii 
+libgcrypt20	1.10.3-2build1	amd64	ii 
+libgdbm-compat4t64	1.23-5.1build1	amd64	ii 
+libgdbm6t64	1.23-5.1build1	amd64	ii 
+libgirepository-1.0-1	1.80.1-1	amd64	ii 
+libglib2.0-0t64	2.80.0-6ubuntu1	amd64	ii 
+libglib2.0-data	2.80.0-6ubuntu1	all	ii 
+libgmp10	2:6.3.0+dfsg-2ubuntu6	amd64	ii 
+libgnutls30t64	3.8.3-1.1ubuntu3.1	amd64	ii 
+libgpg-error0	1.47-3build2	amd64	ii 
+libgpm2	1.20.7-11	amd64	ii 
+libgssapi-krb5-2	1.20.1-6ubuntu2	amd64	ii 
+libhogweed6t64	3.9.1-2.2build1	amd64	ii 
+libibverbs1	50.0-2build2	amd64	ii 
+libicu74	74.2-1ubuntu3	amd64	ii 
+libidn2-0	2.3.7-2build1	amd64	ii 
+libip4tc2	1.8.10-3ubuntu2	amd64	ii 
+libip6tc2	1.8.10-3ubuntu2	amd64	ii 
+libjansson4	2.14-2build2	amd64	ii 
+libjq1	1.7.1-3ubuntu0.24.04.2	amd64	ii 
+libjson-c5	0.17-1build1	amd64	ii 
+libk5crypto3	1.20.1-6ubuntu2	amd64	ii 
+libkeyutils1	1.6.3-3build1	amd64	ii 
+libkmod2	31+20240202-2ubuntu7	amd64	ii 
+libkrb5-3	1.20.1-6ubuntu2	amd64	ii 
+libkrb5support0	1.20.1-6ubuntu2	amd64	ii 
+libldap-common	2.6.10+dfsg-0ubuntu0.24.04.1	all	ii 
+libldap2	2.6.10+dfsg-0ubuntu0.24.04.1	amd64	ii 
+liblmdb0	0.9.31-1build1	amd64	ii 
+liblocale-gettext-perl	1.07-6ubuntu5	amd64	ii 
+liblz4-1	1.9.4-1build1	amd64	ii 
+liblzma5	5.6.1+really5.4.5-1	amd64	ii 
+libmagic-mgc	1:5.45-3build1	amd64	ii 
+libmagic1t64	1:5.45-3build1	amd64	ii 
+libmaxminddb0	1.9.1-1build1	amd64	ii 
+libmd0	1.1.0-2build1	amd64	ii 
+libmnl0	1.0.5-2build1	amd64	ii 
+libmount1	2.39.3-9ubuntu6	amd64	ii 
+libncurses6	6.4+20240113-1ubuntu2	amd64	ii 
+libncursesw6	6.4+20240113-1ubuntu2	amd64	ii 
+libnetfilter-conntrack3	1.0.9-6build1	amd64	ii 
+libnetplan1	1.0-2ubuntu1	amd64	ii 
+libnettle8t64	3.9.1-2.2build1	amd64	ii 
+libnewt0.52	0.52.24-2ubuntu2	amd64	ii 
+libnfnetlink0	1.0.2-2build1	amd64	ii 
+libnftables1	1.0.9-1build1	amd64	ii 
+libnftnl11	1.2.6-2build1	amd64	ii 
+libnghttp2-14	1.59.0-1build4	amd64	ii 
+libnl-3-200	3.7.0-0.3build1	amd64	ii 
+libnl-route-3-200	3.7.0-0.3build1	amd64	ii 
+libnpth0t64	1.6-3.1build1	amd64	ii 
+libnsl2	1.3.0-3build3	amd64	ii 
+libnss-systemd	255.4-1ubuntu8	amd64	ii 
+libntfs-3g89t64	1:2022.10.3-1.2ubuntu3	amd64	ii 
+libnuma1	2.0.18-1build1	amd64	ii 
+libonig5	6.9.9-1build1	amd64	ii 
+libp11-kit0	0.25.3-4ubuntu2	amd64	ii 
+libpam-cap	1:2.66-5ubuntu2	amd64	ii 
+libpam-modules	1.5.3-5ubuntu5	amd64	ii 
+libpam-modules-bin	1.5.3-5ubuntu5	amd64	ii 
+libpam-runtime	1.5.3-5ubuntu5	all	ii 
+libpam-systemd	255.4-1ubuntu8	amd64	ii 
+libpam0g	1.5.3-5ubuntu5	amd64	ii 
+libparted2t64	3.6-4build1	amd64	ii 
+libpcap0.8t64	1.10.4-4.1ubuntu3	amd64	ii 
+libpci3	1:3.10.0-2build1	amd64	ii 
+libpcre2-8-0	10.42-4ubuntu2	amd64	ii 
+libperl5.38t64	5.38.2-3.2ubuntu0.6	amd64	ii 
+libpipeline1	1.5.7-2	amd64	ii 
+libpng16-16t64	1.6.43-5build1	amd64	ii 
+libpopt0	1.19+dfsg-1build1	amd64	ii 
+libproc2-0	2:4.0.4-4ubuntu3	amd64	ii 
+libpsl5t64	0.21.2-1.1build1	amd64	ii 
+libpython3-stdlib	3.12.3-0ubuntu1	amd64	ii 
+libpython3.12-minimal	3.12.3-1	amd64	ii 
+libpython3.12-stdlib	3.12.3-1	amd64	ii 
+libreadline8t64	8.2-4build1	amd64	ii 
+librtmp1	2.4+20151223.gitfa8646d.1-2build7	amd64	ii 
+libsasl2-2	2.1.28+dfsg1-5ubuntu3	amd64	ii 
+libsasl2-modules-db	2.1.28+dfsg1-5ubuntu3	amd64	ii 
+libseccomp2	2.5.5-1ubuntu3	amd64	ii 
+libselinux1	3.5-2ubuntu2	amd64	ii 
+libsemanage-common	3.5-1build5	all	ii 
+libsemanage2	3.5-1build5	amd64	ii 
+libsensors-config	1:3.6.0-9build1	all	ii 
+libsensors5	1:3.6.0-9build1	amd64	ii 
+libsepol2	3.5-2build1	amd64	ii 
+libslang2	2.3.3-3build2	amd64	ii 
+libsmartcols1	2.39.3-9ubuntu6	amd64	ii 
+libsqlite3-0	3.45.1-1ubuntu2	amd64	ii 
+libss2	1.47.0-2.4~exp1ubuntu4	amd64	ii 
+libssh-4	0.10.6-2ubuntu0.5	amd64	ii 
+libssl3t64	3.0.13-0ubuntu3	amd64	ii 
+libstdc++6	14-20240412-0ubuntu1	amd64	ii 
+libsystemd-shared	255.4-1ubuntu8	amd64	ii 
+libsystemd0	255.4-1ubuntu8	amd64	ii 
+libtasn1-6	4.19.0-3build1	amd64	ii 
+libtext-charwidth-perl	0.04-11build3	amd64	ii 
+libtext-iconv-perl	1.7-8build3	amd64	ii 
+libtext-wrapi18n-perl	0.06-10	all	ii 
+libtinfo6	6.4+20240113-1ubuntu2	amd64	ii 
+libtirpc-common	1.3.4+ds-1.1build1	all	ii 
+libtirpc3t64	1.3.4+ds-1.1build1	amd64	ii 
+libtraceevent1	1:1.8.2-1ubuntu2	amd64	ii 
+libtraceevent1-plugin	1:1.8.2-1ubuntu2	amd64	ii 
+libtracefs1	1.8.0-1ubuntu1	amd64	ii 
+libuchardet0	0.0.8-1build1	amd64	ii 
+libudev1	255.4-1ubuntu8	amd64	ii 
+libunistring5	1.1-2build1	amd64	ii 
+libunwind8	1.6.2-3build1	amd64	ii 
+libusb-1.0-0	2:1.0.27-1	amd64	ii 
+libuuid1	2.39.3-9ubuntu6	amd64	ii 
+libuv1t64	1.48.0-1.1build1	amd64	ii 
+libwrap0	7.6.q-33	amd64	ii 
+libx11-6	2:1.8.7-1build1	amd64	ii 
+libx11-data	2:1.8.7-1build1	all	ii 
+libxau6	1:1.0.9-1build6	amd64	ii 
+libxcb1	1.15-1ubuntu2	amd64	ii 
+libxdmcp6	1:1.1.3-0ubuntu6	amd64	ii 
+libxext6	2:1.3.4-1build2	amd64	ii 
+libxkbcommon0	1.6.0-1build1	amd64	ii 
+libxml2	2.9.14+dfsg-1.3ubuntu3	amd64	ii 
+libxmuu1	2:1.1.3-3build2	amd64	ii 
+libxtables12	1.8.10-3ubuntu2	amd64	ii 
+libxxhash0	0.8.2-2build1	amd64	ii 
+libyaml-0-2	0.2.5-1build1	amd64	ii 
+libzstd1	1.5.5+dfsg2-2build1	amd64	ii 
+locales	2.39-0ubuntu8.1	all	ii 
+login	1:4.13+dfsg1-4ubuntu3	amd64	ii 
+logrotate	3.21.0-2build1	amd64	ii 
+logsave	1.47.0-2.4~exp1ubuntu4	amd64	ii 
+lsb-release	12.0-2	all	ii 
+lshw	02.19.git.2021.06.19.996aaad9c7-2build3	amd64	ii 
+lsof	4.95.0-1build3	amd64	ii 
+make	4.3-4.1build2	amd64	ii 
+man-db	2.12.0-4build2	amd64	ii 
+manpages	6.7-2	all	ii 
+mawk	1.3.4.20240123-1build1	amd64	ii 
+media-types	10.1.0	all	ii 
+mount	2.39.3-9ubuntu6	amd64	ii 
+mtr-tiny	0.95-1.1build2	amd64	ii 
+nano	7.2-2build1	amd64	ii 
+ncurses-base	6.4+20240113-1ubuntu2	all	ii 
+ncurses-bin	6.4+20240113-1ubuntu2	amd64	ii 
+netbase	6.4	all	ii 
+netcat-openbsd	1.226-1ubuntu2	amd64	ii 
+netplan-generator	1.0-2ubuntu1	amd64	ii 
+netplan.io	1.0-2ubuntu1	amd64	ii 
+networkd-dispatcher	2.2.4-1	all	ii 
+nftables	1.0.9-1build1	amd64	ii 
+ntfs-3g	1:2022.10.3-1.2ubuntu3	amd64	ii 
+numactl	2.0.18-1build1	amd64	ii 
+openssh-client	1:9.6p1-3ubuntu13	amd64	ii 
+openssh-server	1:9.6p1-3ubuntu13	amd64	ii 
+openssh-sftp-server	1:9.6p1-3ubuntu13	amd64	ii 
+openssl	3.0.13-0ubuntu3	amd64	ii 
+parted	3.6-4build1	amd64	ii 
+passwd	1:4.13+dfsg1-4ubuntu3	amd64	ii 
+patch	2.7.6-7build3	amd64	ii 
+pci.ids	0.0~2024.03.31-1	all	ii 
+pciutils	1:3.10.0-2build1	amd64	ii 
+perl	5.38.2-3.2ubuntu0.6	amd64	ii 
+perl-base	5.38.2-3.2ubuntu0.6	amd64	ii 
+perl-modules-5.38	5.38.2-3.2ubuntu0.6	all	ii 
+pigz	2.8-1	amd64	ii 
+postfix	3.8.6-1build2	amd64	ii 
+procps	2:4.0.4-4ubuntu3	amd64	ii 
+psmisc	23.7-1build1	amd64	ii 
+publicsuffix	20231001.0357-0.1	all	ii 
+python-apt-common	2.7.7ubuntu1	all	ii 
+python3	3.12.3-0ubuntu1	amd64	ii 
+python3-apt	2.7.7ubuntu1	amd64	ii 
+python3-cffi-backend	1.16.0-2build1	amd64	ii 
+python3-commandnotfound	23.04.0	all	ii 
+python3-dbus	1.3.2-5build3	amd64	ii 
+python3-distro-info	1.7build1	all	ii 
+python3-distupgrade	1:24.04.16	all	ii 
+python3-gdbm	3.12.3-0ubuntu1	amd64	ii 
+python3-gi	3.48.2-1	amd64	ii 
+python3-markdown-it	3.0.0-2	all	ii 
+python3-mdurl	0.1.2-1	all	ii 
+python3-minimal	3.12.3-0ubuntu1	amd64	ii 
+python3-netifaces	0.11.0-2build3	amd64	ii 
+python3-netplan	1.0-2ubuntu1	amd64	ii 
+python3-pkg-resources	68.1.2-2ubuntu1	all	ii 
+python3-pygments	2.17.2+dfsg-1	all	ii 
+python3-rich	13.7.1-1	all	ii 
+python3-update-manager	1:24.04.6	all	ii 
+python3-yaml	6.0.1-2build2	amd64	ii 
+python3.12	3.12.3-1	amd64	ii 
+python3.12-minimal	3.12.3-1	amd64	ii 
+readline-common	8.2-4build1	all	ii 
+rsync	3.2.7-1ubuntu1	amd64	ii 
+rsyslog	8.2312.0-3ubuntu9	amd64	ii 
+sed	4.9-2build1	amd64	ii 
+sensible-utils	0.0.22	all	ii 
+shared-mime-info	2.4-4	amd64	ii 
+ssh	1:9.6p1-3ubuntu13	all	ii 
+ssl-cert	1.1.2ubuntu1	all	ii 
+strace	6.8-0ubuntu2	amd64	ii 
+sudo	1.9.15p5-3ubuntu5	amd64	ii 
+sysstat	12.6.1-2	amd64	ii 
+systemd	255.4-1ubuntu8	amd64	ii 
+systemd-dev	255.4-1ubuntu8	all	ii 
+systemd-hwe-hwdb	255.1.3	all	ii 
+systemd-resolved	255.4-1ubuntu8	amd64	ii 
+systemd-sysv	255.4-1ubuntu8	amd64	ii 
+systemd-timesyncd	255.4-1ubuntu8	amd64	ii 
+sysvinit-utils	3.08-6ubuntu3	amd64	ii 
+tar	1.35+dfsg-3build1	amd64	ii 
+tcpdump	4.99.4-3ubuntu4	amd64	ii 
+time	1.9-0.2build1	amd64	ii 
+tnftp	20230507-2build3	amd64	ii 
+trace-cmd	3.2-1ubuntu2	amd64	ii 
+tzdata	2024a-2ubuntu1	all	ii 
+ubuntu-keyring	2023.11.28.1	all	ii 
+ubuntu-minimal	1.539	amd64	ii 
+ubuntu-pro-client	31.2.3	amd64	ii 
+ubuntu-pro-client-l10n	31.2.3	amd64	ii 
+ubuntu-release-upgrader-core	1:24.04.16	all	ii 
+ubuntu-standard	1.539	amd64	ii 
+ucf	3.0043+nmu1	all	ii 
+udev	255.4-1ubuntu8	amd64	ii 
+ufw	0.36.2-6	all	ii 
+update-manager-core	1:24.04.6	all	ii 
+usb.ids	2024.03.18-1	all	ii 
+usbutils	1:017-3build1	amd64	ii 
+util-linux	2.39.3-9ubuntu6	amd64	ii 
+uuid-runtime	2.39.3-9ubuntu6	amd64	ii 
+vim-common	2:9.1.0016-1ubuntu7	all	ii 
+vim-tiny	2:9.1.0016-1ubuntu7	amd64	ii 
+wget	1.21.4-1ubuntu4	amd64	ii 
+whiptail	0.52.24-2ubuntu2	amd64	ii 
+xauth	1:1.1.2-1build1	amd64	ii 
+xdg-user-dirs	0.18-1build1	amd64	ii 
+xkb-data	2.41-2ubuntu1	all	ii 
+xxd	2:9.1.0016-1ubuntu7	amd64	ii 
+xz-utils	5.6.1+really5.4.5-1	amd64	ii 
+zlib1g	1:1.3.dfsg-3.1ubuntu2	amd64	ii 
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ pkg_rpm -
+
+@@NETSCOPE@@ = -
+
+@@NETSCOPE@@ pkg_apk -
+
+@@NETSCOPE@@ = -
+
+@@NETSCOPE@@ last_dpkg -
+1790104516
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ last_apt -
+Start-Date: 2026-09-22  19:15:14
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ last_rpm -
+
+@@NETSCOPE@@ = -
+
+@@NETSCOPE@@ last_apk -
+
+@@NETSCOPE@@ = -
+
+@@NETSCOPE@@ services -
+console-getty.service       loaded active running Console Getty
+container-getty@1.service   loaded active running Container Getty on /dev/tty1
+container-getty@2.service   loaded active running Container Getty on /dev/tty2
+containerd.service          loaded active running containerd container runtime
+cron.service                loaded active running Regular background program processing daemon
+dbus.service                loaded active running D-Bus System Message Bus
+docker.service              loaded active running Docker Application Container Engine
+networkd-dispatcher.service loaded active running Dispatcher daemon for systemd-networkd
+postfix@-.service           loaded active running Postfix Mail Transport Agent (instance -)
+rsyslog.service             loaded active running System Logging Service
+ssh.service                 loaded active running OpenBSD Secure Shell server
+systemd-journald.service    loaded active running Journal Service
+systemd-logind.service      loaded active running User Login Management
+systemd-networkd.service    loaded active running Network Configuration
+systemd-resolved.service    loaded active running Network Name Resolution
+user@0.service              loaded active running User Manager for UID 0
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ sockets ss
+udp UNCONN 0      0              127.0.0.54:53    0.0.0.0:* users:(("systemd-resolve",pid=135,fd=16))
+udp UNCONN 0      0           127.0.0.53%lo:53    0.0.0.0:* users:(("systemd-resolve",pid=135,fd=14))
+udp UNCONN 0      0      192.168.8.123%eth0:68    0.0.0.0:* users:(("systemd-network",pid=115,fd=21))
+udp UNCONN 0      0               127.0.0.1:18082 0.0.0.0:* users:(("docker-proxy",pid=7188,fd=8))   
+udp UNCONN 0      0               127.0.0.1:18083 0.0.0.0:* users:(("docker-proxy",pid=7206,fd=8))   
+tcp LISTEN 0      4096           127.0.0.54:53    0.0.0.0:* users:(("systemd-resolve",pid=135,fd=17))
+tcp LISTEN 0      4096        127.0.0.53%lo:53    0.0.0.0:* users:(("systemd-resolve",pid=135,fd=15))
+tcp LISTEN 0      100             127.0.0.1:25    0.0.0.0:* users:(("master",pid=619,fd=13))         
+tcp LISTEN 0      4096            127.0.0.1:18081 0.0.0.0:* users:(("docker-proxy",pid=7169,fd=8))   
+tcp LISTEN 0      100                 [::1]:25       [::]:* users:(("master",pid=619,fd=14))         
+tcp LISTEN 0      4096                    *:22          *:* users:(("sshd",pid=1166,fd=3),("systemd",pid=1,fd=47))
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ docker_ps -
+{"Command":"\"true\"","CreatedAt":"2026-09-22 20:22:28 +0000 UTC","HealthStatus":"none","ID":"57483c321de6c97f7b22ca5fbfe801abfee2834fe22cc5d76679f6bd8f572e8f","Image":"alpine:3.22","Labels":"","LocalVolumes":"0","Mounts":"","Names":"ns-fixture-stopped","Networks":"bridge","Platform":{"architecture":"amd64","os":"linux"},"Ports":"","RunningFor":"6 seconds ago","Size":"4.1kB (virtual 8.99MB)","State":"created","Status":"Created"}
+{"Command":"\"sleep 3600\"","CreatedAt":"2026-09-22 20:22:27 +0000 UTC","HealthStatus":"none","ID":"6431e200eb73c56520ae8704ced9bf41b117af37778fa4a5fabde0cb5209f67a","Image":"alpine:3.22","Labels":"com.docker.compose.project=nsfixture,com.docker.compose.service=web,org.example.note=a,b","LocalVolumes":"0","Mounts":"","Names":"ns-fixture-web","Networks":"bridge","Platform":{"architecture":"amd64","os":"linux"},"Ports":"127.0.0.1:18081-\u003e80/tcp, 127.0.0.1:18082-\u003e8082/udp, 127.0.0.1:18083-\u003e8083/udp","RunningFor":"7 seconds ago","Size":"4.1kB (virtual 8.99MB)","State":"running","Status":"Up 6 seconds"}
+
+@@NETSCOPE@@ = 0
+
+@@NETSCOPE@@ docker_images -
+{"Containers":"2","CreatedAt":"2026-09-17 20:37:44 +0000 UTC","CreatedSince":"5 days ago","Digest":"\u003cnone\u003e","ID":"sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8","Repository":"alpine","SharedSize":"N/A","Size":"12.8MB","Tag":"3.22","UniqueSize":"N/A"}
+{"Containers":"0","CreatedAt":"2024-09-26 21:31:42 +0000 UTC","CreatedSince":"24 months ago","Digest":"\u003cnone\u003e","ID":"sha256:9db7b59979c38555a39def84a31fb98b5296952f9e3afd4f6f11f05b07adfab0","Repository":"busybox","SharedSize":"N/A","Size":"6.77MB","Tag":"1.37","UniqueSize":"N/A"}
+
+@@NETSCOPE@@ = 0

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-labelledby="t d">
+<title id="t">Funktionen von NetScope</title>
+<desc id="d">Inventar: Geräte mit IPs, MACs, Hersteller, Typ, Tags, Gruppen, Notizen und Custom Fields 14 Scanner: ARP, ICMP, nmap, HTTP, TLS, SNMP, SSH, mDNS, UPnP, NetBIOS, DNS – pro Host live Änderungen &amp; Events: Neue Geräte, Ports, Dienste, Zertifikate, Container und Pakete – mit Diff je Lauf Schwachstellen: CVE-Abgleich gegen die lokal gespiegelte NVD – mit CVSS, Ignorieren und Heuristik Health-Checks: TCP, HTTP, TLS und ICMP mit Flap-Dämpfung, Verfügbarkeit und Ausfallhistorie Topologie: Graph aus FDB, LLDP, ARP, Proxmox und Docker – Zoom, Filter, eigene Kanten Regeln &amp; Benachrichtigungen: Bündeln, Ruhezeiten, Drosselung, Eskalation über Telegram, ntfy, E-Mail, Webhook, n8n Plugins &amp; API: Jede Funktion ein Plugin mit Settings-Schema; JSON-API, OpenAPI, SSE, Prometheus</desc>
+<style>
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+<rect x="0.75" y="0.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="24" y="24" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(34 34) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v11H3z"/><path d="M8 20h8"/><path d="M12 16v4"/></g>
+<text x="92" y="46" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">Inventar</text>
+<text x="92" y="76" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Geräte mit IPs, MACs, Hersteller, Typ, Tags,</text>
+<text x="92" y="98" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Gruppen, Notizen und Custom Fields</text>
+<rect x="488.75" y="0.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="512" y="24" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(522 34) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0"/><path d="M12 12l6-6"/><path d="M12 12h.01"/></g>
+<text x="580" y="46" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">14 Scanner</text>
+<text x="580" y="76" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">ARP, ICMP, nmap, HTTP, TLS, SNMP, SSH,</text>
+<text x="580" y="98" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">mDNS, UPnP, NetBIOS, DNS – pro Host live</text>
+<rect x="0.75" y="144.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="24" y="168" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(34 178) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0"/><path d="M15.5 18a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0"/><path d="M6 8.5V15a3 3 0 0 0 3 3h6"/><path d="M18 15.5V9a3 3 0 0 0-3-3H9"/><path d="M12 3l-3 3 3 3"/><path d="M12 15l3 3-3 3"/></g>
+<text x="92" y="190" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">Änderungen &amp; Events</text>
+<text x="92" y="220" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Neue Geräte, Ports, Dienste, Zertifikate,</text>
+<text x="92" y="242" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Container und Pakete – mit Diff je Lauf</text>
+<rect x="488.75" y="144.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="512" y="168" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(522 178) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5"/><path d="M12 16h.01"/></g>
+<text x="580" y="190" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">Schwachstellen</text>
+<text x="580" y="220" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">CVE-Abgleich gegen die lokal gespiegelte</text>
+<text x="580" y="242" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">NVD – mit CVSS, Ignorieren und Heuristik</text>
+<rect x="0.75" y="288.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="24" y="312" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(34 322) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></g>
+<text x="92" y="334" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">Health-Checks</text>
+<text x="92" y="364" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">TCP, HTTP, TLS und ICMP mit Flap-Dämpfung,</text>
+<text x="92" y="386" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Verfügbarkeit und Ausfallhistorie</text>
+<rect x="488.75" y="288.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="512" y="312" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(522 322) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0"/><path d="M2.5 19a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0"/><path d="M16.5 19a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0"/><path d="M12 7.5v4M12 11.5l-5.6 5.4M12 11.5l5.6 5.4"/></g>
+<text x="580" y="334" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">Topologie</text>
+<text x="580" y="364" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Graph aus FDB, LLDP, ARP, Proxmox und</text>
+<text x="580" y="386" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Docker – Zoom, Filter, eigene Kanten</text>
+<rect x="0.75" y="432.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="24" y="456" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(34 466) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></g>
+<text x="92" y="478" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">Regeln &amp; Benachrichtigungen</text>
+<text x="92" y="508" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Bündeln, Ruhezeiten, Drosselung, Eskalation</text>
+<text x="92" y="530" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">über Telegram, ntfy, E-Mail, Webhook, n8n</text>
+<rect x="488.75" y="432.75" width="470.5" height="126.5" rx="16" fill="#121a25" stroke="#253245" stroke-width="1.5"/>
+<rect x="512" y="456" width="48" height="48" rx="13" fill="rgba(76,180,236,0.14)"/>
+<g transform="translate(522 466) scale(1.1666666666666667)" fill="none" stroke="#4cb4ec" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h2a2 2 0 0 1 4 0h3v5a2 2 0 0 1 0 4v6H4v-5a2 2 0 0 0 0-4V4z"/></g>
+<text x="580" y="478" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="650" fill="#e8ecf2">Plugins &amp; API</text>
+<text x="580" y="508" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">Jede Funktion ein Plugin mit Settings-Schema;</text>
+<text x="580" y="530" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#a3adbd">JSON-API, OpenAPI, SSE, Prometheus</text>
+</svg>

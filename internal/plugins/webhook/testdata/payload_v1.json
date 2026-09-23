@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "source": "netscope",
+  "sentAt": "2026-09-22T12:03:40Z",
+  "notification": {
+    "id": 42,
+    "kind": "event",
+    "priority": "high",
+    "title": "2 neue Ereignisse auf nas",
+    "ruleId": 3,
+    "ruleName": "Neuer Port auf bekanntem Gerät",
+    "link": "http://192.168.8.123:8080/events?notification=42",
+    "createdAt": "2026-09-22T12:03:34Z"
+  },
+  "summary": {
+    "events": 2,
+    "maxSeverity": "critical",
+    "maxSeverityRank": 4,
+    "bySeverity": {
+      "critical": 1,
+      "high": 0,
+      "info": 0,
+      "low": 0,
+      "medium": 1
+    }
+  },
+  "events": [
+    {
+      "id": 1001,
+      "type": "port.opened",
+      "label": "Port neu",
+      "category": "port",
+      "severity": "medium",
+      "severityRank": 2,
+      "severityLabel": "Mittel",
+      "title": "Neuer Port 22/tcp (ssh) auf nas",
+      "message": "OpenSSH 9.6p1 Ubuntu 3ubuntu13",
+      "at": "2026-09-22T12:03:04Z",
+      "acknowledged": false,
+      "escalated": false,
+      "link": "http://192.168.8.123:8080/events/1001",
+      "device": {
+        "id": 17,
+        "name": "nas",
+        "ip": "192.168.8.10",
+        "mac": "aa:bb:cc:dd:ee:ff",
+        "link": "http://192.168.8.123:8080/devices/17"
+      },
+      "payload": {
+        "device_ip": "192.168.8.10",
+        "device_mac": "aa:bb:cc:dd:ee:ff",
+        "device_name": "nas",
+        "device_state": "known",
+        "ip": "192.168.8.10",
+        "port": 22,
+        "product": "OpenSSH",
+        "proto": "tcp",
+        "service": "ssh",
+        "version": "9.6p1 Ubuntu 3ubuntu13"
+      }
+    },
+    {
+      "id": 1002,
+      "type": "cve.new",
+      "label": "Neue Schwachstelle",
+      "category": "vulnerability",
+      "severity": "critical",
+      "severityRank": 4,
+      "severityLabel": "Kritisch",
+      "title": "CVE-2024-6387 (CVSS 8.1) auf nas",
+      "message": "OpenSSH: Race Condition im Signal-Handler (regreSSHion)",
+      "at": "2026-09-22T12:03:06Z",
+      "acknowledged": false,
+      "escalated": false,
+      "link": "http://192.168.8.123:8080/events/1002",
+      "device": {
+        "id": 17,
+        "name": "nas",
+        "ip": "192.168.8.10",
+        "mac": "aa:bb:cc:dd:ee:ff",
+        "link": "http://192.168.8.123:8080/devices/17"
+      },
+      "payload": {
+        "cpe": "cpe:2.3:a:openbsd:openssh:9.6:p1:*:*:*:*:*:*",
+        "cve": "CVE-2024-6387",
+        "cvss": 8.1,
+        "device_ip": "192.168.8.10",
+        "device_mac": "aa:bb:cc:dd:ee:ff",
+        "device_name": "nas",
+        "device_state": "known",
+        "match_type": "range",
+        "product": "openssh",
+        "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "version": "9.6p1"
+      }
+    }
+  ],
+  "text": "2 neue Ereignisse auf nas\n\n[Mittel] Neuer Port 22/tcp (ssh) auf nas (192.168.8.10)\n  OpenSSH 9.6p1 Ubuntu 3ubuntu13\n  http://192.168.8.123:8080/events/1001\n\n[Kritisch] CVE-2024-6387 (CVSS 8.1) auf nas (192.168.8.10)\n  OpenSSH: Race Condition im Signal-Handler (regreSSHion)\n  http://192.168.8.123:8080/events/1002\n\nhttp://192.168.8.123:8080/events?notification=42\n",
+  "body": ""
+}
