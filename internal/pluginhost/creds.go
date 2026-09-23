@@ -68,6 +68,10 @@ func (p *credProvider) Applicable(ctx context.Context, t plugin.CredentialTarget
 		if len(allowed) > 0 && !slices.Contains(allowed, c.ID) {
 			continue
 		}
+		// tunnel configurations belong to subnets, not to targets
+		if len(types) == 0 && c.Type == plugin.CredWireGuard {
+			continue
+		}
 		rank, reason, err := p.match(ctx, c, dev, addrs)
 		if err != nil {
 			return nil, err

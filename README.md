@@ -48,6 +48,8 @@
   TLS (Zertifikate, schwache Protokolle/Cipher), SNMP (inkl. FDB/LLDP), SSH-Inventar
   (Pakete, Dienste, Sockets, Docker), Wake-on-LAN.
 - **Importer:** Proxmox VE, OpenWrt/GL.iNet (DHCP), Docker, NetAlertX, CSV.
+- **Entfernte Netze:** Subnetze hinter Routern oder über einen eigenen WireGuard-Tunnel von
+  NetScope (z. B. ins Rechenzentrum) – Konfiguration hochladen, fertig.
 - **Auswertung:** Änderungserkennung mit Events, CVE-Abgleich gegen eine lokal gespiegelte
   NVD, Health-Checks mit Verfügbarkeit, Topologie-Graph, Berichte.
 - **Benachrichtigungen:** Regel-Engine (Bedingungen, Bündelung, Ruhezeiten, Drosselung,
@@ -260,6 +262,50 @@ SSH-Credential (Benutzer `root`, privater Schlüssel) anlegen und unter „Gilt 
 Proxmox-Node wählen. Ohne Forced Command funktioniert es auch mit einem normalen root-Zugang;
 NetScope schickt dann dasselbe Skript als Befehl mit.
 
+## Entfernte Netze (Router, WireGuard)
+
+Jedes Subnetz hat unter **System → Subnetze** eine **Erreichbarkeit**:
+
+| Erreichbarkeit | Wann | Was NetScope dort kann |
+|---|---|---|
+| Direkt angeschlossen | NetScope hängt selbst im Netz | alles, inklusive ARP-Scan und MAC-Adressen |
+| Über einen Router | anderes VLAN oder Standort, per Gateway erreichbar | Ping, Ports, Dienste, HTTP/TLS, SSH, SNMP, Health-Checks – kein ARP; Geräte werden über die IP erkannt |
+| Über WireGuard-Tunnel | Netz ist nur per VPN erreichbar, z. B. ein Rechenzentrum | wie „über einen Router“; den Tunnel baut NetScope selbst auf |
+
+**WireGuard-Tunnel einrichten:**
+
+1. Auf dem WireGuard-Server einen **eigenen Zugang für NetScope** anlegen, z. B. in der
+   OPNsense unter *VPN → WireGuard → Peer generator*, und die Client-Konfiguration kopieren.
+   Nicht die Konfiguration eines anderen Geräts verwenden – zwei Geräte mit demselben
+   Schlüssel werfen sich gegenseitig aus dem Tunnel.
+2. In NetScope das Subnetz anlegen, *Über WireGuard-Tunnel* wählen, die Konfiguration
+   einfügen oder als `.conf` laden. NetScope zeigt Gegenstelle, Tunnel-Adresse und den
+   eigenen öffentlichen Schlüssel an.
+3. *Verbindung testen* (Handshake mit dem Server), speichern – fertig.
+
+Weitere Subnetze hinter demselben Server (z. B. ein IPMI-Netz) wählen den vorhandenen Tunnel.
+Die Konfiguration liegt verschlüsselt als Credential vom Typ *WireGuard-Tunnel* im Vault.
+
+NetScope leitet **nur die zugeordneten Subnetze** durch den Tunnel – auch wenn die
+Konfiguration `AllowedIPs = 0.0.0.0/0` enthält, bleibt der übrige Verkehr des Servers
+unverändert. `PostUp`/`PreUp`/`PostDown`, `DNS` und `Table` werden ignoriert. Subnetze, die
+sich mit einem lokal angeschlossenen Netz überschneiden oder für die der Host schon eine
+Route hat, werden abgelehnt.
+
+Fällt der Tunnel aus (kein Handshake seit 3 Minuten), gibt es das Event `tunnel.down`, die
+Subnetze dahinter werden bis zur Rückkehr nicht gescannt und ihre Geräte **nicht** als
+offline gewertet; danach folgt `tunnel.up` mit der Ausfalldauer. Der Zustand steht in der
+Subnetz-Liste (verbunden, letzter Handshake, Traffic).
+
+Für die Gegenseite gilt wie bei jedem VPN-Client: Firewall-Regel für die Tunnel-Adresse von
+NetScope und ein Rückweg zu ihr. Geräte mit eigenem Standard-Gateway (z. B. VMs mit
+öffentlicher IP) antworten sonst ins Internet statt in den Tunnel – dann auf dem
+WireGuard-Server Outbound-NAT für das Tunnelnetz einrichten.
+
+Voraussetzungen: Linux-Host mit WireGuard im Kernel (ab 5.6), Container mit Host-Netzwerk
+und `NET_ADMIN` (wie in der mitgelieferten `docker-compose.yml`). Unter Docker Desktop
+(Windows/macOS) ist die Option ausgegraut.
+
 ## Filter-Query-Sprache
 
 In der Geräteliste, in Gruppen, Scopes und Regeln. Terme werden mit UND verknüpft, `|`
@@ -382,8 +428,11 @@ Die Grafiken in diesem README (`docs/assets/*.svg`, hell und dunkel) erzeugt
 - API-Tokens werden nur gehasht gespeichert und genau einmal angezeigt.
 - Secrets (Credentials, geheime Plugin-Einstellungen) liegen AES-256-GCM-verschlüsselt in
   der Datenbank; Key-Rotation unter **System**.
-- Der Container braucht `NET_RAW`/`NET_ADMIN` für ARP, ICMP und OS-Erkennung; das Einbinden
-  des Docker-Sockets ist optional und gibt Root-Rechte auf dem Host.
+- Der Container braucht `NET_RAW`/`NET_ADMIN` für ARP, ICMP, OS-Erkennung und die eigenen
+  WireGuard-Tunnel; das Einbinden des Docker-Sockets ist optional und gibt Root-Rechte auf
+  dem Host.
+- WireGuard-Tunnel führen keine Befehle aus der Konfiguration aus und leiten nur die
+  zugeordneten Subnetze um; ihre Interfaces (`nswg<ID>`) räumt NetScope beim Beenden auf.
 
 ## Dokumentation
 

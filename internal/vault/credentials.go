@@ -12,6 +12,7 @@ import (
 
 	"netscope/internal/db"
 	"netscope/internal/plugin"
+	"netscope/internal/wgconf"
 )
 
 // CredentialMeta is the public view of a credential (no secret values).
@@ -82,6 +83,11 @@ func (v *Vault) splitValues(ct plugin.CredentialType, in map[string]any, prevSec
 	}
 	if ct.Type == plugin.CredSSH && sec["private_key"] == "" && sec["password"] == "" {
 		return nil, nil, &plugin.ValidationError{Errors: []plugin.FieldError{{Field: "private_key", Message: "Schlüssel oder Passwort erforderlich"}}}
+	}
+	if ct.Type == plugin.CredWireGuard {
+		if _, err := wgconf.Parse(sec["config"]); err != nil {
+			return nil, nil, plugin.FieldErr("config", err.Error())
+		}
 	}
 	return pub, sec, nil
 }

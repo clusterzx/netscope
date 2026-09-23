@@ -29,6 +29,7 @@ import (
 	"netscope/internal/pluginhost"
 	"netscope/internal/rules"
 	"netscope/internal/settings"
+	"netscope/internal/tunnel"
 	"netscope/internal/vault"
 )
 
@@ -47,6 +48,7 @@ type Deps struct {
 	Events    *events.Store
 	Rules     *rules.Engine
 	Host      *pluginhost.Host
+	Tunnels   *tunnel.Manager // nil in tests without tunnels
 	Audit     *audit.Log
 	Version   string
 	StartedAt time.Time
@@ -101,6 +103,7 @@ func New(d Deps) *Server {
 	s.registerSystem()
 	s.registerDevices()
 	s.registerMeta()
+	s.registerTunnels()
 	s.registerPlugins()
 	s.registerEvents()
 	s.registerRules()

@@ -126,6 +126,8 @@ const (
 	EvHealthUp              = "health.up"
 	EvPluginFailed          = "plugin.failed"
 	EvNVDSyncFailed         = "nvd.sync_failed"
+	EvTunnelDown            = "tunnel.down"
+	EvTunnelUp              = "tunnel.up"
 )
 
 var deviceFields = []PayloadField{
@@ -190,6 +192,10 @@ var catalog = []EventSpec{
 		[]PayloadField{{"plugin", "string", "Plugin-ID"}, {"run_id", "number", "Lauf"}, {"error", "string", "Fehler"}, {"attempt", "number", "Versuch"}}},
 	{EvNVDSyncFailed, "system", "NVD-Sync fehlgeschlagen", "Der Abgleich der lokalen NVD-Kopie ist fehlgeschlagen.", SevMedium, "cve",
 		[]PayloadField{{"error", "string", "Fehler"}, {"feed", "string", "Feed"}}},
+	{EvTunnelDown, "system", "Tunnel getrennt", "Ein WireGuard-Tunnel in ein entferntes Subnetz ist getrennt oder lässt sich nicht aufbauen. Die Geräte dahinter werden solange nicht als offline gewertet.", SevHigh, "core",
+		[]PayloadField{{"tunnel", "string", "Name des Tunnels"}, {"credential_id", "number", "Credential des Tunnels"}, {"subnets", "list", "Subnetze hinter dem Tunnel"}, {"endpoint", "string", "Gegenstelle"}, {"error", "string", "Fehler (leer = keine Antwort der Gegenstelle)"}}},
+	{EvTunnelUp, "system", "Tunnel wieder verbunden", "Ein getrennter WireGuard-Tunnel steht wieder.", SevInfo, "core",
+		[]PayloadField{{"tunnel", "string", "Name des Tunnels"}, {"credential_id", "number", "Credential des Tunnels"}, {"subnets", "list", "Subnetze hinter dem Tunnel"}, {"down_seconds", "number", "Dauer der Unterbrechung"}}},
 }
 
 // Catalog returns the event type catalog sorted by category and type.

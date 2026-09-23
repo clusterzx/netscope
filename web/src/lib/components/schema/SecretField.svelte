@@ -1,6 +1,7 @@
 <!--
 	Secret input: shows "gesetzt"/"nicht gesetzt". value === SECRET_MASK keeps the stored secret,
-	"" clears it, any other string replaces it.
+	"" clears it, any other string replaces it. Multiline secrets (keys, configs) can be
+	loaded from a local file; it is read in the browser, nothing is uploaded separately.
 -->
 <script lang="ts">
 	import { SECRET_MASK } from '$lib/api/types';
@@ -60,6 +61,22 @@
 		value = text === '' ? (wasSet ? SECRET_MASK : '') : text;
 	}
 
+	let fileInput = $state<HTMLInputElement>();
+	let fileError = $state('');
+	async function loadFile(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const f = input.files?.[0];
+		input.value = '';
+		fileError = '';
+		if (!f) return;
+		if (f.size > 256 * 1024) {
+			fileError = 'Datei zu groß (höchstens 256 KB)';
+			return;
+		}
+		text = (await f.text()).trim() + '\n';
+		oninput();
+	}
+
 	const inputCls =
 		'w-full min-w-0 rounded-md border bg-surface px-2.5 text-sm text-fg shadow-sm placeholder:text-fg-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-focus';
 </script>
@@ -80,18 +97,25 @@
 		{#if editing || (!wasSet && status !== 'cleared')}
 			<div class="flex items-start gap-2">
 				{#if multiline}
-					<textarea
-						id={fid}
-						bind:value={text}
-						{oninput}
-						{disabled}
-						rows="5"
-						spellcheck="false"
-						autocomplete="off"
-						aria-describedby={describedby}
-						aria-invalid={error ? 'true' : undefined}
-						placeholder={placeholder ?? (wasSet ? 'Neuen Wert eingeben (leer = unverändert)' : '')}
-						class="mono py-1.5 {inputCls} {error ? 'border-danger' : 'border-border'}"></textarea>
+					<div class="flex min-w-0 flex-1 flex-col items-start gap-1">
+						<textarea
+							id={fid}
+							bind:value={text}
+							{oninput}
+							{disabled}
+							rows="5"
+							spellcheck="false"
+							autocomplete="off"
+							aria-describedby={describedby}
+							aria-invalid={error ? 'true' : undefined}
+							placeholder={placeholder ?? (wasSet ? 'Neuen Wert eingeben (leer = unverändert)' : '')}
+							class="mono py-1.5 {inputCls} {error ? 'border-danger' : 'border-border'}"></textarea>
+						<Button size="xs" variant="ghost" icon="upload" onclick={() => fileInput?.click()} {disabled}>
+							Aus Datei laden
+						</Button>
+						<input bind:this={fileInput} type="file" class="hidden" onchange={loadFile} tabindex="-1" />
+						{#if fileError}<span class="text-xs text-danger">{fileError}</span>{/if}
+					</div>
 				{:else}
 					<input
 						id={fid}

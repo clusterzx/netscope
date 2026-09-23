@@ -35,10 +35,11 @@ type credentialView struct {
 	UsedBy []credentialUse `json:"usedBy"`
 }
 
-// credentialUse is a plugin whose settings reference a credential.
+// credentialUse is a plugin (or subnet) that references a credential.
 type credentialUse struct {
-	ID   string `json:"id"`   // plugin id (link target /plugins/<id>)
-	Name string `json:"name"` // plugin name
+	ID   string `json:"id"`   // plugin id (link target /plugins/<id>) or subnet id
+	Name string `json:"name"` // plugin name or subnet CIDR
+	Kind string `json:"kind"` // plugin | subnet
 }
 
 // deviceCredential is a credential that applies to a device.
@@ -261,7 +262,7 @@ func (s *Server) credentialUsers(ids []string, id int64, typ string) []credentia
 			}
 			sel := st.CredentialIDs(f.Key)
 			if slices.Contains(sel, id) || (f.Multi && len(sel) == 0) {
-				out = append(out, credentialUse{ID: pid, Name: p.Info().Name})
+				out = append(out, credentialUse{ID: pid, Name: p.Info().Name, Kind: "plugin"})
 				break
 			}
 		}
@@ -363,8 +364,20 @@ func (s *Server) credentialUsage(id int64) []credentialUse {
 			}
 			for _, cid := range st.CredentialIDs(f.Key) {
 				if cid == id && (len(out) == 0 || out[len(out)-1].ID != pid) {
-					out = append(out, credentialUse{ID: pid, Name: p.Info().Name})
+					out = append(out, credentialUse{ID: pid, Name: p.Info().Name, Kind: "plugin"})
 				}
+			}
+		}
+	}
+	// tunnels of subnets
+	if list, err := s.Inventory.ListSubnets(context.Background()); err == nil {
+		for _, sn := range list {
+			if sn.TunnelCredentialID != nil && *sn.TunnelCredentialID == id {
+				name := "Subnetz " + sn.CIDR
+				if sn.Name != "" {
+					name += " (" + sn.Name + ")"
+				}
+				out = append(out, credentialUse{ID: strconv.FormatInt(sn.ID, 10), Name: name, Kind: "subnet"})
 			}
 		}
 	}
@@ -441,6 +454,9 @@ func (s *Server) handleSaveCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	// the audit log only sees public fields and the names of set secrets
 	s.record(r, action, "credential", strconv.FormatInt(id, 10), "Credential „"+m.Name+"“ ("+m.Type+")", before, m)
+	if m.Type == plugin.CredWireGuard {
+		s.reconcileTunnels()
+	}
 	writeJSON(w, status, credentialView{CredentialMeta: *m, UsedBy: s.credentialUsage(id)})
 }
 

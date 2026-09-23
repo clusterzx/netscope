@@ -48,6 +48,7 @@
 	const typeOf = (t: string) => types.find((x) => x.type === t);
 
 	const pluginHref = (id: string) => `/plugins/${encodeURIComponent(id)}`;
+	const useHref = (u: CredentialUse) => (u.kind === 'subnet' ? '/system?tab=subnets' : pluginHref(u.id));
 	const usedNames = (c: Credential) => (c.usedBy ?? []).map((u) => u.name).join(', ');
 
 	function fieldLabel(type: string, key: string): string {
@@ -91,7 +92,7 @@
 		const ok = await confirm({
 			title: `Credential „${c.name}“ löschen?`,
 			message: used.length
-				? `Achtung: Es wird noch verwendet von ${usedNames(c)}. Es muss zuerst in den Einstellungen dieser Plugins entfernt werden.`
+				? `Achtung: Es wird noch verwendet von ${usedNames(c)}. Es muss zuerst dort entfernt werden.`
 				: 'Die verschlüsselten Zugangsdaten werden endgültig gelöscht.',
 			confirmLabel: 'Löschen',
 			danger: true
@@ -152,9 +153,9 @@
 				{blocked.message}
 				{#if blocked.usedBy.length}
 					<span class="mt-1 block">
-						Zuerst in den Einstellungen dieser Plugins entfernen:
+						Zuerst dort entfernen:
 						{#each blocked.usedBy as u, i (u.id)}
-							<a class="link" href={pluginHref(u.id)}>{u.name}</a>{i < blocked.usedBy.length - 1 ? ', ' : ''}
+							<a class="link" href={useHref(u)}>{u.name}</a>{i < blocked.usedBy.length - 1 ? ', ' : ''}
 						{/each}
 					</span>
 				{/if}
@@ -195,6 +196,10 @@
 						<Icon name="key" size={12} class="-mt-px mr-0.5 inline align-middle" />
 						{typeOf(c.type)?.label ?? c.type}
 					</Badge>
+				{:else if col.key === 'scope' && c.type === 'wireguard'}
+					<span class="text-xs text-fg-subtle" title="Tunnel-Konfigurationen werden beim Subnetz ausgewählt"
+						>Tunnel für Subnetze</span
+					>
 				{:else if col.key === 'scope'}
 					{@const level = credentialScopeLevel(c.scope)}
 					<Badge
@@ -233,7 +238,11 @@
 				{:else if col.key === 'usedBy'}
 					<span class="flex flex-wrap gap-1">
 						{#each c.usedBy ?? [] as u (u.id)}
-							<a href={pluginHref(u.id)} class="rounded focus-visible:outline-2" title="Plugin öffnen">
+							<a
+								href={useHref(u)}
+								class="rounded focus-visible:outline-2"
+								title={u.kind === 'subnet' ? 'Subnetz öffnen' : 'Plugin öffnen'}
+							>
 								<Badge tone="accent">{u.name}</Badge>
 							</a>
 						{:else}

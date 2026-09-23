@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,12 +107,22 @@ func (j job) inScope(a netip.Addr) bool {
 }
 
 // buildJobs turns the run targets into arp-scan invocations. Targets that cannot be
-// scanned are returned as errors (one per subnet or address).
-func buildJobs(t plugin.Targets, ifaceFor func(netip.Addr) string) ([]job, []error) {
-	var (
-		jobs []job
-		errs []error
-	)
+// scanned are returned as errors (one per subnet or address). Routed subnets (reached
+// through a router or tunnel) are skipped without error and returned as skipped.
+func buildJobs(t plugin.Targets, routed []netip.Prefix, ifaceFor func(netip.Addr) string) (jobs []job, errs []error, skipped []netip.Prefix) {
+	skip := func(p netip.Prefix) {
+		if !slices.Contains(skipped, p) {
+			skipped = append(skipped, p)
+		}
+	}
+	behind := func(a netip.Addr) (netip.Prefix, bool) {
+		for _, p := range routed {
+			if p.Contains(a) {
+				return p, true
+			}
+		}
+		return netip.Prefix{}, false
+	}
 	if t.DeviceMode {
 		byIface := map[string]map[netip.Addr]bool{}
 		for _, raw := range t.DeviceIPs() {
@@ -120,6 +131,10 @@ func buildJobs(t plugin.Targets, ifaceFor func(netip.Addr) string) ([]job, []err
 				continue
 			}
 			a = a.Unmap()
+			if p, ok := behind(a); ok {
+				skip(p)
+				continue
+			}
 			iface := ""
 			for _, s := range t.Subnets {
 				if s.Interface != "" && s.CIDR.Contains(a) {
@@ -156,7 +171,7 @@ func buildJobs(t plugin.Targets, ifaceFor func(netip.Addr) string) ([]job, []err
 			}
 			jobs = append(jobs, job{label: fmt.Sprintf("%d Geräte über %s", len(addrs), iface), iface: iface, targets: targets, addrs: byIface[iface]})
 		}
-		return jobs, errs
+		return jobs, errs, skipped
 	}
 	seen := map[netip.Prefix]bool{}
 	for _, s := range t.Subnets {
@@ -165,6 +180,10 @@ func buildJobs(t plugin.Targets, ifaceFor func(netip.Addr) string) ([]job, []err
 			continue
 		}
 		seen[p] = true
+		if s.Routed {
+			skip(p)
+			continue
+		}
 		if !p.Addr().Is4() {
 			errs = append(errs, fmt.Errorf("Subnetz %s: arp-scan unterstützt nur IPv4", p))
 			continue
@@ -178,12 +197,32 @@ func buildJobs(t plugin.Targets, ifaceFor func(netip.Addr) string) ([]job, []err
 			iface = ifaceFor(p.Addr())
 		}
 		if iface == "" {
-			errs = append(errs, fmt.Errorf("Subnetz %s: kein lokales Interface gefunden – arp-scan erreicht nur direkt angeschlossene Netze (Interface in der Subnetz-Konfiguration eintragen)", p))
+			errs = append(errs, fmt.Errorf("Subnetz %s: kein lokales Interface gefunden – arp-scan erreicht nur direkt angeschlossene Netze (Interface eintragen oder das Subnetz als „über Router“ erreichbar markieren)", p))
 			continue
 		}
 		jobs = append(jobs, job{label: p.String(), iface: iface, targets: []string{p.String()}, prefix: p})
 	}
-	return jobs, errs
+	return jobs, errs, skipped
+}
+
+// routedSubnets returns the subnets reached through a router or tunnel (from the targets
+// and, for device scans, from the subnet configuration).
+func routedSubnets(ctx context.Context, rc *plugin.RunContext, t plugin.Targets) []netip.Prefix {
+	var out []netip.Prefix
+	add := func(list []plugin.SubnetTarget) {
+		for _, s := range list {
+			if s.Routed && !slices.Contains(out, s.CIDR.Masked()) {
+				out = append(out, s.CIDR.Masked())
+			}
+		}
+	}
+	add(t.Subnets)
+	if t.DeviceMode && rc.Inventory != nil {
+		if list, err := rc.Inventory.Subnets(ctx); err == nil {
+			add(list)
+		}
+	}
+	return out
 }
 
 // localTargets returns the directly attached networks as targets (used when no subnet
@@ -212,13 +251,22 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		rc.Log.Info("Keine Geräte mit IP-Adresse im Scope")
 		return nil
 	}
-	jobs, jobErrs := buildJobs(targets, netutil.InterfaceFor)
+	jobs, jobErrs, skipped := buildJobs(targets, routedSubnets(ctx, rc, targets), netutil.InterfaceFor)
 	for _, err := range jobErrs {
 		rc.Log.Warn(err.Error())
+	}
+	if len(skipped) > 0 {
+		// ARP does not cross routers: devices there are neither seen nor missed by this plugin
+		rc.NotCovered(skipped...)
+		rc.Log.Debug("geroutete Subnetze übersprungen", "subnets", len(skipped))
 	}
 	if len(jobs) == 0 {
 		if len(jobErrs) > 0 {
 			return errors.Join(jobErrs...)
+		}
+		if len(skipped) > 0 {
+			rc.Log.Info("Nur geroutete Subnetze im Scope – ARP-Scans sind dort nicht möglich")
+			return nil
 		}
 		return errors.New("keine scanbaren Netze im Scope")
 	}

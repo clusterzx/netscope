@@ -18,20 +18,34 @@ import (
 
 // ---------------------------------------------------------------- subnets
 
+// Access modes of a subnet.
+const (
+	AccessDirect    = "direct"    // attached to a local interface (ARP, broadcasts)
+	AccessRouted    = "routed"    // reached through a router, layer 3 only
+	AccessWireGuard = "wireguard" // reached through NetScope's own WireGuard tunnel
+)
+
 // Subnet is a configured network.
 type Subnet struct {
-	ID          int64     `json:"id"`
-	CIDR        string    `json:"cidr"`
-	Name        string    `json:"name"`
-	Interface   string    `json:"interface"`
-	VLAN        *int      `json:"vlan,omitempty"`
-	Gateway     string    `json:"gateway"`
-	Enabled     bool      `json:"enabled"`
-	Notes       string    `json:"notes"`
-	DeviceCount int       `json:"deviceCount"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID        int64  `json:"id"`
+	CIDR      string `json:"cidr"`
+	Name      string `json:"name"`
+	Interface string `json:"interface"`
+	VLAN      *int   `json:"vlan,omitempty"`
+	Gateway   string `json:"gateway"`
+	Enabled   bool   `json:"enabled"`
+	Notes     string `json:"notes"`
+	// Access says how the subnet is reached: direct | routed | wireguard.
+	Access string `json:"access"`
+	// TunnelCredentialID is the WireGuard credential of the tunnel (access wireguard).
+	TunnelCredentialID *int64    `json:"tunnelCredentialId,omitempty"`
+	DeviceCount        int       `json:"deviceCount"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }
+
+// Routed reports whether the subnet is reached through a router or tunnel.
+func (s *Subnet) Routed() bool { return s.Access == AccessRouted || s.Access == AccessWireGuard }
 
 func (s *Subnet) validate() error {
 	p, err := netip.ParsePrefix(strings.TrimSpace(s.CIDR))
@@ -55,12 +69,27 @@ func (s *Subnet) validate() error {
 	if s.Interface != "" && !regexp.MustCompile(`^[A-Za-z0-9_.@:-]{1,32}$`).MatchString(s.Interface) {
 		return plugin.FieldErr("interface", fmt.Sprintf("ungültiger Interface-Name %q", s.Interface))
 	}
+	switch s.Access {
+	case "":
+		s.Access = AccessDirect
+	case AccessDirect, AccessRouted, AccessWireGuard:
+	default:
+		return plugin.FieldErr("access", fmt.Sprintf("unbekannte Erreichbarkeit %q", s.Access))
+	}
+	if s.Access == AccessWireGuard {
+		if s.TunnelCredentialID == nil || *s.TunnelCredentialID <= 0 {
+			return plugin.FieldErr("tunnelCredentialId", "Tunnel wählen oder eine WireGuard-Konfiguration hochladen")
+		}
+		s.Interface = "" // the tunnel interface is managed by NetScope
+	} else {
+		s.TunnelCredentialID = nil
+	}
 	return nil
 }
 
 // Subnets lists all subnets.
 func (s *Store) ListSubnets(ctx context.Context) ([]Subnet, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT s.id, s.cidr, s.name, s.interface, s.vlan, s.gateway, s.enabled, s.notes, s.created_at, s.updated_at,
+	rows, err := s.db.R.QueryContext(ctx, `SELECT s.id, s.cidr, s.name, s.interface, s.vlan, s.gateway, s.enabled, s.notes, s.access, s.tunnel_credential_id, s.created_at, s.updated_at,
 		(SELECT COUNT(DISTINCT i.device_id) FROM device_ips i WHERE i.subnet_id = s.id AND i.gone_at IS NULL)
 		FROM subnets s ORDER BY s.cidr`)
 	if err != nil {
@@ -72,10 +101,14 @@ func (s *Store) ListSubnets(ctx context.Context) ([]Subnet, error) {
 		var (
 			sn       Subnet
 			vlan     sql.NullInt64
+			tunnel   sql.NullInt64
 			cre, upd int64
 		)
-		if err := rows.Scan(&sn.ID, &sn.CIDR, &sn.Name, &sn.Interface, &vlan, &sn.Gateway, &sn.Enabled, &sn.Notes, &cre, &upd, &sn.DeviceCount); err != nil {
+		if err := rows.Scan(&sn.ID, &sn.CIDR, &sn.Name, &sn.Interface, &vlan, &sn.Gateway, &sn.Enabled, &sn.Notes, &sn.Access, &tunnel, &cre, &upd, &sn.DeviceCount); err != nil {
 			return nil, err
+		}
+		if tunnel.Valid {
+			sn.TunnelCredentialID = &tunnel.Int64
 		}
 		if vlan.Valid {
 			v := int(vlan.Int64)
@@ -92,23 +125,27 @@ func (s *Store) SaveSubnet(ctx context.Context, sn *Subnet) error {
 	if err := sn.validate(); err != nil {
 		return err
 	}
-	var vlan any
+	var vlan, tunnel any
 	if sn.VLAN != nil {
 		vlan = *sn.VLAN
+	}
+	if sn.TunnelCredentialID != nil {
+		tunnel = *sn.TunnelCredentialID
 	}
 	now := db.Now()
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if sn.ID == 0 {
-			res, err := tx.ExecContext(ctx, `INSERT INTO subnets(cidr, name, interface, vlan, gateway, enabled, notes, created_at, updated_at)
-				VALUES (?,?,?,?,?,?,?,?,?)`, sn.CIDR, sn.Name, sn.Interface, vlan, sn.Gateway, db.Bool(sn.Enabled), sn.Notes, now, now)
+			res, err := tx.ExecContext(ctx, `INSERT INTO subnets(cidr, name, interface, vlan, gateway, enabled, notes, access, tunnel_credential_id, created_at, updated_at)
+				VALUES (?,?,?,?,?,?,?,?,?,?,?)`, sn.CIDR, sn.Name, sn.Interface, vlan, sn.Gateway, db.Bool(sn.Enabled), sn.Notes, sn.Access, tunnel, now, now)
 			if err != nil {
 				return uniqueErr(err, "cidr", "Subnetz existiert bereits")
 			}
 			sn.ID, _ = res.LastInsertId()
 			return nil
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE subnets SET cidr = ?, name = ?, interface = ?, vlan = ?, gateway = ?, enabled = ?, notes = ?, updated_at = ?
-			WHERE id = ?`, sn.CIDR, sn.Name, sn.Interface, vlan, sn.Gateway, db.Bool(sn.Enabled), sn.Notes, now, sn.ID)
+		res, err := tx.ExecContext(ctx, `UPDATE subnets SET cidr = ?, name = ?, interface = ?, vlan = ?, gateway = ?, enabled = ?, notes = ?, access = ?,
+			tunnel_credential_id = ?, updated_at = ? WHERE id = ?`, sn.CIDR, sn.Name, sn.Interface, vlan, sn.Gateway, db.Bool(sn.Enabled), sn.Notes,
+			sn.Access, tunnel, now, sn.ID)
 		if err != nil {
 			return uniqueErr(err, "cidr", "Subnetz existiert bereits")
 		}
@@ -245,7 +282,7 @@ func (s *Store) Subnets(ctx context.Context) ([]plugin.SubnetTarget, error) {
 		if err != nil {
 			continue
 		}
-		out = append(out, plugin.SubnetTarget{ID: sn.ID, CIDR: p, Name: sn.Name, Interface: sn.Interface, Gateway: sn.Gateway})
+		out = append(out, plugin.SubnetTarget{ID: sn.ID, CIDR: p, Name: sn.Name, Interface: sn.Interface, Gateway: sn.Gateway, Routed: sn.Routed()})
 	}
 	return out, nil
 }

@@ -178,28 +178,30 @@ func TestBuildJobs(t *testing.T) {
 		}
 		return ""
 	}
-	jobs, errs := buildJobs(plugin.Targets{Subnets: []plugin.SubnetTarget{
+	jobs, errs, skipped := buildJobs(plugin.Targets{Subnets: []plugin.SubnetTarget{
 		{CIDR: netip.MustParsePrefix("192.168.8.0/24")},
 		{CIDR: netip.MustParsePrefix("10.20.0.0/24"), Interface: "vlan20"},
 		{CIDR: netip.MustParsePrefix("172.16.0.0/24")},
 		{CIDR: netip.MustParsePrefix("10.0.0.0/8"), Interface: "eth1"},
-	}}, ifaceFor)
-	if len(jobs) != 2 || len(errs) != 2 {
+		{CIDR: netip.MustParsePrefix("192.168.1.0/24"), Routed: true},
+	}}, nil, ifaceFor)
+	if len(jobs) != 2 || len(errs) != 2 || len(skipped) != 1 || skipped[0].String() != "192.168.1.0/24" {
 		t.Fatalf("jobs=%+v errs=%v", jobs, errs)
 	}
 	if jobs[0].iface != "eth0" || jobs[0].targets[0] != "192.168.8.0/24" || jobs[1].iface != "vlan20" {
 		t.Fatalf("jobs=%+v", jobs)
 	}
 
-	jobs, errs = buildJobs(plugin.Targets{DeviceMode: true,
+	jobs, errs, skipped = buildJobs(plugin.Targets{DeviceMode: true,
 		Subnets: []plugin.SubnetTarget{{CIDR: netip.MustParsePrefix("10.20.0.0/24"), Interface: "vlan20"}},
 		Devices: []plugin.DeviceInfo{
 			{ID: 1, PrimaryIP: "192.168.8.44", IPs: []string{"192.168.8.44", "10.20.0.5"}},
 			{ID: 2, PrimaryIP: "192.168.8.1"},
 			{ID: 3, PrimaryIP: "8.8.8.8"},
 			{ID: 4, PrimaryIP: "fd00::1"},
-		}}, ifaceFor)
-	if len(jobs) != 2 || len(errs) != 1 {
+			{ID: 5, PrimaryIP: "192.168.1.10"}, // behind a tunnel: skipped without error
+		}}, []netip.Prefix{netip.MustParsePrefix("192.168.1.0/24")}, ifaceFor)
+	if len(jobs) != 2 || len(errs) != 1 || len(skipped) != 1 {
 		t.Fatalf("jobs=%+v errs=%v", jobs, errs)
 	}
 	if jobs[0].iface != "eth0" || strings.Join(jobs[0].targets, ",") != "192.168.8.1,192.168.8.44" {

@@ -27,6 +27,7 @@ import (
 	"netscope/internal/pluginhost"
 	"netscope/internal/rules"
 	"netscope/internal/settings"
+	"netscope/internal/tunnel"
 	"netscope/internal/vault"
 	"netscope/internal/webui"
 
@@ -37,10 +38,11 @@ import (
 const InitialPasswordFile = "admin-initial-password.txt"
 
 type services struct {
-	db    *db.DB
-	host  *pluginhost.Host
-	rules *rules.Engine
-	srv   *http.Server
+	db      *db.DB
+	host    *pluginhost.Host
+	rules   *rules.Engine
+	tunnels *tunnel.Manager
+	srv     *http.Server
 }
 
 // Run starts NetScope and blocks until ctx is cancelled.
@@ -136,6 +138,8 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	if err := host.Init(ctx); err != nil {
 		return fail(err)
 	}
+	tunnels := tunnel.New(tunnel.Deps{Subnets: inv, Creds: v, Events: ev, Bus: b, Log: log.With("component", "tunnel")})
+	host.SetUnreachable(tunnels.Unreachable)
 	engine := rules.New(d, b, log, ev, inv, host, st, cfg.Location)
 	if err := engine.SeedDefaults(ctx); err != nil {
 		return fail(err)
@@ -143,7 +147,7 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	inv.OnChanges(host.DispatchChanges)
 	ev.OnEvent(engine.OnEvent)
 	server := api.New(api.Deps{Config: cfg, DB: d, Bus: b, Log: log, Logs: ring, LevelVar: level, Auth: authSvc, Vault: v, Settings: st,
-		Inventory: inv, Events: ev, Rules: engine, Host: host, Audit: audit.New(d), Version: version, StartedAt: started,
+		Inventory: inv, Events: ev, Rules: engine, Host: host, Tunnels: tunnels, Audit: audit.New(d), Version: version, StartedAt: started,
 		Restore: func(path string) {
 			select {
 			case restore <- path:
@@ -152,6 +156,7 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 		}, UI: webui.Handler()})
 	srv := &http.Server{Addr: cfg.Listen, Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second,
 		ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
+	tunnels.Start(ctx)
 	host.Start(ctx)
 	engine.Start(ctx)
 	go func() {
@@ -176,12 +181,12 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	}()
 	select {
 	case err := <-errCh:
-		stop(&services{db: d, host: host, rules: engine}, log)
+		stop(&services{db: d, host: host, rules: engine, tunnels: tunnels}, log)
 		return nil, fmt.Errorf("HTTP-Server: %w", err)
 	case <-time.After(200 * time.Millisecond):
 	}
 	log.Info("NetScope bereit", "listen", cfg.Listen, "plugins", len(host.IDs()))
-	return &services{db: d, host: host, rules: engine, srv: srv}, nil
+	return &services{db: d, host: host, rules: engine, tunnels: tunnels, srv: srv}, nil
 }
 
 // stop shuts down in order: HTTP, rule engine, plugins (running runs are cancelled),
@@ -201,6 +206,9 @@ func stop(s *services, log *slog.Logger) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		s.host.Stop(ctx)
 		cancel()
+	}
+	if s.tunnels != nil {
+		s.tunnels.Stop()
 	}
 	if err := s.db.Close(); err != nil {
 		log.Error("Datenbank schließen", "err", err)

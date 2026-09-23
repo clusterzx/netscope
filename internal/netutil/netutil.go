@@ -165,7 +165,7 @@ func LocalSubnets() ([]LocalSubnet, error) {
 		}
 		name := ifc.Name
 		skip := false
-		for _, pfx := range []string{"docker", "br-", "veth", "cni", "flannel", "virbr", "tailscale", "zt", "wg", "lxc"} {
+		for _, pfx := range []string{"docker", "br-", "veth", "cni", "flannel", "virbr", "tailscale", "zt", "wg", "nswg", "lxc"} {
 			if strings.HasPrefix(name, pfx) {
 				skip = true
 			}

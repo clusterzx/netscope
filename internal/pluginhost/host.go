@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,6 +104,8 @@ type Host struct {
 	metrics  *metrics
 	wakeCh   chan struct{}
 	dispatch chan struct{}
+	// unreachable returns subnets that cannot be reached right now (tunnel down)
+	unreachable func() []netip.Prefix
 
 	ctx    context.Context
 	cancel context.CancelFunc

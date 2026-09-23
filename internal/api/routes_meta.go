@@ -12,12 +12,12 @@ type groupMembers struct {
 }
 
 func (s *Server) registerMeta() {
-	s.add(&route{Method: "GET", Path: "/api/v1/subnets", Tag: "Subnetze", Summary: "Subnetze", Scope: scopeRead,
-		Resp: []inventory.Subnet{}, handler: s.handleSubnets})
+	s.add(&route{Method: "GET", Path: "/api/v1/subnets", Tag: "Subnetze", Summary: "Subnetze (mit Tunnel-Zustand)", Scope: scopeRead,
+		Resp: []subnetView{}, handler: s.handleSubnets})
 	s.add(&route{Method: "POST", Path: "/api/v1/subnets", Tag: "Subnetze", Summary: "Subnetz anlegen", Scope: scopeWrite,
-		Body: inventory.Subnet{}, Resp: inventory.Subnet{}, Status: http.StatusCreated, handler: s.handleSaveSubnet})
+		Body: inventory.Subnet{}, Resp: subnetView{}, Status: http.StatusCreated, handler: s.handleSaveSubnet})
 	s.add(&route{Method: "PUT", Path: "/api/v1/subnets/{id}", Tag: "Subnetze", Summary: "Subnetz ändern", Scope: scopeWrite,
-		Body: inventory.Subnet{}, Resp: inventory.Subnet{}, handler: s.handleSaveSubnet})
+		Body: inventory.Subnet{}, Resp: subnetView{}, handler: s.handleSaveSubnet})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/subnets/{id}", Tag: "Subnetze", Summary: "Subnetz löschen", Scope: scopeWrite,
 		Resp: okResponse{}, handler: s.handleDeleteSubnet})
 
@@ -61,7 +61,11 @@ func optionalID(r *http.Request) (int64, error) {
 
 func (s *Server) handleSubnets(w http.ResponseWriter, r *http.Request) {
 	list, err := s.Inventory.ListSubnets(r.Context())
-	s.respond(w, r, list, err)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.subnetViews(list))
 }
 
 func (s *Server) handleSaveSubnet(w http.ResponseWriter, r *http.Request) {
@@ -76,16 +80,21 @@ func (s *Server) handleSaveSubnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sn.ID = id
+	if err := s.checkTunnelSubnet(r.Context(), &sn); err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	if err := s.Inventory.SaveSubnet(r.Context(), &sn); err != nil {
 		s.fail(w, r, err)
 		return
 	}
+	s.reconcileTunnels()
 	action, status := "subnet.update", http.StatusOK
 	if id == 0 {
 		action, status = "subnet.create", http.StatusCreated
 	}
 	s.record(r, action, "subnet", strconv.FormatInt(sn.ID, 10), "Subnetz "+sn.CIDR, nil, sn)
-	writeJSON(w, status, sn)
+	writeJSON(w, status, s.subnetViews([]inventory.Subnet{sn})[0])
 }
 
 func (s *Server) handleDeleteSubnet(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +107,7 @@ func (s *Server) handleDeleteSubnet(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	s.reconcileTunnels()
 	s.record(r, "subnet.delete", "subnet", strconv.FormatInt(id, 10), "Subnetz gelöscht", nil, nil)
 	writeJSON(w, http.StatusOK, okResponse{OK: true})
 }

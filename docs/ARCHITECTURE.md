@@ -48,6 +48,9 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `internal/api` | HTTP-API, OpenAPI-Generator, SSE, Prometheus-Endpoint |
 | `internal/webui` | eingebettete SPA (`dist/` wird vom Frontend-Build befüllt) |
 | `internal/plugins/<id>` | alle Plugins; `internal/plugins/all` importiert sie |
+| `internal/tunnel` | eigene WireGuard-Tunnel in entfernte Subnetze (Netlink, Handshake-Überwachung, Events) |
+| `internal/wgconf` | Parser für WireGuard-Client-Konfigurationen (wg-quick-Format) |
+| `internal/dockercli` | Parser für `docker ps`/`docker images` (SSH-Inventar, Docker in Proxmox-LXCs) |
 | `internal/sshx`, `internal/execx`, `internal/netutil` | gemeinsame Helfer (SSH mit TOFU, Prozesse streamend, Adressen) |
 | `web/` | SvelteKit-Quellen (TypeScript, Tailwind) |
 | `scripts/` | `smoke.sh` (End-to-End-Test), `deploy.sh` (Deployment per SSH) |
@@ -64,7 +67,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 | System | `settings`, `users`, `sessions`, `api_tokens`, `audit_log` |
 | Vault | `vault_meta` (Key-Prüfwert), `credentials` (öffentliche Felder + AES-GCM-Blob + Geltungsbereich `scope`) |
 | Plugins | `plugin_configs` (inkl. verschlüsselter Secret-Felder), `runs`, `run_logs` |
-| Netz | `subnets` |
+| Netz | `subnets` (inkl. Erreichbarkeit `access` und Tunnel-Credential) |
 | Geräte | `devices` (manuelle Felder + effektive Werte), `device_macs`, `device_ips`*, `device_facts`* (Hostname/Hersteller/OS/Typ/Attribute je Quelle), `device_presence`, `external_refs`, `device_inventory`, `device_tags`, `groups`, `group_members`, `custom_fields`, `saved_views`, `relations` |
 | Beobachtungen | `observations` (normalisiert + Rohausgabe je Plugin und Lauf) |
 | Zustand | `ports`*, `certificates`*, `http_services`*, `packages`*, `containers`*, `container_images`* |
@@ -85,6 +88,30 @@ Systemeinstellungen änderbar).
 **Präsenz:** Nur Plugins mit `Presence` (arpscan, icmp, nmap) zählen verpasste Läufe je Gerät.
 Ein Gerät geht offline, wenn ein solches Plugin es `offlineAfterMissed`-mal in Folge nicht
 sieht und kein anderes Plugin es seitdem gesehen hat. IP-Wechsel werden am Laufende erkannt.
+
+## WireGuard-Tunnel
+
+Ein Subnetz mit Erreichbarkeit `wireguard` verweist auf ein Credential vom Typ `wireguard`
+(wg-quick-Konfiguration, verschlüsselt im Vault). `internal/tunnel` legt pro Credential ein
+Interface `nswg<ID>` im Netz-Namespace des Containers (Host-Netzwerk) an – per Netlink und
+`wgctrl`, ohne externe Programme:
+
+- Peer-`AllowedIPs` und Routen sind genau die aktiven Subnetze des Tunnels; die Adressen der
+  Konfiguration werden als Host-Adressen (/32) gesetzt. `AllowedIPs` der Datei, `DNS`,
+  `Table` und `PostUp`/`PreUp`/`PostDown` werden nicht angewendet.
+- Abgelehnt werden Subnetze, die ein lokal angeschlossenes Netz überschneiden, für die der
+  Host bereits eine Route über ein anderes Interface hat oder die den Endpoint enthalten.
+- Zustände: `connecting` (bis zum ersten Handshake, 45 s), `up` (Handshake jünger als
+  3 min; WireGuard erneuert ihn alle 2 min, das Keepalive – Standard 25 s – sorgt für
+  Verkehr), `down`, `error`. Übergänge erzeugen `tunnel.down` / `tunnel.up` und eine
+  SSE-Nachricht (`system`/`tunnel`).
+- Der Plugin-Host entfernt Subnetze hinter nicht verbundenen Tunneln aus den Zielen eines
+  Laufs (`SetUnreachable`); deren Geräte werden weder gescannt noch als verpasst gezählt.
+- Alle 5 min werden nicht verbundene Tunnel neu eingerichtet (Endpoint-DNS, gelöschtes
+  Interface); beim Beenden entfernt NetScope seine Interfaces, beim Start auch Reste.
+- Beim Start prüft ein Probe-Interface, ob der Host WireGuard-Interfaces anlegen darf
+  (Kernel ≥ 5.6, `NET_ADMIN`); sonst meldet `GET /tunnels` den Grund und die UI graut die
+  Option aus.
 
 ## Plugin-Interfaces
 
@@ -133,6 +160,8 @@ aktiv, Cron-Zeitplan, Timeout, Wiederholungen + Backoff, Parallelität, Scope
 | `health.up` | Check wieder OK | info | healthcheck |
 | `plugin.failed` | Plugin-Lauf fehlgeschlagen | medium | core |
 | `nvd.sync_failed` | NVD-Sync fehlgeschlagen | medium | cve |
+| `tunnel.down` | Tunnel getrennt | high | tunnel |
+| `tunnel.up` | Tunnel wieder verbunden | info | tunnel |
 
 Payload-Felder je Typ: `GET /api/v1/events/types` bzw. `internal/plugin/events.go`.
 
@@ -146,7 +175,8 @@ Prometheus-Metriken unter `/metrics`.
 |---|---|
 | Auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `PUT /auth/password`, `GET/POST /tokens`, `DELETE /tokens/{id}` |
 | Geräte | `GET/POST /devices`, `GET/PATCH/DELETE /devices/{id}`, `POST /devices/bulk`, `POST /devices/merge`, `POST /devices/{id}/split`, `POST /devices/{id}/scan`, `POST /devices/{id}/actions/{plugin}/{action}`, Tabs: `…/ports`, `…/http`, `…/certificates`, `…/packages`, `…/containers`, `…/inventory`, `…/cves`, `…/health`, `…/events`, `…/timeline`, `…/relations`, `…/observations`, `…/timeseries`, `…/credentials` (passende Zugangsdaten mit Rang und Grund); `GET /tags`, `GET /certificates` |
-| Stammdaten | `/subnets`, `/groups` (+ `/members`), `/custom-fields`, `/views` (CRUD) |
+| Stammdaten | `/subnets` (mit Tunnel-Zustand), `/groups` (+ `/members`), `/custom-fields`, `/views` (CRUD) |
+| Tunnel | `GET /tunnels` (Verfügbarkeit und Zustand), `POST /tunnels/inspect` (Konfiguration prüfen, nur öffentliche Angaben), `POST /tunnels/test` (Handshake-Test) |
 | Plugins | `GET /plugins`, `GET /plugins/{id}`, `PUT /plugins/{id}/config`, `POST /plugins/{id}/run`, `POST /plugins/{id}/actions/{action}` (`?wait=0` antwortet sofort mit der Lauf-ID), `POST /plugins/{id}/test`, `GET /runs` (Filter `plugin`, `status`, `kind`, `before`, `scope=full`), `GET /runs/active`, `GET /runs/{id}`, `GET /runs/{id}/logs?after=`, `POST /runs/{id}/cancel` |
 | Events | `GET /events`, `GET /events/{id}`, `POST /events/ack`, `GET /events/types`, `GET /events/counts`, `GET /diff` |
 | Regeln | `/rules` (CRUD), `PUT /rules/order`, `POST /rules/test`, `POST /rules/{id}/test`, `GET /notifications` (Filter `status`, `publisher`, `event`, `rule`), `GET /publishers` |

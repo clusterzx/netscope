@@ -94,7 +94,7 @@ gespeicherten Werte, bevor sie gegen das Schema normalisiert werden, und muss id
 | Feld | Bedeutung |
 |---|---|
 | `Settings` | validierte Einstellungen (typisierte Getter) |
-| `Targets` | aufgelöster Scope: `Subnets` (CIDR + Interface), `Devices` (inkl. IPs, MACs, offene Ports), `DeviceMode` |
+| `Targets` | aufgelöster Scope: `Subnets` (CIDR, Interface, `Routed` = nur über Router/Tunnel erreichbar, kein Layer 2), `Devices` (inkl. IPs, MACs, offene Ports), `DeviceMode` |
 | `Sink` | `Observe(ctx, *Observation)` – schreibt **sofort** (eine Transaktion pro Aufruf) |
 | `Events` | `Emit(ctx, Event)` – nur Processor |
 | `Creds` | `Get(ctx, id)` – entschlüsselt ein Vault-Credential; `Applicable(ctx, target, types, allowed)` – passende Credentials für ein Ziel, spezifischste zuerst |
@@ -105,6 +105,7 @@ gespeicherten Werte, bevor sie gegen das Schema normalisiert werden, und muss id
 | `Progress(done, total)`, `AddStat`, `SetStat` | Live-Fortschritt und Laufstatistik |
 | `Live(topic, typ, data)` | Live-Nachricht an die Oberfläche (SSE); nur freigegebene Topics (derzeit `health`) |
 | `PresenceIncomplete(prefixes…)` | Subnetze, die in diesem Lauf nicht zuverlässig gescannt wurden – dort zählt niemand als „verpasst“ |
+| `NotCovered(prefixes…)` | Subnetze, die das Plugin bewusst nicht bearbeitet (z. B. ARP in gerouteten Netzen) – wie oben, aber ohne Warnung |
 | `Parallelism()` | konfigurierte Parallelität, mit `plugin.ForEach` nutzen |
 | `Env.PublicURL` | Basis-URL für Deep-Links |
 

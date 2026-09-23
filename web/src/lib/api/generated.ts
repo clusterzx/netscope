@@ -63,6 +63,7 @@ export interface ApiCreateDeviceRequest {
 
 export interface ApiCredentialUse {
 	id: string;
+	kind: string;
 	name: string;
 }
 
@@ -340,6 +341,23 @@ export interface ApiSplitRequest {
 	macs: string[];
 }
 
+export interface ApiSubnetView {
+	access: string;
+	cidr: string;
+	createdAt: string;
+	deviceCount: number;
+	enabled: boolean;
+	gateway: string;
+	id: number;
+	interface: string;
+	name: string;
+	notes: string;
+	tunnel?: TunnelStatus;
+	tunnelCredentialId?: number;
+	updatedAt: string;
+	vlan?: number;
+}
+
 export interface ApiSystemInfo {
 	client: ApiClientInfo;
 	configPath: string;
@@ -379,6 +397,18 @@ export interface ApiTopCVE {
 	cve: string;
 	cvss: number;
 	devices: number;
+}
+
+export interface ApiTunnelInput {
+	config?: string;
+	credentialId?: number;
+	subnets?: string[];
+}
+
+export interface ApiTunnelOverview {
+	available: boolean;
+	reason?: string;
+	tunnels: TunnelStatus[];
 }
 
 export interface ApiUploadResponse {
@@ -1018,6 +1048,7 @@ export interface InventorySavedView {
 }
 
 export interface InventorySubnet {
+	access: string;
 	cidr: string;
 	createdAt: string;
 	deviceCount: number;
@@ -1027,6 +1058,7 @@ export interface InventorySubnet {
 	interface: string;
 	name: string;
 	notes: string;
+	tunnelCredentialId?: number;
 	updatedAt: string;
 	vlan?: number;
 }
@@ -1492,12 +1524,47 @@ export interface TimeseriesSeries {
 	unit?: string;
 }
 
+export interface TunnelStatus {
+	addresses: string[];
+	credentialId: number;
+	endpoint: string;
+	error?: string;
+	interface: string;
+	lastHandshake?: string;
+	name: string;
+	publicKey: string;
+	rxBytes: number;
+	since: string;
+	state: string;
+	subnets: string[];
+	txBytes: number;
+	warnings: string[];
+}
+
+export interface TunnelTestResult {
+	latencyMs?: number;
+	message: string;
+	ok: boolean;
+}
+
 export interface VaultCredentialInput {
 	description: string;
 	name: string;
 	scope?: PluginScope;
 	type: string;
 	values: Record<string, unknown>;
+}
+
+export interface WgconfSummary {
+	addresses: string[];
+	allowedIps: string[];
+	endpoint: string;
+	keepalive: number;
+	mtu?: number;
+	peerPublicKey: string;
+	presharedKey: boolean;
+	publicKey: string;
+	warnings: string[];
 }
 
 /** All documented endpoints: ApiPaths[path][method] = { query, body, response }. */
@@ -1928,14 +1995,14 @@ export interface ApiPaths {
 		get: { query: { topics?: string | null }; body: never; response: unknown };
 	};
 	'/api/v1/subnets': {
-		/** Subnetze */
-		get: { query: never; body: never; response: InventorySubnet[] };
+		/** Subnetze (mit Tunnel-Zustand) */
+		get: { query: never; body: never; response: ApiSubnetView[] };
 		/** Subnetz anlegen */
-		post: { query: never; body: InventorySubnet; response: InventorySubnet };
+		post: { query: never; body: InventorySubnet; response: ApiSubnetView };
 	};
 	'/api/v1/subnets/{id}': {
 		/** Subnetz ändern */
-		put: { query: never; body: InventorySubnet; response: InventorySubnet };
+		put: { query: never; body: InventorySubnet; response: ApiSubnetView };
 		/** Subnetz löschen */
 		delete: { query: never; body: never; response: ApiOkResponse };
 	};
@@ -2018,6 +2085,18 @@ export interface ApiPaths {
 	'/api/v1/topology/edges/{id}': {
 		/** Kante löschen */
 		delete: { query: never; body: never; response: ApiOkResponse };
+	};
+	'/api/v1/tunnels': {
+		/** WireGuard-Tunnel und ihr Zustand */
+		get: { query: never; body: never; response: ApiTunnelOverview };
+	};
+	'/api/v1/tunnels/inspect': {
+		/** WireGuard-Konfiguration prüfen (liefert nur öffentliche Angaben und Hinweise) */
+		post: { query: never; body: ApiTunnelInput; response: WgconfSummary };
+	};
+	'/api/v1/tunnels/test': {
+		/** Verbindungstest: Handshake mit dem WireGuard-Server (bis 10 s) */
+		post: { query: never; body: ApiTunnelInput; response: TunnelTestResult };
 	};
 	'/api/v1/uploads': {
 		/** Datei hochladen (multipart „file“, z. B. für Importer) */

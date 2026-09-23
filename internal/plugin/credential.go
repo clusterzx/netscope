@@ -14,6 +14,9 @@ const (
 	CredSNMPv2c  = "snmp_v2c"
 	CredSNMPv3   = "snmp_v3"
 	CredAPIToken = "api_token"
+	// CredWireGuard is a WireGuard client configuration for a tunnel into a remote subnet
+	// (used by subnets, not by plugins).
+	CredWireGuard = "wireguard"
 )
 
 // Credential is a decrypted vault entry. Only plugins get decrypted credentials;
@@ -91,6 +94,11 @@ func CredentialTypes() []CredentialType {
 		{CredAPIToken, "API-Token", "Token für HTTP-APIs (z. B. Proxmox: Token-ID user@realm!name + Secret).", Schema{Fields: []Field{
 			{Key: "token_id", Type: FieldString, Label: "Token-ID", Description: "Bei Proxmox: user@realm!tokenname. Sonst optional."},
 			{Key: "token", Type: FieldSecret, Label: "Token/Secret", Required: true},
+		}}},
+		{CredWireGuard, "WireGuard-Tunnel", "Client-Konfiguration für einen Tunnel in ein entferntes Netz. Wird bei einem Subnetz unter „Erreichbarkeit“ ausgewählt.", Schema{Fields: []Field{
+			{Key: "config", Type: FieldSecret, Label: "Konfiguration", Required: true, Multiline: true,
+				Placeholder: "[Interface]\nPrivateKey = …\nAddress = 10.10.10.3/32\n\n[Peer]\nPublicKey = …\nEndpoint = vpn.example.org:51820\nAllowedIPs = 192.168.1.0/24",
+				Description: "Inhalt der .conf-Datei (wg-quick-Format), z. B. aus dem Peer-Generator der OPNsense. Einen eigenen Zugang nur für NetScope anlegen – die Konfiguration eines anderen Geräts nicht wiederverwenden."},
 		}}},
 	}
 }

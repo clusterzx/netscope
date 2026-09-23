@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"runtime/debug"
+	"slices"
 	"sync"
 	"time"
 
@@ -213,6 +215,9 @@ func (h *Host) execute(r queuedRun, a *activeRun, runCtx context.Context) {
 	if terr != nil {
 		runErr = fmt.Errorf("Scope auflösen: %w", terr)
 	} else {
+		if skipped := h.dropUnreachable(&targets); len(skipped) > 0 {
+			logger.Info("Subnetze übersprungen – Tunnel getrennt", "subnets", prefixList(skipped))
+		}
 		rc.Targets = targets
 		if len(targets.Subnets) > 0 || len(targets.Devices) > 0 {
 			logger.Log(ctx, lifecycleLevel(r.trigger), "Lauf gestartet", "subnets", len(targets.Subnets), "devices", len(targets.Devices), "trigger", r.trigger)
@@ -306,27 +311,31 @@ func (h *Host) execute(r queuedRun, a *activeRun, runCtx context.Context) {
 	}
 	summary := plugin.RunSummary{RunID: r.id, PluginID: r.pluginID, Kind: info.Kind, Status: status, Presence: info.Presence,
 		Targets: rc.Targets, Started: started, Finished: finished, Error: errText}
-	if all, prefixes := rc.IncompletePresence(); all {
+	all, incomplete := rc.IncompletePresence()
+	notCovered := rc.NotCoveredSubnets()
+	if all {
 		summary.Presence = false
-	} else if len(prefixes) > 0 {
-		// subnets whose scan failed must not count their devices as missed
+	} else if len(incomplete) > 0 || len(notCovered) > 0 {
+		// subnets whose scan failed or that the plugin does not cover must not count
+		// their devices as missed
+		excluded := append(append([]netip.Prefix(nil), incomplete...), notCovered...)
 		var kept []plugin.SubnetTarget
 		for _, sn := range summary.Targets.Subnets {
-			skip := false
-			for _, p := range prefixes {
-				if p.Masked() == sn.CIDR.Masked() {
-					skip = true
-				}
-			}
-			if !skip {
+			if !slices.ContainsFunc(excluded, func(p netip.Prefix) bool { return p.Masked() == sn.CIDR.Masked() }) {
 				kept = append(kept, sn)
 			}
 		}
 		summary.Targets.Subnets = kept
-		if len(kept) == 0 {
+		if summary.Targets.DeviceMode {
+			summary.Targets.Devices = slices.DeleteFunc(slices.Clone(summary.Targets.Devices), func(d plugin.DeviceInfo) bool {
+				return onlyIn(d, excluded)
+			})
+		} else if len(kept) == 0 {
 			summary.Presence = false
 		}
-		logger.Warn("Anwesenheitsauswertung ohne fehlgeschlagene Subnetze", "subnets", len(prefixes))
+		if len(incomplete) > 0 {
+			logger.Warn("Anwesenheitsauswertung ohne fehlgeschlagene Subnetze", "subnets", len(incomplete))
+		}
 	}
 	if err := h.Inventory.RunFinished(bg, summary); err != nil {
 		h.Log.Error("presence evaluation", "plugin", r.pluginID, "err", err)

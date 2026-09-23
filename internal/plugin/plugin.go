@@ -178,6 +178,9 @@ type SubnetTarget struct {
 	Name      string       `json:"name"`
 	Interface string       `json:"interface"`
 	Gateway   string       `json:"gateway"`
+	// Routed subnets are reached through a router or tunnel: layer-2 methods (ARP,
+	// broadcasts) do not work there and MAC addresses are not visible.
+	Routed bool `json:"routed"`
 }
 
 // PortRef is an open port of a known device.
@@ -305,6 +308,7 @@ type RunContext struct {
 	statsMu    sync.Mutex
 	stats      map[string]any
 	incomplete []netip.Prefix
+	notCovered []netip.Prefix
 	allUnsure  bool
 }
 
@@ -319,6 +323,22 @@ func (rc *RunContext) PresenceIncomplete(prefixes ...netip.Prefix) {
 		return
 	}
 	rc.incomplete = append(rc.incomplete, prefixes...)
+}
+
+// NotCovered tells the core that the plugin deliberately does not work on the given
+// subnets (e.g. ARP scans on routed networks): their devices are neither seen nor missed
+// by this run. Unlike PresenceIncomplete this is expected and not logged as a problem.
+func (rc *RunContext) NotCovered(prefixes ...netip.Prefix) {
+	rc.statsMu.Lock()
+	defer rc.statsMu.Unlock()
+	rc.notCovered = append(rc.notCovered, prefixes...)
+}
+
+// NotCoveredSubnets returns what NotCovered recorded.
+func (rc *RunContext) NotCoveredSubnets() []netip.Prefix {
+	rc.statsMu.Lock()
+	defer rc.statsMu.Unlock()
+	return append([]netip.Prefix(nil), rc.notCovered...)
 }
 
 // IncompletePresence returns what PresenceIncomplete recorded.

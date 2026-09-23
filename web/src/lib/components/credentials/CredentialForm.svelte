@@ -189,30 +189,32 @@
 			<div class="border-t border-border pt-4">
 				<SchemaForm {fields} bind:values errors={schemaErrors} idPrefix="cred-{typeId}" compact />
 			</div>
-			<section class="border-t border-border pt-4" aria-labelledby="cred-scope-title">
-				<div class="flex flex-wrap items-start justify-between gap-2">
-					<div class="min-w-0">
-						<h3 id="cred-scope-title" class="text-[0.8125rem] font-medium text-fg">Gilt für</h3>
-						<p class="text-sm break-words text-fg-muted">{scopeText}</p>
+			{#if typeId !== 'wireguard'}
+				<section class="border-t border-border pt-4" aria-labelledby="cred-scope-title">
+					<div class="flex flex-wrap items-start justify-between gap-2">
+						<div class="min-w-0">
+							<h3 id="cred-scope-title" class="text-[0.8125rem] font-medium text-fg">Gilt für</h3>
+							<p class="text-sm break-words text-fg-muted">{scopeText}</p>
+						</div>
+						<Button
+							size="sm"
+							icon={showScope ? 'chevron-up' : 'edit'}
+							aria-expanded={showScope}
+							aria-controls="cred-scope"
+							onclick={() => (showScope = !showScope)}>{showScope ? 'Einklappen' : 'Anpassen'}</Button
+						>
 					</div>
-					<Button
-						size="sm"
-						icon={showScope ? 'chevron-up' : 'edit'}
-						aria-expanded={showScope}
-						aria-controls="cred-scope"
-						onclick={() => (showScope = !showScope)}>{showScope ? 'Einklappen' : 'Anpassen'}</Button
-					>
-				</div>
-				<p class="mt-1 text-xs text-fg-subtle">
-					Plugins ohne eigene Auswahl nehmen pro Gerät automatisch die passenden Zugangsdaten – zuerst die dem
-					Gerät zugewiesenen, dann Gruppe, Tag oder Filter, dann Subnetz, zuletzt „überall“.
-				</p>
-				{#if showScope}
-					<div id="cred-scope" class="mt-4">
-						<ScopeEditor bind:value={scope} mode="credential" errors={scopeErrors} idPrefix="cred-scope" />
-					</div>
-				{/if}
-			</section>
+					<p class="mt-1 text-xs text-fg-subtle">
+						Plugins ohne eigene Auswahl nehmen pro Gerät automatisch die passenden Zugangsdaten – zuerst die
+						dem Gerät zugewiesenen, dann Gruppe, Tag oder Filter, dann Subnetz, zuletzt „überall“.
+					</p>
+					{#if showScope}
+						<div id="cred-scope" class="mt-4">
+							<ScopeEditor bind:value={scope} mode="credential" errors={scopeErrors} idPrefix="cred-scope" />
+						</div>
+					{/if}
+				</section>
+			{/if}
 			<p class="flex items-start gap-1.5 text-xs text-fg-subtle">
 				<Icon name="lock" size={13} class="mt-px shrink-0" />
 				Secrets werden verschlüsselt gespeichert und danach nie wieder angezeigt.
