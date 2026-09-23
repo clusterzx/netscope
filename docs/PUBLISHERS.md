@@ -10,7 +10,7 @@ N Minuten – und übergibt sie dem Publisher.
 | Telegram | `telegram` | Bot-API `sendMessage` | MarkdownV2, gebündelt, Deep-Links |
 | Webhook | `webhook` | HTTP `POST`/`PUT` | JSON – NetScope-Payload v1, optional HMAC-signiert |
 | ntfy | `ntfy` | ntfy.sh oder eigener Server | JSON-Publishing, Markdown, Emoji-Tags |
-| E-Mail | `email` | SMTP (STARTTLS/TLS) | `multipart/alternative` (Text + HTML) |
+| E-Mail | `email` | SMTP (STARTTLS/TLS) | `multipart/alternative` (Text + HTML), Berichte zusätzlich mit PDF-Anhang |
 | n8n | `n8n` | n8n-Webhook-Node | JSON – NetScope-Payload v1 |
 
 Alle Publisher sind nach der Installation **deaktiviert** und haben keinen Zeitplan. Aktivieren
@@ -133,8 +133,9 @@ Aufbau:
   Meldung, Link „Öffnen“, Markierungen „⏰ eskaliert“ / „✅ quittiert“.
 - **Höchstens 20 Events** pro Benachrichtigung, danach „… und N weitere Ereignisse – Alle
   anzeigen“ (Link auf die Benachrichtigung in der UI).
-- **Berichte und Tests:** Der Markdown-Text aus `body` wird als reiner, escapeter Text
-  gesendet (Markdown-Zeichen erscheinen wörtlich).
+- **Berichte und Tests:** Der Markdown-Text aus `body` wird umgesetzt: Überschriften und
+  `**fett**` erscheinen fett, Listenpunkte mit „•“; alles andere wird escaped (unpaarige
+  Markdown-Zeichen erscheinen wörtlich).
 - **Lange Nachrichten** (> 4096 Zeichen, gezählt in UTF-16 wie bei Telegram) werden an
   Event-Grenzen bzw. Zeilen geteilt. Folgenachrichten beginnen mit „*Titel* (Fortsetzung)“, alle
   Teile enden mit „Teil i/n“. Teile werden im Abstand von 1 s gesendet.
@@ -356,10 +357,20 @@ Fehler werden mit der Meldung des Servers zurückgegeben, z. B.
 
 1. `text/plain; charset=utf-8` – die Textdarstellung der Benachrichtigung (bei Eskalationen mit
    Hinweiszeile), quoted-printable,
-2. `text/html; charset=utf-8` – schlichtes HTML mit Inline-Styles: Kopf mit Priorität, Regel
-   und Anzahl, Tabelle der Events (farbiges Schweregrad-Label, Titel mit Link, Meldung, Gerät
-   mit Link und IP, Zeit), bei Berichten der Text, Fußzeile mit Link in die UI. Eskalationen
-   bekommen einen roten Balken „⏰ Eskalation – nicht quittiert“.
+2. `text/html; charset=utf-8` – HTML im NetScope-Design, nur Tabellen und Inline-Styles
+   (Outlook, Gmail, Apple Mail): dunkles Kopfband mit Wortmarke und Art der Nachricht, Titel,
+   Tabelle der Events (Schweregrad-Chips, Titel mit Link, Meldung, Gerät mit Link und IP,
+   Zeit), Fußzeile mit Button „In NetScope öffnen“. Eskalationen bekommen einen roten Balken
+   „⏰ Eskalation – nicht quittiert“. Texte (z. B. Testnachrichten) werden aus Markdown
+   dargestellt. Auf Smartphones greifen Media-Queries (Kacheln 2 × 2, Nebenspalten
+   ausgeblendet); Clients ohne `<style>`-Unterstützung zeigen das Desktop-Layout.
+
+**Berichte** (Wochenbericht, „Jetzt versenden“) kommen als `multipart/mixed`: die obige
+Nachricht mit eigenem Berichtslayout – Kennzahl-Kacheln (Geräte, online, neu, unbekannt),
+offene Events und aktive Schwachstellen als farbige Chips, Tabellen für wichtige Ereignisse,
+neue Geräte, neue Schwachstellen, ablaufende Zertifikate, Ausfälle und fehlgeschlagene Läufe,
+Balken für die Ereignisse nach Typ – plus der vollständige Bericht als **PDF-Anhang**. Lange
+Listen sind in der Mail gekürzt („… und N weitere im PDF-Anhang“).
 
 Header: `From`, `To`, `Subject` (RFC 2047, Umlaute kodiert), `Date`, `Message-ID`,
 `MIME-Version`, `Auto-Submitted: auto-generated`, `X-Mailer: NetScope/1.0`,

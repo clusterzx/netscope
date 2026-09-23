@@ -262,8 +262,8 @@ func TestRenderReportAndTest(t *testing.T) {
 		Link: "https://netscope.example/reports/38",
 	}
 	msgs := render(n, time.UTC)
-	want := "📊 *Wochenbericht KW 38*\n\n\\# Änderungen\n\n\\- \\*\\*3\\*\\* neue Geräte \\(IoT\\)\n" +
-		"\\- 1 CVE \\>\\= 9\\.0: \\`CVE\\-2024\\-6387\\`\n\\| a \\| b \\|\n\n" +
+	want := "📊 *Wochenbericht KW 38*\n\n*Änderungen*\n\n• *3* neue Geräte \\(IoT\\)\n" +
+		"• 1 CVE \\>\\= 9\\.0: \\`CVE\\-2024\\-6387\\`\n\\| a \\| b \\|\n\n" +
 		"[In NetScope öffnen](https://netscope.example/reports/38)"
 	if len(msgs) != 1 || msgs[0] != want {
 		t.Fatalf("report:\n%q\nwant\n%q", msgs, want)
@@ -374,7 +374,7 @@ func TestRenderLongReportBody(t *testing.T) {
 		plain, _ := mustValid(t, m)
 		all.WriteString(plain)
 	}
-	for _, want := range []string{"- Gerät 000: 192.168.8.0 (neu) [ok]", "- Gerät 299: 192.168.8.44 (neu) [ok]"} {
+	for _, want := range []string{"• Gerät 000: 192.168.8.0 (neu) [ok]", "• Gerät 299: 192.168.8.44 (neu) [ok]"} {
 		if !strings.Contains(all.String(), want) {
 			t.Errorf("missing %q", want)
 		}

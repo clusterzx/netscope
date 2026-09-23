@@ -70,6 +70,24 @@ type Notification struct {
 	Events    []EventView `json:"events,omitempty"`
 	Link      string      `json:"link,omitempty"` // deep link into the UI
 	CreatedAt time.Time   `json:"createdAt"`
+
+	// Optional rich content (reports). Publishers that cannot use it ignore it; Body
+	// stays the complete Markdown fallback. Not part of JSON payloads (size).
+	HTML        string       `json:"-"` // email-safe HTML fragment for the message body
+	Attachments []Attachment `json:"-"` // files, e.g. the report as PDF
+}
+
+// Attachment is a file sent along with a notification.
+type Attachment struct {
+	Name        string `json:"name"`
+	ContentType string `json:"contentType"`
+	Data        []byte `json:"data"` // base64 in JSON
+}
+
+// NotificationExtra is the rich content stored with a queued notification.
+type NotificationExtra struct {
+	HTML        string       `json:"html,omitempty"`
+	Attachments []Attachment `json:"attachments,omitempty"`
 }
 
 // PlainText renders the notification as plain text (used by email, ntfy, logs).

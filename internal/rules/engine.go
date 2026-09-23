@@ -373,12 +373,13 @@ type pending struct {
 	eventIDs  []int64
 	title     string
 	body      string
+	extra     string // JSON plugin.NotificationExtra
 	attempts  int
 	created   int64
 }
 
 func (e *Engine) deliverDue(ctx context.Context) error {
-	rows, err := e.db.R.QueryContext(ctx, `SELECT id, rule_id, publisher_id, kind, priority, event_ids, title, body, attempts, created_at
+	rows, err := e.db.R.QueryContext(ctx, `SELECT id, rule_id, publisher_id, kind, priority, event_ids, title, body, extra, attempts, created_at
 		FROM notifications WHERE status = ? AND deliver_after <= ? ORDER BY deliver_after LIMIT 50`, NStatusPending, e.nowFn().UnixMilli())
 	if err != nil {
 		return err
@@ -389,7 +390,7 @@ func (e *Engine) deliverDue(ctx context.Context) error {
 			p   pending
 			ids string
 		)
-		if err := rows.Scan(&p.id, &p.ruleID, &p.publisher, &p.kind, &p.priority, &ids, &p.title, &p.body, &p.attempts, &p.created); err != nil {
+		if err := rows.Scan(&p.id, &p.ruleID, &p.publisher, &p.kind, &p.priority, &ids, &p.title, &p.body, &p.extra, &p.attempts, &p.created); err != nil {
 			rows.Close()
 			return err
 		}
@@ -426,6 +427,9 @@ func (e *Engine) BuildNotification(ctx context.Context, id int64, kind, priority
 		Title: title, Body: body, CreatedAt: created}
 	if base != "" {
 		n.Link = base + "/events"
+		if kind == plugin.NotifyReport {
+			n.Link = base + "/reports"
+		}
 	}
 	for _, ev := range evs {
 		link, devLink := eventLinks(base, ev)
@@ -497,6 +501,14 @@ func (e *Engine) deliver(ctx context.Context, p pending) {
 		}
 	}
 	n := e.BuildNotification(ctx, p.id, p.kind, p.priority, ruleName, p.ruleID.Int64, evs, p.title, p.body, time.UnixMilli(p.created))
+	if p.extra != "" && p.extra != "{}" {
+		var x plugin.NotificationExtra
+		if err := json.Unmarshal([]byte(p.extra), &x); err != nil {
+			e.log.Warn("Zusatzinhalt der Benachrichtigung unlesbar", "notification", p.id, "err", err)
+		} else {
+			n.HTML, n.Attachments = x.HTML, x.Attachments
+		}
+	}
 	err = e.pub.Publish(ctx, p.publisher, n)
 	e.finish(ctx, p, err)
 }

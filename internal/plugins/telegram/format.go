@@ -195,7 +195,40 @@ func render(n *plugin.Notification, loc *time.Location) []string {
 	return pack(head.String(), cont, segs, maxMessageLen-partReserve)
 }
 
-// bodyPieces escapes a report/test body line by line; overlong lines are split so that
+// bodyLine renders one line of a Markdown body (reports, tests) as MarkdownV2: headings and
+// **bold** become bold, list items get a bullet, everything else is escaped. Unbalanced
+// markers stay literal.
+func bodyLine(line string) string {
+	t := strings.TrimSpace(line)
+	switch {
+	case strings.HasPrefix(t, "#"):
+		if h := strings.TrimSpace(strings.ReplaceAll(strings.TrimLeft(t, "#"), "**", "")); h != "" {
+			return "*" + escape(h) + "*"
+		}
+	case strings.HasPrefix(t, "- "), strings.HasPrefix(t, "* "):
+		return "• " + inlineBold(strings.TrimSpace(t[2:]))
+	}
+	return inlineBold(line)
+}
+
+// inlineBold escapes s and turns **x** into bold.
+func inlineBold(s string) string {
+	parts := strings.Split(s, "**")
+	if len(parts) < 3 || len(parts)%2 == 0 {
+		return escape(s)
+	}
+	var b strings.Builder
+	for i, p := range parts {
+		if i%2 == 1 && p != "" {
+			b.WriteString("*" + escape(p) + "*")
+		} else {
+			b.WriteString(escape(p))
+		}
+	}
+	return b.String()
+}
+
+// bodyPieces renders a report/test body line by line; overlong lines are split so that
 // every piece fits into a message.
 func bodyPieces(body string) []string {
 	body = strings.Trim(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
@@ -207,10 +240,10 @@ func bodyPieces(body string) []string {
 		line = strings.TrimRight(line, " \t")
 		rs := []rune(line)
 		for len(rs) > maxBodyPieceRunes {
-			out = append(out, escape(string(rs[:maxBodyPieceRunes])))
+			out = append(out, bodyLine(string(rs[:maxBodyPieceRunes])))
 			rs = rs[maxBodyPieceRunes:]
 		}
-		out = append(out, escape(string(rs)))
+		out = append(out, bodyLine(string(rs)))
 	}
 	return out
 }

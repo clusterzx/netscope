@@ -84,6 +84,10 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		base = rc.Env.PublicURL + "/reports"
 	}
 	body := r.Markdown(loc, base)
+	extra, err := r.NotificationExtra(loc, rc.Env.PublicURL)
+	if err != nil {
+		return fmt.Errorf("Bericht als PDF: %w", err)
+	}
 	_, week := to.In(loc).ISOWeek()
 	title := strings.TrimSpace(rc.Settings.String("title"))
 	if title == "" {
@@ -93,8 +97,8 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	now := db.Now()
 	for _, pub := range pubs {
 		if _, err := rc.DB.W.ExecContext(ctx, `INSERT INTO notifications(publisher_id, kind, priority, status, event_ids, title, body,
-			deliver_after, created_at) VALUES (?, ?, ?, 'pending', '[]', ?, ?, ?, ?)`, pub, plugin.NotifyReport, rc.Settings.String("priority"),
-			title, body, now, now); err != nil {
+			extra, deliver_after, created_at) VALUES (?, ?, ?, 'pending', '[]', ?, ?, ?, ?, ?)`, pub, plugin.NotifyReport, rc.Settings.String("priority"),
+			title, body, extra, now, now); err != nil {
 			return err
 		}
 		rc.Log.Info("Bericht eingereiht", "publisher", pub)

@@ -3,6 +3,7 @@ package email
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"io"
 	"log/slog"
@@ -235,7 +236,7 @@ func checkMIME(t *testing.T, data []byte, n *plugin.Notification) {
 		`<a href="http://192.168.8.123:8080/events/1"`,
 		`<a href="http://192.168.8.123:8080/devices/5"`,
 		`<a href="http://192.168.8.123:8080/events?notification=11"`,
-		"background-color:#b91c1c", "background-color:#a16207", ">Kritisch</span>", ">Mittel</span>",
+		"background-color:#fdecef;color:#be123c", "background-color:#fdf6e3;color:#a66300", ">Kritisch</span>", ">Mittel</span>",
 		"Hersteller: Espressif &amp; Co.<br>Quelle: arpscan",
 		"Priorität: Hoch · Regel: Unbekannte Geräte · 2 Ereignisse", "&#9989; quittiert", "22.09.2026 12:04",
 	} {
@@ -450,5 +451,85 @@ func TestValidateSettings(t *testing.T) {
 		if (err == nil) != tc.ok {
 			t.Errorf("%v: err = %v, want ok=%v", tc.settings, err, tc.ok)
 		}
+	}
+}
+
+func TestAttachmentAndReportHTML(t *testing.T) {
+	from, _ := mail.ParseAddress("netscope@example.org")
+	to, _ := mail.ParseAddress("admin@example.org")
+	pdf := bytes.Repeat([]byte("%PDF-1.4 binär \x00\xff"), 200)
+	n := &plugin.Notification{Kind: plugin.NotifyReport, Priority: plugin.PrioNormal, Title: "Wochenbericht",
+		Body: "**Zeitraum:** heute", HTML: `<div id="report-html">Kacheln</div>`,
+		Attachments: []plugin.Attachment{{Name: "bericht.pdf", ContentType: "application/pdf", Data: pdf}}}
+	data, err := buildMessage(n, envelope{From: from, To: []*mail.Address{to}, Now: time.Now(), Loc: time.UTC})
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err := mail.ReadMessage(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mt, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	if err != nil || mt != "multipart/mixed" {
+		t.Fatalf("content type %q: %v", mt, err)
+	}
+	mr := multipart.NewReader(msg.Body, params["boundary"])
+	// part 1: the alternative with text and the report HTML
+	p1, err := mr.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	amt, aparams, _ := mime.ParseMediaType(p1.Header.Get("Content-Type"))
+	if amt != "multipart/alternative" {
+		t.Fatalf("first part %q", amt)
+	}
+	ar := multipart.NewReader(p1, aparams["boundary"])
+	var htmlPart string
+	for {
+		p, err := ar.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(quotedprintable.NewReader(p))
+		if strings.HasPrefix(p.Header.Get("Content-Type"), "text/html") {
+			htmlPart = string(b)
+		}
+	}
+	if !strings.Contains(htmlPart, `<div id="report-html">Kacheln</div>`) || strings.Contains(htmlPart, "**Zeitraum") ||
+		!strings.Contains(htmlPart, "bericht.pdf") {
+		t.Errorf("report HTML not used: %s", htmlPart)
+	}
+	// part 2: the PDF, base64, byte-exact
+	p2, err := mr.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p2.FileName() != "bericht.pdf" || !strings.HasPrefix(p2.Header.Get("Content-Type"), "application/pdf") {
+		t.Fatalf("attachment headers %v", p2.Header)
+	}
+	got, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, p2))
+	if err != nil || !bytes.Equal(got, pdf) {
+		t.Fatalf("attachment content differs (%v)", err)
+	}
+	if _, err := mr.NextPart(); err != io.EOF {
+		t.Fatalf("unexpected extra part: %v", err)
+	}
+}
+
+func TestMarkdownHTML(t *testing.T) {
+	out := markdownHTML("## Neue Geräte\n- **nas** (192.168.8.5)\n- <b>tv</b>\n\nText mit `code` und https://ns.lan/x.\nZweite Zeile")
+	for _, want := range []string{
+		`>Neue Geräte</h2>`, `<li style="margin:0 0 4px 0;"><strong style=`, `&lt;b&gt;tv&lt;/b&gt;`, "<code style=",
+		`<a href="https://ns.lan/x" style=`, "code</code> und", "<br>Zweite Zeile",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("markdown lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "<b>") || strings.Contains(out, "**") || strings.Contains(out, "##") {
+		t.Errorf("raw markdown or html left: %s", out)
 	}
 }

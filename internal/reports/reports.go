@@ -479,6 +479,26 @@ func (r *ChangeReport) Markdown(loc *time.Location, baseURL string) string {
 	return strings.TrimSpace(b.String())
 }
 
+// NotificationExtra renders what mail publishers send with a report notification: the
+// HTML version and the PDF as attachment (JSON plugin.NotificationExtra). root is the
+// public URL of the UI ("" = no links).
+func (r *ChangeReport) NotificationExtra(loc *time.Location, root string) (string, error) {
+	if loc == nil {
+		loc = time.Local
+	}
+	var buf bytes.Buffer
+	if err := r.PDF(&buf, loc); err != nil {
+		return "", err
+	}
+	x := plugin.NotificationExtra{HTML: r.EmailHTML(loc, root), Attachments: []plugin.Attachment{{
+		Name:        "netscope-bericht_" + r.From.In(loc).Format("2006-01-02") + "_" + r.To.In(loc).Format("2006-01-02") + ".pdf",
+		ContentType: "application/pdf",
+		Data:        buf.Bytes(),
+	}}}
+	b, err := json.Marshal(x)
+	return string(b), err
+}
+
 // ToBytes renders a report in the given format.
 func (r *ChangeReport) ToBytes(format string, loc *time.Location, baseURL string) ([]byte, string, error) {
 	switch format {

@@ -222,10 +222,15 @@ func (s *Server) handleSendReport(w http.ResponseWriter, r *http.Request) {
 	}
 	title := fmt.Sprintf("NetScope Änderungsbericht %s–%s", from.In(s.Config.Location).Format("02.01."), to.In(s.Config.Location).Format("02.01.2006"))
 	body := rep.Markdown(s.Config.Location, base)
+	extra, err := rep.NotificationExtra(s.Config.Location, s.Settings.System().PublicURL)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	now := db.Now()
 	for _, id := range req.Publishers {
 		if _, err := s.DB.W.ExecContext(r.Context(), `INSERT INTO notifications(publisher_id, kind, priority, status, event_ids, title, body,
-			deliver_after, created_at) VALUES (?, ?, 'normal', 'pending', '[]', ?, ?, ?, ?)`, id, plugin.NotifyReport, title, body, now, now); err != nil {
+			extra, deliver_after, created_at) VALUES (?, ?, 'normal', 'pending', '[]', ?, ?, ?, ?, ?)`, id, plugin.NotifyReport, title, body, extra, now, now); err != nil {
 			s.fail(w, r, err)
 			return
 		}
