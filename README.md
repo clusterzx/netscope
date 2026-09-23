@@ -185,8 +185,8 @@ sofort, ohne Neustart.
 | `snmp` | Scanner | aus | v2c/v3: System, Interfaces, ARP, Bridge-FDB, LLDP (für die Topologie) |
 | `ssh` | Scanner | aus | Linux-Inventar: OS, Kernel, CPU/RAM/Disks, Pakete, Dienste, Sockets, Docker, Uptime, Updates – nur feste Lesekommandos |
 | `wol` | Aktion | – | Wake-on-LAN pro Gerät bzw. als Massenaktion |
-| `proxmox` | Importer | aus | VMs/CTs mit VMID, Status, MACs, Ressourcen, Node; verknüpft VM ↔ Gerät („läuft auf Node X“) |
-| `openwrt` | Importer | aus | DHCP-Leases und statische Leases (SSH oder LuCI-RPC) |
+| `proxmox` | Importer | aus | VMs/CTs mit VMID, Status, MACs, Ressourcen, Node; verknüpft VM ↔ Gerät („läuft auf Node X“); mehrere Hosts/Cluster; optional Docker-Container in LXCs |
+| `openwrt` | Importer | aus | DHCP-Leases und statische Leases (SSH oder LuCI-RPC), mehrere Router |
 | `docker` | Importer | aus | Container, Images, Ports, Compose-Projekte (lokaler Socket, TCP oder SSH-Tunnel) |
 | `netalertx` | Importer | manuell | Einmaliger Import einer NetAlertX-Datenbank oder -CSV |
 | `csv` | Importer | manuell | Generischer Inventar-Import (Export: Reports) |
@@ -205,6 +205,17 @@ sofort, ohne Neustart.
 Zugangsdaten werden unter **Credentials** angelegt, verschlüsselt gespeichert und in den
 Plugin-Einstellungen nur referenziert. Die API liefert Secrets nie aus.
 
+**Gilt für (Geltungsbereich):** Jedes Credential hat einen Geltungsbereich – überall, ein
+oder mehrere Subnetze oder bestimmte Geräte (einzeln, per Gruppe, Tag oder Filter). Plugins,
+bei denen keine Zugangsdaten fest ausgewählt sind, nehmen pro Ziel automatisch die passenden –
+das spezifischste zuerst: dem Gerät zugewiesen → Gruppe/Tag/Filter → Subnetz → überall. Wird
+eins abgelehnt, probieren sie das nächste; das funktionierende merken sich SSH- und
+SNMP-Scanner pro Gerät. So bekommen zwei Proxmox-Hosts oder mehrere Router jeweils ihr eigenes
+Token bzw. Passwort, ohne dass man Plugins doppelt konfigurieren muss. Welche Zugangsdaten für
+ein Gerät gelten, zeigt die Karte **Zugangsdaten** auf der Geräteseite
+(`GET /api/v1/devices/{id}/credentials`). Eine feste Auswahl im Plugin schränkt auf diese
+Credentials ein (die Reihenfolge nach Geltungsbereich bleibt).
+
 - **SSH** (`ssh`, `openwrt`, `docker` über `ssh://`): Benutzer mit privatem Schlüssel und/oder
   Passwort. Hostschlüssel werden beim ersten Kontakt gespeichert (TOFU) und danach geprüft.
   Der SSH-Scanner führt nur eine feste Liste lesender Befehle aus.
@@ -215,8 +226,39 @@ Plugin-Einstellungen nur referenziert. Die API liefert Secrets nie aus.
   pveum aclmod / -user netscope@pve -role PVEAuditor
   pveum user token add netscope@pve netscope --privsep 0
   ```
-  Im Credential (Typ API-Token) als Token-ID `netscope@pve!netscope` plus Secret eintragen.
+  Im Credential (Typ API-Token) als Token-ID `netscope@pve!netscope` plus Secret eintragen und
+  bei mehreren Hosts unter „Gilt für“ dem jeweiligen Proxmox-Gerät zuweisen.
 - **OpenWrt/GL.iNet**: `root` mit dem Router-Passwort (SSH) oder LuCI-RPC (Paket `luci-mod-rpc`).
+
+### Docker-Container in Proxmox-LXCs
+
+Die Proxmox-API schaut nicht in Container hinein. Mit der Option **Docker-Container in LXCs
+erfassen** meldet sich der Proxmox-Importer per SSH am Node an und liest mit `pct exec` die
+Docker-Container aller laufenden LXCs (`docker ps`, `docker images`, `docker version` – nur
+lesend). Die Container erscheinen am jeweiligen LXC-Gerät und in der Topologie.
+
+Empfohlen ist ein eigener Schlüssel, der auf dem Node **nur** das Inventar-Skript ausführen
+darf (Forced Command). Das Skript
+[scripts/proxmox/netscope-docker-inventory](scripts/proxmox/netscope-docker-inventory) aus dem
+Repository auf jeden Node kopieren:
+
+```bash
+scp scripts/proxmox/netscope-docker-inventory root@pve.lan:/usr/local/sbin/
+ssh root@pve.lan chmod 0755 /usr/local/sbin/netscope-docker-inventory
+```
+
+Dann auf dem Node in `/root/.ssh/authorized_keys` eine Zeile mit dem öffentlichen Schlüssel von
+NetScope ergänzen – `from=` auf die IP von NetScope setzen:
+
+```
+command="/usr/local/sbin/netscope-docker-inventory",from="192.168.8.123",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA… netscope
+```
+
+Der Schlüssel kann dann weder eine Shell öffnen noch andere Befehle ausführen oder Ports
+weiterleiten – egal, was NetScope sendet, der Node führt nur das Skript aus. In NetScope ein
+SSH-Credential (Benutzer `root`, privater Schlüssel) anlegen und unter „Gilt für“ den
+Proxmox-Node wählen. Ohne Forced Command funktioniert es auch mit einem normalen root-Zugang;
+NetScope schickt dann dasselbe Skript als Befehl mit.
 
 ## Filter-Query-Sprache
 

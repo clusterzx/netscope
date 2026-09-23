@@ -115,6 +115,20 @@ type SettingsValidator interface {
 	ValidateSettings(s Settings) error
 }
 
+// EndpointProvider is implemented by importers that connect to configured hosts. The
+// core uses it to show on a device which credentials a plugin would use there.
+type EndpointProvider interface {
+	// Endpoints returns the host names or IP addresses the plugin connects to.
+	Endpoints(s Settings) []string
+}
+
+// SettingsMigrator converts stored settings of an older plugin version (renamed or
+// merged keys) before they are normalized against the current schema. It must be
+// idempotent: the host applies it every time the configuration is loaded.
+type SettingsMigrator interface {
+	MigrateSettings(stored map[string]any) map[string]any
+}
+
 // ActionScope says where an action button is shown.
 type ActionScope string
 
@@ -241,9 +255,14 @@ type EventEmitter interface {
 	Emit(ctx context.Context, ev Event) (int64, error)
 }
 
-// CredentialProvider decrypts vault credentials referenced by credential-ref fields.
+// CredentialProvider decrypts vault credentials referenced by credential-ref fields and
+// selects credentials by their scope.
 type CredentialProvider interface {
 	Get(ctx context.Context, id int64) (*Credential, error)
+	// Applicable returns the credentials whose scope covers the target, most specific
+	// first (see CredentialMatch.Rank). types restricts the credential types; a non-empty
+	// allowed list restricts the result to these ids and orders equal ranks by it.
+	Applicable(ctx context.Context, t CredentialTarget, types []string, allowed []int64) ([]CredentialMatch, error)
 }
 
 // InventoryReader gives read access to the inventory.

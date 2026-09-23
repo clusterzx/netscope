@@ -1,6 +1,7 @@
 // Package proxmox imports hypervisor nodes, virtual machines and containers from the
 // Proxmox VE API. Guests are linked to scanned devices by the MACs of their network
-// configuration and get a runs_on relation to their node.
+// configuration and get a runs_on relation to their node. Optionally the Docker
+// containers inside running LXC containers are read over SSH on the node (pct exec).
 package proxmox
 
 import (
@@ -10,13 +11,16 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"netscope/internal/plugin"
+	"netscope/internal/sshx"
 )
 
 func init() { plugin.Register(&Plugin{}) }
@@ -39,8 +43,8 @@ func (p *Plugin) Info() plugin.Info {
 		ID:          "proxmox",
 		Kind:        plugin.KindImporter,
 		Name:        "Proxmox VE",
-		Description: "Importiert Nodes, VMs und LXC-Container aus der Proxmox-VE-API (Name, VMID, Status, MACs, Ressourcen) und verknüpft sie per MAC mit gescannten Geräten inklusive „läuft auf Node X“.",
-		Version:     "1.0.0",
+		Description: "Importiert Nodes, VMs und LXC-Container aus der Proxmox-VE-API (Name, VMID, Status, MACs, Ressourcen) und verknüpft sie per MAC mit gescannten Geräten inklusive „läuft auf Node X“. Optional auch die Docker-Container in LXCs.",
+		Version:     "1.1.0",
 
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/15 * * * *",
@@ -54,12 +58,13 @@ func (p *Plugin) Info() plugin.Info {
 // Schema implements plugin.Plugin.
 func (p *Plugin) Schema() plugin.Schema {
 	return plugin.Schema{Fields: []plugin.Field{
-		{Key: "url", Type: plugin.FieldString, Label: "API-URL", Required: true, Placeholder: "https://pve.lan:8006",
-			Description: "Adresse eines Proxmox-Nodes mit Port. In einem Cluster genügt ein Node, alle anderen werden über ihn abgefragt.",
+		{Key: "urls", Type: plugin.FieldStringList, Label: "API-URLs", Required: true, Placeholder: "https://pve.lan:8006",
+			Description: "Eine Adresse pro Zeile, mit Port. In einem Cluster genügt ein Node, alle anderen werden über ihn abgefragt; weitere Nodes desselben Clusters dienen als Ausweichadresse und werden nicht doppelt importiert. Mehrere eigenständige Hosts oder Cluster einfach untereinander eintragen.",
 			Validation:  &plugin.Validation{Format: "url"}},
-		{Key: "credential", Type: plugin.FieldCredentialRef, Label: "API-Token", Required: true,
+		{Key: "credentials", Type: plugin.FieldCredentialRef, Label: "API-Tokens", Multi: true,
 			CredentialTypes: []string{plugin.CredAPIToken},
-			Description:     "Credential vom Typ API-Token mit Token-ID (user@realm!tokenname) und Secret. Lesende Rechte genügen, z. B. die Rolle PVEAuditor auf /."},
+			Description: "Credentials vom Typ API-Token (Token-ID user@realm!tokenname und Secret). Leer = automatisch das passende Token je Host nach dem Geltungsbereich des Credentials (z. B. dem Gerät des Proxmox-Hosts zugewiesen). " +
+				"Wird ein Token abgelehnt, wird das nächste probiert. Lesende Rechte genügen, z. B. die Rolle PVEAuditor auf /."},
 		{Key: "verify_tls", Type: plugin.FieldBool, Label: "TLS-Zertifikat prüfen", Default: false,
 			Description: "Ausgeschaltet lassen, solange Proxmox das selbstsignierte Standardzertifikat verwendet."},
 		{Key: "include_stopped", Type: plugin.FieldBool, Label: "Gestoppte Gäste importieren", Default: true},
@@ -69,50 +74,201 @@ func (p *Plugin) Schema() plugin.Schema {
 			Description: "Bei laufenden VMs den QEMU-Gast-Agent (falls aktiviert) und bei Containern die Interfaces abfragen."},
 		{Key: "create_missing", Type: plugin.FieldBool, Label: "Fehlende Geräte anlegen", Default: true,
 			Description: "Nodes, VMs und Container anlegen, die noch kein Scan gefunden hat (z. B. gestoppte VMs)."},
+		{Key: "lxc_docker", Type: plugin.FieldBool, Label: "Docker-Container in LXCs erfassen", Default: false, Group: lxcGroup,
+			Description: "Die Proxmox-API kann nicht in Container hineinschauen. NetScope meldet sich dafür per SSH am Node an und liest mit pct exec die Docker-Container laufender LXCs – nur lesend. " +
+				"Empfohlen: das Skript netscope-docker-inventory als Forced Command für den Schlüssel einrichten, dann kann er nichts anderes ausführen (siehe Doku)."},
+		{Key: "lxc_docker_credentials", Type: plugin.FieldCredentialRef, Label: "SSH-Zugangsdaten für die Nodes", Multi: true, Group: lxcGroup,
+			CredentialTypes: []string{plugin.CredSSH, plugin.CredPassword}, VisibleIf: lxcVisible,
+			Description: "Leer = automatisch die SSH-Zugangsdaten, deren Geltungsbereich die Node-IP abdeckt. Der Benutzer muss pct ausführen dürfen (root)."},
+		{Key: "lxc_docker_port", Type: plugin.FieldInt, Label: "SSH-Port", Default: 22, Group: lxcGroup, VisibleIf: lxcVisible, Advanced: true,
+			Validation: &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(65535)}},
+		{Key: "lxc_docker_host_key_policy", Type: plugin.FieldEnum, Label: "SSH-Hostschlüssel", Default: "tofu", Group: lxcGroup, VisibleIf: lxcVisible,
+			Options: []plugin.Option{
+				{Value: "tofu", Label: "Beim ersten Kontakt merken, Änderungen ablehnen"},
+				{Value: "insecure", Label: "Nicht prüfen (unsicher)"},
+			}},
+		{Key: "lxc_docker_timeout", Type: plugin.FieldDuration, Label: "Zeitlimit pro Node", Default: "3m", Group: lxcGroup, VisibleIf: lxcVisible, Advanced: true,
+			Description: "Für alle Container eines Nodes zusammen; jedes einzelne docker-Kommando ist auf dem Node auf 20 s begrenzt.",
+			Validation:  &plugin.Validation{Min: plugin.Int64(10), Max: plugin.Int64(1800)}},
 	}}
+}
+
+const lxcGroup = "Docker in LXC-Containern"
+
+var lxcVisible = &plugin.Condition{Field: "lxc_docker", Equals: []any{true}}
+
+// MigrateSettings implements plugin.SettingsMigrator: version 1.0 had a single "url"
+// and "credential".
+func (p *Plugin) MigrateSettings(stored map[string]any) map[string]any {
+	if u, ok := stored["url"].(string); ok {
+		if _, has := stored["urls"]; !has && strings.TrimSpace(u) != "" {
+			stored["urls"] = []any{u}
+		}
+		delete(stored, "url")
+	}
+	if c, ok := stored["credential"]; ok {
+		if _, has := stored["credentials"]; !has {
+			if id := plugin.NewSettings(map[string]any{"c": c}).CredentialID("c"); id > 0 {
+				stored["credentials"] = []any{id}
+			}
+		}
+		delete(stored, "credential")
+	}
+	return stored
+}
+
+// Endpoints implements plugin.EndpointProvider.
+func (p *Plugin) Endpoints(s plugin.Settings) []string {
+	var out []string
+	for _, raw := range s.StringList("urls") {
+		if u, err := url.Parse(strings.TrimSpace(raw)); err == nil && u.Hostname() != "" {
+			out = append(out, u.Hostname())
+		}
+	}
+	return out
 }
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	s := rc.Settings
-	credID := s.CredentialID("credential")
-	if credID == 0 {
-		return plugin.ErrNoCredential
+	urls := s.StringList("urls")
+	if len(urls) == 0 {
+		return errors.New("keine Proxmox-API-URL konfiguriert")
 	}
-	cred, err := rc.Creds.Get(ctx, credID)
-	if err != nil {
-		return fmt.Errorf("Credential %d: %w", credID, err)
+	st := &runState{
+		tokens:   &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredAPIToken}, Allowed: s.CredentialIDs("credentials"), Log: rc.Log},
+		imported: map[string]string{},
 	}
-	if err := cred.RequireType(plugin.CredAPIToken); err != nil {
+	if s.Bool("lxc_docker") {
+		st.lxc = &lxcDockerConfig{
+			picker: &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredSSH, plugin.CredPassword},
+				Allowed: s.CredentialIDs("lxc_docker_credentials"), Log: rc.Log,
+				Check: func(c *plugin.Credential) error { _, _, err := sshx.AuthMethods(c); return err }},
+			port:    s.Int("lxc_docker_port"),
+			timeout: s.Duration("lxc_docker_timeout"),
+		}
+		if st.lxc.timeout <= 0 {
+			st.lxc.timeout = 3 * time.Minute
+		}
+		if s.String("lxc_docker_host_key_policy") != "insecure" {
+			st.lxc.knownHosts = filepath.Join(rc.DataDir, "known_hosts")
+		}
+	}
+	for _, k := range []string{"nodes", "vms", "containers"} {
+		rc.SetStat(k, 0)
+	}
+	var errs []error
+	for _, u := range urls {
+		err := p.importURL(ctx, rc, st, u)
+		if err == nil {
+			continue
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if len(urls) == 1 {
+			return err
+		}
+		rc.AddStat("failed_urls", 1)
+		rc.Log.Warn("Proxmox-Endpunkt fehlgeschlagen", "url", u, "error", err)
+		errs = append(errs, fmt.Errorf("%s: %w", u, err))
+	}
+	if len(errs) == len(urls) {
+		return fmt.Errorf("kein Proxmox-Endpunkt importiert: %w", errors.Join(errs...))
+	}
+	return nil
+}
+
+// runState is shared by the endpoints of one run.
+type runState struct {
+	tokens *plugin.CredentialPicker
+	lxc    *lxcDockerConfig // nil = Docker in LXCs disabled
+
+	mu       sync.Mutex
+	imported map[string]string // cluster (or standalone node) -> URL that imported it
+
+	done, total atomic.Int64
+}
+
+// claim records that a cluster is imported through url; false (with the other URL) if
+// another endpoint of the run already imported it.
+func (st *runState) claim(key, url string) (string, bool) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if prev, ok := st.imported[key]; ok {
+		return prev, false
+	}
+	st.imported[key] = url
+	return "", true
+}
+
+// importURL imports one API endpoint, trying the applicable tokens in order.
+func (p *Plugin) importURL(ctx context.Context, rc *plugin.RunContext, st *runState, rawURL string) error {
+	s := rc.Settings
+	if _, err := baseURL(rawURL); err != nil {
 		return err
 	}
-	c, err := newClient(s.String("url"), cred.Get("token_id"), cred.Get("token"), s.Bool("verify_tls"), requestTimeout)
+	tokens, err := st.tokens.For(ctx, plugin.CredentialTarget{IP: hostIP(ctx, rawURL)})
 	if err != nil {
 		return err
 	}
-	defer c.close()
-	im := &importer{
-		rc:            rc,
-		c:             c,
-		createMissing: s.Bool("create_missing"),
-		stopped:       s.Bool("include_stopped"),
-		templates:     s.Bool("include_templates"),
-		guestIPs:      s.Bool("guest_agent_ips"),
+	if len(tokens) == 0 {
+		return fmt.Errorf("kein API-Token passt zu %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w", rawURL, plugin.ErrNoCredential)
 	}
-	return im.run(ctx)
+	var lastErr error
+	for i, cred := range tokens {
+		c, err := newClient(rawURL, cred.Get("token_id"), cred.Get("token"), s.Bool("verify_tls"), requestTimeout)
+		if err != nil {
+			lastErr = fmt.Errorf("%s: %w", cred.Name, err)
+			continue
+		}
+		im := &importer{
+			rc:            rc,
+			c:             c,
+			url:           rawURL,
+			st:            st,
+			lxc:           st.lxc,
+			createMissing: s.Bool("create_missing"),
+			stopped:       s.Bool("include_stopped"),
+			templates:     s.Bool("include_templates"),
+			guestIPs:      s.Bool("guest_agent_ips"),
+		}
+		err = im.run(ctx)
+		c.close()
+		if errors.Is(err, errTokenRejected) && i < len(tokens)-1 {
+			rc.Log.Info("API-Token abgelehnt, nächstes wird probiert", "url", rawURL, "credential", cred.Name, "error", err)
+			lastErr = err
+			continue
+		}
+		return err
+	}
+	return lastErr
 }
 
 type importer struct {
 	rc            *plugin.RunContext
 	c             *client
+	url           string
+	st            *runState
+	lxc           *lxcDockerConfig
 	createMissing bool
 	stopped       bool
 	templates     bool
 	guestIPs      bool
 
-	done, total int64
-	failed      atomic.Int64
+	docker  map[string]*lxcDocker // guest ref -> Docker inside the LXC
+	objects int64
+	failed  atomic.Int64
 }
+
+// errTokenRejected matches answers another token might pass (401, missing permissions).
+var errTokenRejected = errors.New("Token abgelehnt")
+
+// rejectedError is a token problem with a user-facing message.
+type rejectedError struct{ msg string }
+
+func (e *rejectedError) Error() string        { return e.msg }
+func (e *rejectedError) Is(target error) bool { return target == errTokenRejected }
 
 // wrapFatal turns errors of the initial requests into user-facing messages.
 func wrapFatal(what string, err error) error {
@@ -120,9 +276,9 @@ func wrapFatal(what string, err error) error {
 	if errors.As(err, &ae) {
 		switch ae.Status {
 		case 401:
-			return fmt.Errorf("Anmeldung an der Proxmox-API fehlgeschlagen (%s) – Token-ID und Secret prüfen", ae.Msg)
+			return &rejectedError{fmt.Sprintf("Anmeldung an der Proxmox-API fehlgeschlagen (%s) – Token-ID und Secret prüfen", ae.Msg)}
 		case 403:
-			return fmt.Errorf("%s: keine Berechtigung (%s) – das Token braucht lesende Rechte, z. B. die Rolle PVEAuditor auf /", what, ae.Msg)
+			return &rejectedError{fmt.Sprintf("%s: keine Berechtigung (%s) – das Token braucht lesende Rechte, z. B. die Rolle PVEAuditor auf /", what, ae.Msg)}
 		}
 		return fmt.Errorf("%s: %w", what, err)
 	}
@@ -149,26 +305,34 @@ func (im *importer) run(ctx context.Context) error {
 	}
 	if len(nodes) == 0 {
 		// the API filters by permission instead of failing
-		return errors.New("die Proxmox-API liefert keine Nodes – dem Token fehlen Leserechte (z. B. Rolle PVEAuditor auf /; bei Privilege Separation muss das Token selbst berechtigt sein)")
+		return &rejectedError{"die Proxmox-API liefert keine Nodes – dem Token fehlen Leserechte (z. B. Rolle PVEAuditor auf /; bei Privilege Separation muss das Token selbst berechtigt sein)"}
+	}
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Node < nodes[j].Node })
+	cluster, nodeIPs := clusterInfo(status)
+	key := "cluster:" + cluster
+	if cluster == "" {
+		key = "node:" + nodes[0].Node
+	}
+	if prev, ok := im.st.claim(key, im.url); !ok {
+		rc.Log.Info("Cluster bereits über einen anderen Endpunkt importiert", "url", im.url, "importiert_über", prev, "cluster", cluster)
+		return nil
 	}
 	var resources []resource
 	if err := c.get(ctx, "/cluster/resources?type=vm", &resources); err != nil {
 		return wrapFatal("Gäste-Liste", err)
 	}
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Node < nodes[j].Node })
 
 	guests := im.selectGuests(resources)
-	im.total = int64(len(nodes) + len(guests))
-	rc.Progress(0, int(im.total))
-	rc.SetStat("nodes", 0)
-	rc.SetStat("vms", 0)
-	rc.SetStat("containers", 0)
+	im.objects = int64(len(nodes) + len(guests))
+	rc.Progress(int(im.st.done.Load()), int(im.st.total.Add(im.objects)))
 
-	cluster, nodeIPs := clusterInfo(status)
 	if len(nodes) == 1 && nodeIPs[nodes[0].Node] == "" {
-		if ip := im.urlHostIP(ctx); ip != "" {
+		if ip := hostIP(ctx, im.url); ip != "" {
 			nodeIPs[nodes[0].Node] = ip
 		}
+	}
+	if im.lxc != nil {
+		im.docker = im.collectLXCDocker(ctx, nodes, nodeIPs, guests)
 	}
 	for _, n := range nodes {
 		if err := ctx.Err(); err != nil {
@@ -183,10 +347,10 @@ func (im *importer) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if n := im.failed.Load(); n > 0 && n == im.total {
+	if n := im.failed.Load(); n > 0 && n == im.objects {
 		return fmt.Errorf("keines der %d Proxmox-Objekte konnte gespeichert werden", n)
 	}
-	rc.Log.Info("Proxmox-Import abgeschlossen", "nodes", len(nodes), "gaeste", len(guests), "fehler", im.failed.Load())
+	rc.Log.Info("Proxmox-Import abgeschlossen", "url", im.url, "cluster", cluster, "nodes", len(nodes), "gaeste", len(guests), "fehler", im.failed.Load())
 	return nil
 }
 
@@ -233,10 +397,10 @@ func clusterInfo(status []clusterEntry) (string, map[string]string) {
 	return cluster, ips
 }
 
-// urlHostIP returns the IPv4 address of the configured API host (used for a single
-// node without cluster/status information).
-func (im *importer) urlHostIP(ctx context.Context) string {
-	u, err := url.Parse(im.c.base)
+// hostIP returns the IPv4 address of an API URL's host (used to select the token and for
+// a single node without cluster/status information).
+func hostIP(ctx context.Context, rawURL string) string {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
 		return ""
 	}
@@ -254,7 +418,7 @@ func (im *importer) urlHostIP(ctx context.Context) string {
 }
 
 func (im *importer) progress() {
-	im.rc.Progress(int(atomic.AddInt64(&im.done, 1)), int(im.total))
+	im.rc.Progress(int(im.st.done.Add(1)), int(im.st.total.Load()))
 }
 
 // nodeInventory is the structured inventory of a hypervisor node.
@@ -367,30 +531,31 @@ func (im *importer) observeNode(ctx context.Context, n nodeEntry, cluster, ip st
 
 // guestInventory is the structured inventory of a VM or container.
 type guestInventory struct {
-	VMID         int64      `json:"vmid"`
-	Node         string     `json:"node"`
-	Type         string     `json:"type"`
-	Name         string     `json:"name"`
-	Status       string     `json:"status"`
-	CPUs         int64      `json:"cpus"`
-	CPU          float64    `json:"cpu"`
-	Mem          int64      `json:"mem"`
-	MaxMem       int64      `json:"maxmem"`
-	Disk         int64      `json:"disk"`
-	MaxDisk      int64      `json:"maxdisk"`
-	Uptime       int64      `json:"uptime"`
-	Tags         []string   `json:"tags,omitempty"`
-	Template     bool       `json:"template"`
-	HAState      string     `json:"hastate,omitempty"`
-	Pool         string     `json:"pool,omitempty"`
-	Lock         string     `json:"lock,omitempty"`
-	OSType       string     `json:"ostype,omitempty"`
-	OnBoot       bool       `json:"onboot"`
-	Agent        bool       `json:"agent,omitempty"`
-	Unprivileged bool       `json:"unprivileged,omitempty"`
-	Description  string     `json:"description,omitempty"`
-	Networks     []netIface `json:"networks,omitempty"`
-	GuestIPs     []string   `json:"guestIps,omitempty"`
+	VMID         int64          `json:"vmid"`
+	Node         string         `json:"node"`
+	Type         string         `json:"type"`
+	Name         string         `json:"name"`
+	Status       string         `json:"status"`
+	CPUs         int64          `json:"cpus"`
+	CPU          float64        `json:"cpu"`
+	Mem          int64          `json:"mem"`
+	MaxMem       int64          `json:"maxmem"`
+	Disk         int64          `json:"disk"`
+	MaxDisk      int64          `json:"maxdisk"`
+	Uptime       int64          `json:"uptime"`
+	Tags         []string       `json:"tags,omitempty"`
+	Template     bool           `json:"template"`
+	HAState      string         `json:"hastate,omitempty"`
+	Pool         string         `json:"pool,omitempty"`
+	Lock         string         `json:"lock,omitempty"`
+	OSType       string         `json:"ostype,omitempty"`
+	OnBoot       bool           `json:"onboot"`
+	Agent        bool           `json:"agent,omitempty"`
+	Unprivileged bool           `json:"unprivileged,omitempty"`
+	Description  string         `json:"description,omitempty"`
+	Networks     []netIface     `json:"networks,omitempty"`
+	GuestIPs     []string       `json:"guestIps,omitempty"`
+	Docker       *lxcDockerInfo `json:"docker,omitempty"`
 }
 
 // guestRef returns the external reference id of a guest.
@@ -399,8 +564,9 @@ func guestRef(r resource) string {
 }
 
 // guestObservation builds the observation of a VM or container. cfg may be nil when the
-// configuration could not be read; addrs are the addresses reported from inside the guest.
-func guestObservation(r resource, cfg guestConfig, addrs []string, create bool) *plugin.Observation {
+// configuration could not be read; addrs are the addresses reported from inside the guest;
+// docker is the Docker inventory inside an LXC (nil = not read, the stored containers stay).
+func guestObservation(r resource, cfg guestConfig, addrs []string, docker *lxcDocker, create bool) *plugin.Observation {
 	vmid := r.VMID.int()
 	inv := guestInventory{
 		VMID: vmid, Node: r.Node, Type: r.Type, Name: r.Name, Status: r.Status,
@@ -435,6 +601,10 @@ func guestObservation(r resource, cfg guestConfig, addrs []string, create bool) 
 		}
 	}
 	inv.GuestIPs = addrs
+	if docker != nil {
+		info := docker.info
+		inv.Docker = &info
+	}
 	devType := "vm"
 	if r.Type == "lxc" {
 		devType = "container"
@@ -466,6 +636,9 @@ func guestObservation(r resource, cfg guestConfig, addrs []string, create bool) 
 	if len(addrs) > 1 {
 		obs.IPs = addrs[1:]
 	}
+	if docker != nil {
+		obs.Containers = docker.inv
+	}
 	return obs
 }
 
@@ -486,7 +659,7 @@ func (im *importer) observeGuest(ctx context.Context, r resource) {
 	if im.guestIPs && r.Status == "running" && cfg != nil {
 		addrs = im.guestAddrs(ctx, r, base, cfg)
 	}
-	obs := guestObservation(r, cfg, addrs, im.createMissing)
+	obs := guestObservation(r, cfg, addrs, im.docker[guestRef(r)], im.createMissing)
 	id, err := rc.Sink.Observe(ctx, obs)
 	if err != nil {
 		im.failed.Add(1)

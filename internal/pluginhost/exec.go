@@ -17,7 +17,6 @@ import (
 	"netscope/internal/events"
 	"netscope/internal/logging"
 	"netscope/internal/plugin"
-	"netscope/internal/vault"
 )
 
 // Run triggers.
@@ -192,7 +191,7 @@ func (h *Host) execute(r queuedRun, a *activeRun, runCtx context.Context) {
 		RunID: r.id, PluginID: r.pluginID, Trigger: r.trigger, Settings: plugin.NewSettings(cfg.Settings),
 		Scope: r.scope, Params: r.params, Concurrency: cfg.Concurrency, Log: logger,
 		Sink: &sink{h: h, pluginID: r.pluginID, runID: r.id}, Events: events.Emitter{S: h.Events, PluginID: r.pluginID},
-		Creds: vault.Provider{V: h.Vault}, Inventory: h.Inventory, DB: h.DB, DataDir: h.dataDir(r.pluginID), Env: h.Env(),
+		Creds: h.CredentialProvider(), Inventory: h.Inventory, DB: h.DB, DataDir: h.dataDir(r.pluginID), Env: h.Env(),
 	}
 	rc.OnLive = h.liveFunc(r.pluginID)
 	rc.OnProgress = func(done, total int) {

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/pem"
+	"errors"
 	"net"
 	"net/netip"
 	"os"
@@ -250,8 +251,12 @@ func TestRunWithoutTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 	rc.Creds = plugintest.Creds{}
-	if err := p.Run(context.Background(), rc); err == nil {
-		t.Fatal("unusable credentials must fail the run")
+	rc.Targets = plugin.Targets{Devices: []plugin.DeviceInfo{{ID: 3, PrimaryIP: "127.0.0.1"}}}
+	if err := p.Run(context.Background(), rc); !errors.Is(err, plugin.ErrNoCredential) {
+		t.Fatalf("err = %v, want ErrNoCredential", err)
+	}
+	if rc.Stats()["no_credential"] != 1 || rc.Stats()["failed"] != nil {
+		t.Errorf("stats = %v", rc.Stats())
 	}
 }
 
@@ -324,8 +329,8 @@ func TestSchemaDefaults(t *testing.T) {
 	if err := p.Schema().Check(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.Schema().Validate(map[string]any{}, nil, nil); err == nil {
-		t.Error("credentials are required")
+	if _, err := p.Schema().Validate(map[string]any{}, nil, nil); err != nil {
+		t.Errorf("empty credentials select automatically: %v", err)
 	}
 	cfg := loadConfig(plugin.NewSettings(p.Schema().Defaults()), "/data/plugins/ssh")
 	if cfg.port != 22 || !cfg.requireOpenPort || cfg.commandTimeout != 20*time.Second || !cfg.packages || !cfg.docker ||

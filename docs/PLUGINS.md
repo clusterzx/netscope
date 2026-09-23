@@ -70,7 +70,7 @@ Die UI rendert das Formular ausschließlich aus dem Schema. Feldtypen:
 | `enum` | `String(key)` / `StringList(key)` | `Options` Pflicht, `Multi` für Mehrfachauswahl |
 | `string-list` | `StringList(key)` | eine Zeile pro Eintrag, Pattern/Format je Eintrag |
 | `subnet-list` | `StringList(key)`, `Prefixes(key)` | CIDR oder einzelne IP, wird normalisiert |
-| `credential-ref` | `CredentialID(key)` / `CredentialIDs(key)` | `CredentialTypes` begrenzt die Auswahl, `Multi` für mehrere |
+| `credential-ref` | `CredentialID(key)` / `CredentialIDs(key)` | `CredentialTypes` begrenzt die Auswahl, `Multi` für mehrere; ein leeres `Multi`-Feld bedeutet „automatisch nach Geltungsbereich“ (siehe unten) |
 | `duration` | `Duration(key)` | Go-Dauer (`30s`, `5m`); `Validation.Min/Max` in Sekunden |
 
 Weitere Feld-Attribute: `Label` (Pflicht, deutsch), `Description`, `Default`, `Required`,
@@ -84,6 +84,11 @@ Schema-Fehler (doppelte Keys, Enum ohne Optionen, ungültiger Default …) lasse
 Allgemeine Einstellungen verwaltet der Core selbst, sie gehören **nicht** ins Schema:
 aktiv/inaktiv, Cron-Zeitplan, Timeout, Wiederholungen + Backoff, Parallelität, Scope.
 
+**Umbenannte Einstellungen:** Ändert eine neue Plugin-Version Keys (z. B. `url` → `urls`),
+implementiert das Plugin `plugin.SettingsMigrator`. `MigrateSettings(stored)` bekommt die
+gespeicherten Werte, bevor sie gegen das Schema normalisiert werden, und muss idempotent sein
+(neue Keys haben Vorrang, alte werden entfernt) – der Host ruft es bei jedem Laden auf.
+
 ## RunContext
 
 | Feld | Bedeutung |
@@ -92,7 +97,7 @@ aktiv/inaktiv, Cron-Zeitplan, Timeout, Wiederholungen + Backoff, Parallelität, 
 | `Targets` | aufgelöster Scope: `Subnets` (CIDR + Interface), `Devices` (inkl. IPs, MACs, offene Ports), `DeviceMode` |
 | `Sink` | `Observe(ctx, *Observation)` – schreibt **sofort** (eine Transaktion pro Aufruf) |
 | `Events` | `Emit(ctx, Event)` – nur Processor |
-| `Creds` | `Get(ctx, id)` – entschlüsselt ein Vault-Credential |
+| `Creds` | `Get(ctx, id)` – entschlüsselt ein Vault-Credential; `Applicable(ctx, target, types, allowed)` – passende Credentials für ein Ziel, spezifischste zuerst |
 | `Inventory` | Lesezugriff auf Geräte (`Devices(query)`, `DeviceByIP` …) |
 | `DB` | direkter DB-Zugriff – **nur Processor** für eigene Tabellen |
 | `DataDir` | persistentes Verzeichnis des Plugins (`/data/plugins/<id>`) |
@@ -112,6 +117,31 @@ Regeln für `Run`:
   Konfiguration). Einzelne Host-Fehler loggen (`rc.Log.Warn`) und weitermachen; nur wenn
   gar nichts ging, einen Fehler zurückgeben.
 - **Nur lesen:** Scanner verändern nichts auf Zielsystemen.
+
+## Zugangsdaten pro Ziel
+
+Credentials haben einen Geltungsbereich (`plugin.Scope`: überall, Subnetze, Geräte, Gruppen,
+Tags, Filter). Plugins wählen pro Ziel mit `plugin.CredentialPicker`:
+
+```go
+picker := &plugin.CredentialPicker{
+	Creds:   rc.Creds,
+	Types:   []string{plugin.CredSSH, plugin.CredPassword},
+	Allowed: rc.Settings.CredentialIDs("credentials"), // leer = alle passenden
+	Log:     rc.Log,
+	Check:   func(c *plugin.Credential) error { _, _, err := sshx.AuthMethods(c); return err },
+}
+creds, err := picker.For(ctx, plugin.CredentialTarget{DeviceID: dev.ID, IP: ip})
+cl, used, err := sshx.DialFirst(ctx, ip, creds, opt) // abgelehnte werden übersprungen
+```
+
+Reihenfolge (`CredentialMatch.Rank`): 4 = Gerät zugewiesen, 3 = Gruppe/Tag/Filter,
+2 = Subnetz, 1 = überall; bei gleichem Rang zählt die Reihenfolge von `Allowed`. Ohne
+`DeviceID` sucht der Provider das Gerät über die IP. Der Picker entschlüsselt und prüft jedes
+Credential nur einmal pro Lauf. Gibt es für ein Ziel nichts Passendes, das Ziel überspringen
+(Statistik `no_credential`) und erst dann mit `plugin.ErrNoCredential` scheitern, wenn kein
+einziges Ziel Zugangsdaten hatte. Für Importer mit mehreren Endpunkten gilt: jeden Endpunkt
+einzeln versuchen, Fehler loggen und nur scheitern, wenn alle fehlschlagen.
 
 ## Observation – was ein Scanner/Importer meldet
 
@@ -187,7 +217,7 @@ Parser werden mit **echten Fixtures** unter `testdata/` getestet
 ## Checkliste
 
 - [ ] ID, deutsches Label/Beschreibung, sinnvolle Defaults (Zeitplan, Timeout, Parallelität)
-- [ ] Schema vollständig, Secrets als `secret`, Zugangsdaten als `credential-ref`
+- [ ] Schema vollständig, Secrets als `secret`, Zugangsdaten als `credential-ref` (mehrere Ziele: `Multi`, Auswahl über `CredentialPicker`)
 - [ ] Ergebnisse pro Host sofort über den Sink, `Scanned`-Bereiche gesetzt
 - [ ] `ctx` wird respektiert, Fehler pro Host geloggt statt abgebrochen
 - [ ] Parser-Tests mit echten Fixtures

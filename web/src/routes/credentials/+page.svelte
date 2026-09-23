@@ -16,7 +16,8 @@
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
 	import CredentialForm from '$lib/components/credentials/CredentialForm.svelte';
-	import { credentials as credentialCatalog } from '$lib/stores/catalog.svelte';
+	import { credentialScopeLevel, credentialScopeSummary } from '$lib/components/plugins/plugin';
+	import { credentials as credentialCatalog, groups } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -34,6 +35,13 @@
 			return { list: list ?? [], types: types ?? [] };
 		});
 	});
+
+	$effect(() => {
+		groups.load().catch(() => {});
+	});
+	const groupName = (id: number) => groups.value?.find((g) => g.id === id)?.name ?? `#${id}`;
+	const levelTone = { device: 'accent', selection: 'accent', subnet: 'info', everywhere: 'neutral' } as const;
+	const levelIcon = { device: 'server', selection: 'tag', subnet: 'network', everywhere: 'globe' } as const;
 
 	const list = $derived(data.data?.list ?? []);
 	const types = $derived(data.data?.types ?? []);
@@ -108,8 +116,8 @@
 	const columns: Column<Credential>[] = [
 		{ key: 'name', label: 'Name' },
 		{ key: 'type', label: 'Typ', hideBelow: 'sm' },
-		{ key: 'public', label: 'Angaben', hideBelow: 'md' },
-		{ key: 'secrets', label: 'Secrets', hideBelow: 'lg' },
+		{ key: 'scope', label: 'Gilt für', hideBelow: 'md' },
+		{ key: 'public', label: 'Angaben', hideBelow: 'lg' },
 		{ key: 'usedBy', label: 'Verwendet von', hideBelow: 'sm' },
 		{ key: 'lastUsed', label: 'Zuletzt verwendet', hideBelow: 'lg' },
 		{ key: 'updated', label: 'Geändert', hideBelow: 'xl' },
@@ -129,7 +137,13 @@
 	<Alert tone="info" title="Verschlüsselt gespeichert">
 		Secrets (Passwörter, private Schlüssel, Tokens, Communities) werden mit AES-256-GCM verschlüsselt abgelegt
 		und nach dem Speichern nie wieder angezeigt – weder hier noch über die API. Plugins verweisen nur auf das
-		Credential. Der Master-Schlüssel wird unter <a href="/system?tab=vault" class="link">System → Vault</a> rotiert.
+		Credential. Der Master-Schlüssel wird unter <a href="/system?tab=vault" class="link">System → Vault</a>
+		rotiert.
+		<span class="mt-1 block">
+			<strong class="font-medium">Automatische Auswahl:</strong> Plugins ohne eigene Auswahl nehmen pro Gerät die
+			Zugangsdaten, deren „Gilt für“ passt – das spezifischste zuerst (Gerät, dann Gruppe/Tag/Filter, dann Subnetz,
+			zuletzt überall). Welche für ein Gerät gelten, zeigt die Geräteseite.
+		</span>
 	</Alert>
 
 	{#if blocked}
@@ -181,31 +195,41 @@
 						<Icon name="key" size={12} class="-mt-px mr-0.5 inline align-middle" />
 						{typeOf(c.type)?.label ?? c.type}
 					</Badge>
+				{:else if col.key === 'scope'}
+					{@const level = credentialScopeLevel(c.scope)}
+					<Badge
+						tone={levelTone[level]}
+						title="Geltungsbereich – bestimmt, für welche Ziele Plugins dieses Credential automatisch wählen"
+					>
+						<Icon name={levelIcon[level]} size={12} class="-mt-px mr-0.5 inline align-middle" />
+						<span class="inline-block max-w-56 truncate align-bottom"
+							>{credentialScopeSummary(c.scope, groupName)}</span
+						>
+					</Badge>
 				{:else if col.key === 'public'}
 					{@const pub = publicFields(c)}
-					{#if pub.length}
-						<dl class="flex flex-col gap-0.5 text-xs">
-							{#each pub as [k, v] (k)}
-								<div class="flex gap-1.5">
-									<dt class="text-fg-subtle">{fieldLabel(c.type, k)}:</dt>
-									<dd class="mono truncate text-fg">{v}</dd>
-								</div>
+					<div class="flex flex-col gap-1">
+						{#if pub.length}
+							<dl class="flex flex-col gap-0.5 text-xs">
+								{#each pub as [k, v] (k)}
+									<div class="flex gap-1.5">
+										<dt class="text-fg-subtle">{fieldLabel(c.type, k)}:</dt>
+										<dd class="mono truncate text-fg">{v}</dd>
+									</div>
+								{/each}
+							</dl>
+						{/if}
+						<span class="flex flex-wrap gap-1">
+							{#each c.secretsSet ?? [] as s (s)}
+								<Badge tone="ok" title="Secret ist gespeichert (wird nicht angezeigt)">
+									<Icon name="lock" size={11} class="-mt-px mr-0.5 inline align-middle" />
+									{fieldLabel(c.type, s)}
+								</Badge>
+							{:else}
+								{#if !pub.length}<span class="text-fg-subtle">–</span>{/if}
 							{/each}
-						</dl>
-					{:else}
-						<span class="text-fg-subtle">–</span>
-					{/if}
-				{:else if col.key === 'secrets'}
-					<span class="flex flex-wrap gap-1">
-						{#each c.secretsSet ?? [] as s (s)}
-							<Badge tone="ok" title="Secret ist gespeichert (wird nicht angezeigt)">
-								<Icon name="lock" size={11} class="-mt-px mr-0.5 inline align-middle" />
-								{fieldLabel(c.type, s)}
-							</Badge>
-						{:else}
-							<span class="text-fg-subtle">keine</span>
-						{/each}
-					</span>
+						</span>
+					</div>
 				{:else if col.key === 'usedBy'}
 					<span class="flex flex-wrap gap-1">
 						{#each c.usedBy ?? [] as u (u.id)}
@@ -213,7 +237,11 @@
 								<Badge tone="accent">{u.name}</Badge>
 							</a>
 						{:else}
-							<span class="text-xs text-fg-subtle">nicht verwendet</span>
+							<span
+								class="text-xs text-fg-subtle"
+								title="Kein Plugin hat es fest ausgewählt. Plugins ohne eigene Auswahl verwenden es automatisch, wenn „Gilt für“ passt."
+								>nicht fest zugewiesen</span
+							>
 						{/each}
 					</span>
 				{:else if col.key === 'lastUsed'}

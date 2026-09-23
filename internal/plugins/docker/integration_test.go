@@ -35,7 +35,7 @@ func TestIntegrationSSH(t *testing.T) {
 	}
 	creds := plugintest.Creds{1: {ID: 1, Name: "lxc", Type: plugin.CredSSH,
 		Public: map[string]string{"username": "root"}, Secret: map[string]string{"private_key": string(key)}}}
-	obs, rc, err := run(t, map[string]any{"endpoints": []any{"ssh://root@" + host}, "ssh_credential": 1}, creds)
+	obs, rc, err := run(t, map[string]any{"endpoints": []any{"ssh://root@" + host}, "ssh_credentials": []any{1}}, creds)
 	if err != nil {
 		t.Fatal(err)
 	}

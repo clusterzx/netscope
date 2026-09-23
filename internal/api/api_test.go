@@ -323,3 +323,46 @@ func mustURL(s string) *url.URL {
 	u, _ := url.Parse(s)
 	return u
 }
+
+func TestCredentialScopeAPI(t *testing.T) {
+	h := newHarness(t)
+	h.login(t)
+	ctx := context.Background()
+	id, err := h.inv.Observe(ctx, "arpscan", 0, &plugin.Observation{MACs: []string{"aa:bb:cc:dd:ee:07"}, IP: "192.168.1.27", Present: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := map[string]any{"username": "root", "password": "x"}
+	resp, body := h.do(t, "POST", "/api/v1/credentials", map[string]any{"name": "Router", "type": "ssh", "values": values,
+		"scope": map[string]any{"devices": []int64{id}}}, csrf, "1")
+	if resp.StatusCode != 201 {
+		t.Fatalf("create: %d %s", resp.StatusCode, body)
+	}
+	var cred credentialView
+	_ = json.Unmarshal(body, &cred)
+	if len(cred.Scope.Devices) != 1 || cred.Scope.Devices[0] != id || cred.Scope.AllSubnets {
+		t.Fatalf("scope: %+v", cred.Scope)
+	}
+	if resp, body := h.do(t, "POST", "/api/v1/credentials", map[string]any{"name": "Global", "type": "ssh", "values": values}, csrf, "1"); resp.StatusCode != 201 ||
+		!strings.Contains(string(body), `"allSubnets":true`) {
+		t.Fatalf("default scope: %d %s", resp.StatusCode, body)
+	}
+	resp, body = h.do(t, "POST", "/api/v1/credentials", map[string]any{"name": "Kaputt", "type": "ssh", "values": values,
+		"scope": map[string]any{"subnets": []string{"kein-netz"}}}, csrf, "1")
+	if resp.StatusCode != 400 || !strings.Contains(string(body), "scope.subnets") {
+		t.Fatalf("invalid scope: %d %s", resp.StatusCode, body)
+	}
+
+	resp, body = h.do(t, "GET", "/api/v1/devices/"+strconv.FormatInt(id, 10)+"/credentials", nil)
+	var list []deviceCredential
+	if err := json.Unmarshal(body, &list); err != nil || resp.StatusCode != 200 {
+		t.Fatalf("device credentials: %d %s", resp.StatusCode, body)
+	}
+	if len(list) != 2 || list[0].ID != cred.ID || list[0].Rank != plugin.RankDevice || list[0].Reason != "Gerät zugewiesen" ||
+		list[1].Name != "Global" || list[0].UsedBy == nil {
+		t.Fatalf("matches: %s", body)
+	}
+	if resp, _ := h.do(t, "GET", "/api/v1/devices/999/credentials", nil); resp.StatusCode != 404 {
+		t.Errorf("unknown device: %d", resp.StatusCode)
+	}
+}

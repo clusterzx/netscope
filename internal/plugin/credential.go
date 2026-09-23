@@ -1,6 +1,11 @@
 package plugin
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"sync"
+)
 
 // Credential types.
 const (
@@ -98,4 +103,98 @@ func LookupCredentialType(t string) (CredentialType, bool) {
 		}
 	}
 	return CredentialType{}, false
+}
+
+// Ranks of CredentialMatch: how specifically a credential's scope covers a target.
+const (
+	RankEverywhere = 1 // scope "everywhere"
+	RankSubnet     = 2 // target address inside one of the scope's subnets
+	RankSelection  = 3 // device selected by group, tag or filter
+	RankDevice     = 4 // device assigned explicitly
+)
+
+// CredentialTarget is what a plugin wants to connect to. The provider looks up the
+// inventory device by IP when DeviceID is 0.
+type CredentialTarget struct {
+	DeviceID int64
+	IP       string
+}
+
+// CredentialMatch is a credential whose scope covers a target.
+type CredentialMatch struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Rank   int    `json:"rank"`
+	Reason string `json:"reason"` // e.g. "Gerät zugewiesen", "Subnetz 10.0.0.0/24"
+}
+
+// CredentialPicker selects the applicable credentials per target during a run. Each
+// credential is decrypted (and checked) once; unusable ones are logged once and skipped.
+// Safe for concurrent use.
+type CredentialPicker struct {
+	Creds   CredentialProvider
+	Types   []string
+	Allowed []int64 // optional restriction from the plugin settings (empty = all)
+	// Check rejects credentials the plugin cannot use (optional).
+	Check func(*Credential) error
+	Log   *slog.Logger
+
+	mu    sync.Mutex
+	cache map[int64]*Credential
+	bad   map[int64]bool
+}
+
+// For returns the usable credentials for a target, most specific first.
+func (p *CredentialPicker) For(ctx context.Context, t CredentialTarget) ([]*Credential, error) {
+	if p.Creds == nil {
+		return nil, ErrNoCredential
+	}
+	matches, err := p.Creds.Applicable(ctx, t, p.Types, p.Allowed)
+	if err != nil {
+		return nil, err
+	}
+	var out []*Credential
+	for _, m := range matches {
+		if c := p.get(ctx, m.ID); c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+func (p *CredentialPicker) get(ctx context.Context, id int64) *Credential {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.cache == nil {
+		p.cache, p.bad = map[int64]*Credential{}, map[int64]bool{}
+	}
+	if c, ok := p.cache[id]; ok {
+		return c
+	}
+	if p.bad[id] {
+		return nil
+	}
+	c, err := p.Creds.Get(ctx, id)
+	if err == nil {
+		err = c.RequireType(p.Types...)
+		if len(p.Types) == 0 {
+			err = nil
+		}
+	}
+	if err == nil && p.Check != nil {
+		err = p.Check(c)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
+		p.bad[id] = true
+		if p.Log != nil {
+			p.Log.Warn("Credential nicht verwendbar", "credential_id", id, "error", err)
+		}
+		return nil
+	}
+	p.cache[id] = c
+	return c
 }

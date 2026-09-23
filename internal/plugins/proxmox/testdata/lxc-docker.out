@@ -1,0 +1,22 @@
+Welcome to proxmox (banner of a shell profile)
+#netscope-docker-inventory 1
+#node pve1
+#lxc 105
+#version
+27.3.1
+#ps
+{"Command":"\"/docker-entrypoint.…\"","CreatedAt":"2026-09-20 10:12:03 +0200 CEST","ID":"3f1c2b9d8e7a6f5041322a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d","Image":"nginx:1.27","Labels":"com.docker.compose.project=web,com.docker.compose.service=nginx,com.docker.compose.version=2.29.7","LocalVolumes":"0","Mounts":"","Names":"web-nginx-1","Networks":"web_default","Ports":"0.0.0.0:8080->80/tcp, [::]:8080->80/tcp","RunningFor":"3 days ago","Size":"0B","State":"running","Status":"Up 3 days"}
+{"Command":"\"docker-entrypoint.s…\"","CreatedAt":"2026-09-01 08:00:00 +0200 CEST","ID":"9a8b7c6d5e4f30211a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7081","Image":"sha256:5d0da3dc976460b72c77d94c8a1ad043720b0416bfc16c52c45d4847e53fadb6","Labels":"com.docker.compose.project=db,com.docker.compose.service=postgres","LocalVolumes":"1","Mounts":"db_data","Names":"db-postgres-1","Networks":"db_default","Ports":"5432/tcp","RunningFor":"3 weeks ago","Size":"0B","State":"exited","Status":"Exited (0) 2 days ago"}
+#images
+{"Containers":"N/A","CreatedAt":"2026-08-13 01:02:03 +0000 UTC","CreatedSince":"5 weeks ago","Digest":"<none>","ID":"sha256:39286ab8a5e14aeaf5fdd6e2fac76e0c8d31a0c07224f0ee5e6be502f12e93f3","Repository":"nginx","SharedSize":"N/A","Size":"192MB","Tag":"1.27","UniqueSize":"N/A","VirtualSize":"192.1MB"}
+{"Containers":"N/A","CreatedAt":"2026-07-02 11:22:33 +0000 UTC","CreatedSince":"2 months ago","Digest":"<none>","ID":"sha256:5d0da3dc976460b72c77d94c8a1ad043720b0416bfc16c52c45d4847e53fadb6","Repository":"postgres","SharedSize":"N/A","Size":"453MB","Tag":"16","UniqueSize":"N/A","VirtualSize":"453.2MB"}
+#lxc 107
+#nodocker
+#lxc 108
+#version
+#error version 1
+#ps
+#error ps 1
+#images
+#error images 1
+#end

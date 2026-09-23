@@ -1,5 +1,6 @@
 <!--
-	Editor for a plugin scope (which subnets/devices a plugin works on).
+	Editor for a plugin scope (which subnets/devices a plugin works on) or a credential scope
+	(where the credential applies; mode="credential").
 	<ScopeEditor bind:value={scope} targets={p.info.targets} errors={genericErrors} idPrefix="pl-arpscan" />
 	Error keys: scope, scope.subnets, scope.groups, scope.tags, scope.devices, scope.query.
 -->
@@ -13,13 +14,24 @@
 
 	interface Props {
 		value: PluginScope;
-		targets: string;
+		targets?: string;
+		/** texts for a plugin scope (default) or a credential scope */
+		mode?: 'plugin' | 'credential';
 		errors?: Record<string, string>;
 		disabled?: boolean;
 		idPrefix?: string;
 	}
 
-	let { value = $bindable(), targets, errors = {}, disabled = false, idPrefix = 'scope' }: Props = $props();
+	let {
+		value = $bindable(),
+		targets = 'devices',
+		mode = 'plugin',
+		errors = {},
+		disabled = false,
+		idPrefix = 'scope'
+	}: Props = $props();
+
+	const cred = $derived(mode === 'credential');
 
 	onMount(() => {
 		subnets.load().catch(() => {});
@@ -75,7 +87,7 @@
 	{#if errors.scope}<Alert tone="danger">{errors.scope}</Alert>{/if}
 
 	<fieldset class="flex flex-col gap-2" {disabled}>
-		<legend class="mb-1 text-[0.8125rem] font-medium text-fg">Subnetze</legend>
+		<legend class="mb-1 text-[0.8125rem] font-medium text-fg">{cred ? 'Netzbereich' : 'Subnetze'}</legend>
 		<label class="flex cursor-pointer items-start gap-2 text-sm">
 			<input
 				type="radio"
@@ -85,8 +97,17 @@
 				onchange={() => setMode(true)}
 			/>
 			<span>
-				Alle aktiven Subnetze
-				<span class="block text-xs text-fg-subtle">Neue Subnetze werden automatisch mit abgedeckt.</span>
+				{#if cred}
+					{restricted ? 'Keine Einschränkung nach Subnetz' : 'Überall'}
+					<span class="block text-xs text-fg-subtle">
+						{restricted
+							? 'Gilt für die Geräte der Auswahl unten, egal in welchem Netz.'
+							: 'Gilt für jedes Ziel, auch außerhalb der erfassten Subnetze. Spezifischere Zugangsdaten werden vorher probiert.'}
+					</span>
+				{:else}
+					Alle aktiven Subnetze
+					<span class="block text-xs text-fg-subtle">Neue Subnetze werden automatisch mit abgedeckt.</span>
+				{/if}
 			</span>
 		</label>
 		<label class="flex cursor-pointer items-start gap-2 text-sm">
@@ -98,11 +119,17 @@
 				onchange={() => setMode(false)}
 			/>
 			<span>
-				Nur ausgewählte Subnetze
+				{cred ? 'Nur in ausgewählten Subnetzen' : 'Nur ausgewählte Subnetze'}
 				<span class="block text-xs text-fg-subtle">
-					{restricted
-						? 'Leer lassen, um nur über die Geräteauswahl unten zu arbeiten.'
-						: 'Ohne Auswahl und ohne Geräteauswahl gelten alle aktiven Subnetze.'}
+					{#if cred}
+						{restricted
+							? 'Nur Geräte der Auswahl unten, die in diesen Subnetzen liegen.'
+							: 'Für alle Ziele mit einer Adresse in diesen Subnetzen. Ohne Auswahl: überall.'}
+					{:else}
+						{restricted
+							? 'Leer lassen, um nur über die Geräteauswahl unten zu arbeiten.'
+							: 'Ohne Auswahl und ohne Geräteauswahl gelten alle aktiven Subnetze.'}
+					{/if}
 				</span>
 			</span>
 		</label>
@@ -124,14 +151,21 @@
 
 	<fieldset class="flex flex-col gap-3" {disabled}>
 		<legend class="text-[0.8125rem] font-medium text-fg"
-			>Geräte einschränken <span class="font-normal text-fg-subtle">(optional)</span></legend
+			>{cred ? 'Nur für bestimmte Geräte' : 'Geräte einschränken'}
+			<span class="font-normal text-fg-subtle">(optional)</span></legend
 		>
 		<p class="-mt-1 text-xs text-fg-subtle">
-			{targets === 'subnets'
-				? 'Ist hier etwas gesetzt, scannt das Plugin nur noch die IP-Adressen dieser Geräte statt ganzer Subnetze.'
-				: 'Ist hier etwas gesetzt, arbeitet das Plugin nur auf diesen Geräten.'}
-			Gruppen, Tags und einzelne Geräte werden zusammengefasst; ein Filter schränkt diese Menge weiter ein (allein
-			verwendet: alle passenden Geräte). Ignorierte Geräte werden nur bei expliziter Auswahl berücksichtigt.
+			{#if cred}
+				Ist hier etwas gesetzt, gilt das Credential nur für diese Geräte – und wird dort vor allgemeineren
+				Zugangsdaten probiert (einzeln zugewiesene Geräte zuerst). Gruppen, Tags und einzelne Geräte werden
+				zusammengefasst; ein Filter schränkt diese Menge weiter ein (allein verwendet: alle passenden Geräte).
+			{:else}
+				{targets === 'subnets'
+					? 'Ist hier etwas gesetzt, scannt das Plugin nur noch die IP-Adressen dieser Geräte statt ganzer Subnetze.'
+					: 'Ist hier etwas gesetzt, arbeitet das Plugin nur auf diesen Geräten.'}
+				Gruppen, Tags und einzelne Geräte werden zusammengefasst; ein Filter schränkt diese Menge weiter ein (allein
+				verwendet: alle passenden Geräte). Ignorierte Geräte werden nur bei expliziter Auswahl berücksichtigt.
+			{/if}
 		</p>
 		<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 			<MultiSelect

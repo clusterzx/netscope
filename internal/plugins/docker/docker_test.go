@@ -206,13 +206,17 @@ func TestValidateSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ve *plugin.ValidationError
-	if err := p.ValidateSettings(plugin.NewSettings(vals)); !errors.As(err, &ve) || ve.Errors[0].Field != "ssh_credential" {
-		t.Errorf("ssh endpoint without credential: %v", err)
-	}
-	vals["ssh_credential"] = int64(3)
+	// no credential selected: picked automatically by scope
 	if err := p.ValidateSettings(plugin.NewSettings(vals)); err != nil {
 		t.Errorf("valid settings: %v", err)
+	}
+	var ve *plugin.ValidationError
+	if err := p.ValidateSettings(plugin.NewSettings(map[string]any{"endpoints": []any{"ssh://"}})); !errors.As(err, &ve) || ve.Errors[0].Field != "endpoints" {
+		t.Errorf("invalid endpoint: %v", err)
+	}
+	got := p.MigrateSettings(map[string]any{"endpoints": []any{"ssh://a"}, "ssh_credential": float64(3)})
+	if !reflect.DeepEqual(got, map[string]any{"endpoints": []any{"ssh://a"}, "ssh_credentials": []any{int64(3)}}) {
+		t.Errorf("migrated: %#v", got)
 	}
 	if _, err := p.Schema().Validate(map[string]any{"endpoints": []any{"docker.lan:2375"}}, nil, nil); err == nil {
 		t.Error("endpoint without scheme must fail schema validation")
@@ -423,7 +427,7 @@ func TestRunSSH(t *testing.T) {
 	creds := plugintest.Creds{7: {ID: 7, Name: "docker", Type: plugin.CredPassword,
 		Public: map[string]string{"username": "nobody"}, Secret: map[string]string{"password": "goodpass"}}}
 	ep := "ssh://root@127.0.0.1:" + strconv.Itoa(srv.port)
-	obs, _, err := run(t, map[string]any{"endpoints": []any{ep}, "ssh_credential": 7}, creds)
+	obs, _, err := run(t, map[string]any{"endpoints": []any{ep}, "ssh_credentials": []any{7}}, creds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +442,7 @@ func TestRunSSH(t *testing.T) {
 func TestRunErrors(t *testing.T) {
 	// ssh endpoint without credential
 	if _, _, err := run(t, map[string]any{"endpoints": []any{"ssh://root@127.0.0.1:1"}}, nil); err == nil ||
-		!strings.Contains(err.Error(), "SSH-Credential") {
+		!errors.Is(err, plugin.ErrNoCredential) {
 		t.Errorf("missing credential: %v", err)
 	}
 	// unreachable engine: the whole run fails

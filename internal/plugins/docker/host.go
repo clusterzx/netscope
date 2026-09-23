@@ -3,15 +3,12 @@ package docker
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/netip"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"netscope/internal/netutil"
 )
@@ -97,26 +94,4 @@ func primaryIPv4() (string, error) {
 		return subs[0].Addr.String(), nil
 	}
 	return "", errors.New("keine lokale IPv4-Adresse gefunden")
-}
-
-// resolveHost returns the address of a host name (IPv4 preferred) or the literal IP.
-func resolveHost(ctx context.Context, host string) (string, error) {
-	if a, err := netip.ParseAddr(host); err == nil {
-		return a.Unmap().String(), nil
-	}
-	lctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	addrs, err := net.DefaultResolver.LookupNetIP(lctx, "ip", host)
-	if err != nil {
-		return "", fmt.Errorf("Hostname %s nicht auflösbar: %w", host, err)
-	}
-	for _, a := range addrs {
-		if a.Unmap().Is4() {
-			return a.Unmap().String(), nil
-		}
-	}
-	if len(addrs) > 0 {
-		return addrs[0].String(), nil
-	}
-	return "", fmt.Errorf("Hostname %s nicht auflösbar", host)
 }

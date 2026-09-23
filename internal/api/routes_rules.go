@@ -1,11 +1,15 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 
+	"netscope/internal/netutil"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
 	"netscope/internal/rules"
@@ -35,6 +39,14 @@ type credentialView struct {
 type credentialUse struct {
 	ID   string `json:"id"`   // plugin id (link target /plugins/<id>)
 	Name string `json:"name"` // plugin name
+}
+
+// deviceCredential is a credential that applies to a device.
+type deviceCredential struct {
+	plugin.CredentialMatch
+	// UsedBy lists the plugins that use the credential for this device: explicitly
+	// selected or picked automatically (empty credential selection).
+	UsedBy []credentialUse `json:"usedBy"`
 }
 
 func (s *Server) registerRules() {
@@ -232,6 +244,112 @@ func (s *Server) handlePublishers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+// credentialUsers lists the plugins (among ids) that use a credential of the given type:
+// explicitly referenced or picked automatically by a visible multi credential field
+// left empty.
+func (s *Server) credentialUsers(ids []string, id int64, typ string) []credentialUse {
+	out := []credentialUse{}
+	for _, pid := range ids {
+		p, _ := s.Host.Plugin(pid)
+		cfg, _ := s.Host.Config(pid)
+		schema := p.Schema()
+		st := plugin.NewSettings(cfg.Settings)
+		for _, f := range schema.Fields {
+			if f.Type != plugin.FieldCredentialRef || (len(f.CredentialTypes) > 0 && !slices.Contains(f.CredentialTypes, typ)) ||
+				!schema.Visible(f, cfg.Settings) {
+				continue
+			}
+			sel := st.CredentialIDs(f.Key)
+			if slices.Contains(sel, id) || (f.Multi && len(sel) == 0) {
+				out = append(out, credentialUse{ID: pid, Name: p.Info().Name})
+				break
+			}
+		}
+	}
+	return out
+}
+
+// pluginsCovering returns the plugins that connect to a device: scanners whose scope
+// covers it and importers with the device among their configured hosts.
+func (s *Server) pluginsCovering(ctx context.Context, dev *plugin.DeviceInfo) []string {
+	subnets, _ := s.Inventory.Subnets(ctx)
+	addrs := map[string]bool{}
+	for _, ip := range append([]string{dev.PrimaryIP}, dev.IPs...) {
+		if a, err := netip.ParseAddr(ip); err == nil {
+			addrs[a.Unmap().String()] = true
+		}
+	}
+	inSubnet := func(sc plugin.Scope) bool {
+		for _, sn := range subnets {
+			if !sc.AllSubnets && len(sc.Subnets) > 0 && !slices.Contains(sc.Subnets, sn.CIDR.String()) {
+				continue
+			}
+			for ip := range addrs {
+				if a, err := netip.ParseAddr(ip); err == nil && sn.CIDR.Contains(a) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	isEndpoint := func(p plugin.Plugin, cfg *pluginhost.Config) bool {
+		ep, ok := p.(plugin.EndpointProvider)
+		if !ok {
+			return false
+		}
+		for _, host := range ep.Endpoints(plugin.NewSettings(cfg.Settings)) {
+			if ip, err := netutil.ResolveHost(ctx, host); err == nil && addrs[ip] {
+				return true
+			}
+		}
+		return false
+	}
+	var out []string
+	for _, pid := range s.Host.IDs() {
+		p, _ := s.Host.Plugin(pid)
+		cfg, _ := s.Host.Config(pid)
+		mode := p.Info().Targets
+		switch {
+		case mode == plugin.TargetNone:
+			if !isEndpoint(p, cfg) {
+				continue
+			}
+		case cfg.Scope.DeviceRestricted():
+			t, err := s.Inventory.ResolveTargets(ctx, cfg.Scope, mode)
+			if err != nil || !slices.ContainsFunc(t.Devices, func(d plugin.DeviceInfo) bool { return d.ID == dev.ID }) {
+				continue
+			}
+		case !inSubnet(cfg.Scope):
+			continue
+		}
+		out = append(out, pid)
+	}
+	return out
+}
+
+func (s *Server) handleDeviceCredentials(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.deviceID(w, r)
+	if !ok {
+		return
+	}
+	dev, err := s.Inventory.Device(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	list, err := s.Host.CredentialProvider().Applicable(r.Context(), plugin.CredentialTarget{DeviceID: id}, nil, nil)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	plugins := s.pluginsCovering(r.Context(), dev)
+	out := make([]deviceCredential, 0, len(list))
+	for _, m := range list {
+		out = append(out, deviceCredential{CredentialMatch: m, UsedBy: s.credentialUsers(plugins, m.ID, m.Type)})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // credentialUsage lists the plugins whose settings reference a credential.
 func (s *Server) credentialUsage(id int64) []credentialUse {
 	out := []credentialUse{}
@@ -294,6 +412,12 @@ func (s *Server) handleSaveCredential(w http.ResponseWriter, r *http.Request) {
 	if err := decode(r, &in); err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	if in.Scope != nil {
+		if err := s.Host.ValidateScope(r.Context(), in.Scope); err != nil {
+			s.fail(w, r, err)
+			return
+		}
 	}
 	var before *vault.CredentialMeta
 	if id == 0 {

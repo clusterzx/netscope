@@ -15,6 +15,7 @@
 	import { customFields } from '$lib/stores/catalog.svelte';
 	import { formatDateTime, formatNumber } from '$lib/utils/format';
 	import { deviceTypeName, factKindLabel, relationKindLabel } from '$lib/utils/labels';
+	import CredentialsCard from './CredentialsCard.svelte';
 	import NotesCard from './NotesCard.svelte';
 	import PingCharts from './PingCharts.svelte';
 	import { groupFacts, LazyData, sourceName } from './util';
@@ -339,6 +340,8 @@
 				{/each}
 			{/if}
 		</Card>
+
+		<CredentialsCard deviceId={d.id} {version} {active} />
 
 		{#if d.refs?.length}
 			<Card title="Externe Referenzen" icon="external" padding="none">

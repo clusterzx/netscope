@@ -46,9 +46,10 @@ func (p *Plugin) Info() plugin.Info {
 // Schema implements plugin.Plugin.
 func (p *Plugin) Schema() plugin.Schema {
 	return plugin.Schema{Fields: []plugin.Field{
-		{Key: "credentials", Type: plugin.FieldCredentialRef, Label: "Zugangsdaten", Multi: true, Required: true,
+		{Key: "credentials", Type: plugin.FieldCredentialRef, Label: "Zugangsdaten", Multi: true,
 			CredentialTypes: []string{plugin.CredSNMPv2c, plugin.CredSNMPv3}, Group: "Verbindung",
-			Description: "Community (v2c) oder USM-Benutzer (v3). Werden der Reihe nach probiert; das funktionierende Credential wird pro Gerät gemerkt."},
+			Description: "Community (v2c) oder USM-Benutzer (v3). Leer = automatisch alle, deren Geltungsbereich das Gerät abdeckt. " +
+				"Probiert wird das spezifischste zuerst; das funktionierende wird pro Gerät gemerkt."},
 		{Key: "port", Type: plugin.FieldInt, Label: "UDP-Port", Default: 161, Group: "Verbindung",
 			Validation: &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(65535)}},
 		{Key: "timeout", Type: plugin.FieldDuration, Label: "Zeitlimit pro Anfrage", Default: "3s", Group: "Verbindung",
@@ -120,25 +121,8 @@ type target struct {
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	cfg := loadConfig(rc.Settings, rc.DataDir)
-	if len(cfg.credIDs) == 0 {
-		return plugin.ErrNoCredential
-	}
-	var creds []*plugin.Credential
-	for _, id := range cfg.credIDs {
-		c, err := rc.Creds.Get(ctx, id)
-		if err != nil {
-			rc.Log.Warn("Credential nicht verfügbar", "credential_id", id, "error", err)
-			continue
-		}
-		if _, err := newClient(ctx, "127.0.0.1", c, cfg.client); err != nil {
-			rc.Log.Warn("Credential unbrauchbar", "credential", c.Name, "error", err)
-			continue
-		}
-		creds = append(creds, c)
-	}
-	if len(creds) == 0 {
-		return errors.New("keines der konfigurierten Credentials ist verwendbar")
-	}
+	picker := &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredSNMPv2c, plugin.CredSNMPv3}, Allowed: cfg.credIDs, Log: rc.Log,
+		Check: func(c *plugin.Credential) error { _, err := newClient(ctx, "127.0.0.1", c, cfg.client); return err }}
 	var subnets []netip.Prefix
 	if rc.Inventory != nil {
 		if list, err := rc.Inventory.Subnets(ctx); err != nil {
@@ -165,18 +149,21 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	}
 	rc.SetStat("targets", len(targets))
 	var (
-		ok, failed atomic.Int64
-		mu         sync.Mutex
-		done       int
+		ok, failed, noCred atomic.Int64
+		mu                 sync.Mutex
+		done               int
 	)
 	rc.Progress(0, len(targets))
 	runErr := plugin.ForEach(ctx, rc.Parallelism(), targets, func(ctx context.Context, t target) error {
-		err := p.scan(ctx, rc, cfg, creds, store, subnets, t)
+		err := p.scan(ctx, rc, cfg, picker, store, subnets, t)
 		switch {
 		case err == nil:
 			ok.Add(1)
 			rc.AddStat("answered", 1)
 		case ctx.Err() != nil:
+		case errors.Is(err, errNoCredential):
+			noCred.Add(1)
+			rc.AddStat("no_credential", 1)
 		default:
 			failed.Add(1)
 			rc.AddStat("no_answer", 1)
@@ -194,16 +181,29 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if runErr != nil {
 		return runErr
 	}
-	rc.Log.Info("SNMP-Abfrage abgeschlossen", "answered", ok.Load(), "no_answer", failed.Load())
-	if ok.Load() == 0 && failed.Load() > 0 {
+	rc.Log.Info("SNMP-Abfrage abgeschlossen", "answered", ok.Load(), "no_answer", failed.Load(), "no_credential", noCred.Load())
+	switch {
+	case ok.Load() == 0 && failed.Load() > 0:
 		return fmt.Errorf("kein Gerät hat per SNMP geantwortet (%d ohne Antwort)", failed.Load())
+	case ok.Load() == 0 && noCred.Load() > 0:
+		return fmt.Errorf("für keines der %d Geräte gibt es passende Zugangsdaten: %w", noCred.Load(), plugin.ErrNoCredential)
 	}
 	return nil
 }
 
+// errNoCredential marks a device without applicable credential (skipped, not failed).
+var errNoCredential = errors.New("kein passendes Credential")
+
 // scan queries one device.
-func (p *Plugin) scan(ctx context.Context, rc *plugin.RunContext, cfg config, creds []*plugin.Credential, store *credStore,
+func (p *Plugin) scan(ctx context.Context, rc *plugin.RunContext, cfg config, picker *plugin.CredentialPicker, store *credStore,
 	subnets []netip.Prefix, t target) error {
+	creds, err := picker.For(ctx, plugin.CredentialTarget{DeviceID: t.dev.ID, IP: t.ip})
+	if err != nil {
+		return err
+	}
+	if len(creds) == 0 {
+		return errNoCredential
+	}
 	ordered := orderedCredentials(store.get(t.dev.ID), creds, func(c *plugin.Credential) int64 { return c.ID })
 	var errs []string
 	for _, c := range ordered {

@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"netscope/internal/netutil"
 	"netscope/internal/plugin"
 	"netscope/internal/sshx"
 )
@@ -51,9 +52,10 @@ func (p *Plugin) Schema() plugin.Schema {
 			Placeholder: "unix:///var/run/docker.sock",
 			Description: "Ein Endpunkt pro Zeile: unix:///var/run/docker.sock (in den NetScope-Container gemounteter Socket des eigenen Hosts), tcp://host:2375 (unverschlüsselte Docker-API) oder ssh://[benutzer@]host[:port] (Socket /var/run/docker.sock des Hosts per SSH-Tunnel).",
 			Validation:  &plugin.Validation{Pattern: `^(unix|tcp|ssh)://\S+$`}},
-		{Key: "ssh_credential", Type: plugin.FieldCredentialRef, Label: "SSH-Credential",
+		{Key: "ssh_credentials", Type: plugin.FieldCredentialRef, Label: "SSH-Zugangsdaten", Multi: true,
 			CredentialTypes: []string{plugin.CredSSH, plugin.CredPassword},
-			Description:     "Für ssh://-Endpunkte. Ein Benutzer in der URL hat Vorrang; er braucht Zugriff auf den Docker-Socket (root oder Gruppe docker)."},
+			Description: "Für ssh://-Endpunkte. Leer = automatisch die passenden je Host nach dem Geltungsbereich des Credentials; abgelehnte werden übersprungen. " +
+				"Ein Benutzer in der URL hat Vorrang; er braucht Zugriff auf den Docker-Socket (root oder Gruppe docker)."},
 		{Key: "host_key_policy", Type: plugin.FieldEnum, Label: "SSH-Hostschlüssel", Default: "tofu", Options: []plugin.Option{
 			{Value: "tofu", Label: "Beim ersten Kontakt merken, Änderungen ablehnen"},
 			{Value: "insecure", Label: "Nicht prüfen (unsicher)"},
@@ -63,20 +65,39 @@ func (p *Plugin) Schema() plugin.Schema {
 	}}
 }
 
+// MigrateSettings implements plugin.SettingsMigrator: version 1.0 had a single
+// "ssh_credential".
+func (p *Plugin) MigrateSettings(stored map[string]any) map[string]any {
+	if c, ok := stored["ssh_credential"]; ok {
+		if _, has := stored["ssh_credentials"]; !has {
+			if id := plugin.NewSettings(map[string]any{"c": c}).CredentialID("c"); id > 0 {
+				stored["ssh_credentials"] = []any{id}
+			}
+		}
+		delete(stored, "ssh_credential")
+	}
+	return stored
+}
+
+// Endpoints implements plugin.EndpointProvider (remote engines; the local socket has no
+// configured host).
+func (p *Plugin) Endpoints(s plugin.Settings) []string {
+	var out []string
+	for _, raw := range s.StringList("endpoints") {
+		if ep, err := parseEndpoint(raw); err == nil && ep.Host != "" {
+			out = append(out, ep.Host)
+		}
+	}
+	return out
+}
+
 // ValidateSettings implements plugin.SettingsValidator.
 func (p *Plugin) ValidateSettings(s plugin.Settings) error {
 	var errs []plugin.FieldError
-	needSSH := false
 	for _, raw := range s.StringList("endpoints") {
-		ep, err := parseEndpoint(raw)
-		if err != nil {
+		if _, err := parseEndpoint(raw); err != nil {
 			errs = append(errs, plugin.FieldError{Field: "endpoints", Message: err.Error()})
-			continue
 		}
-		needSSH = needSSH || ep.Scheme == "ssh"
-	}
-	if needSSH && s.CredentialID("ssh_credential") == 0 {
-		errs = append(errs, plugin.FieldError{Field: "ssh_credential", Message: "für ssh://-Endpunkte erforderlich"})
 	}
 	if len(errs) > 0 {
 		return &plugin.ValidationError{Errors: errs}
@@ -98,7 +119,10 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if len(eps) == 0 {
 		return errors.New("keine Docker-Endpunkte konfiguriert")
 	}
-	im := &importer{rc: rc, timeout: s.Duration("timeout"), credID: s.CredentialID("ssh_credential")}
+	im := &importer{rc: rc, timeout: s.Duration("timeout"),
+		creds: &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredSSH, plugin.CredPassword},
+			Allowed: s.CredentialIDs("ssh_credentials"), Log: rc.Log,
+			Check: func(c *plugin.Credential) error { _, _, err := sshx.AuthMethods(c); return err }}}
 	if im.timeout <= 0 {
 		im.timeout = defaultTimeout
 	}
@@ -141,29 +165,29 @@ type importer struct {
 	rc         *plugin.RunContext
 	timeout    time.Duration
 	knownHosts string
-	credID     int64
-
-	credOnce sync.Once
-	cred     *plugin.Credential
-	credErr  error
+	creds      *plugin.CredentialPicker
 
 	localOnce sync.Once
 	localIP   string
 	localErr  error
 }
 
-func (im *importer) sshCredential(ctx context.Context) (*plugin.Credential, error) {
-	im.credOnce.Do(func() {
-		if im.credID == 0 {
-			im.credErr = errors.New("für ssh://-Endpunkte ist ein SSH-Credential nötig")
-			return
-		}
-		im.cred, im.credErr = im.rc.Creds.Get(ctx, im.credID)
-		if im.credErr != nil {
-			im.credErr = fmt.Errorf("SSH-Credential %d: %w", im.credID, im.credErr)
-		}
-	})
-	return im.cred, im.credErr
+// sshCredentials returns the applicable credentials for an ssh:// endpoint (with the
+// user of the URL, if any).
+func (im *importer) sshCredentials(ctx context.Context, ep endpoint) ([]*plugin.Credential, error) {
+	ip, _ := netutil.ResolveHost(ctx, ep.Host)
+	creds, err := im.creds.For(ctx, plugin.CredentialTarget{IP: ip})
+	if err != nil {
+		return nil, err
+	}
+	if len(creds) == 0 {
+		return nil, fmt.Errorf("keine passenden SSH-Zugangsdaten für %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w", ep.Host, plugin.ErrNoCredential)
+	}
+	out := make([]*plugin.Credential, len(creds))
+	for i, c := range creds {
+		out[i] = withUser(c, ep.User)
+	}
+	return out, nil
 }
 
 func (im *importer) localAddress() (string, error) {
@@ -202,18 +226,18 @@ func (im *importer) transport(ctx context.Context, ep endpoint) (dial func(conte
 		}
 		return func(ctx context.Context) (net.Conn, error) { return d.DialContext(ctx, "unix", ep.Path) }, func() {}, ip, nil
 	case "tcp":
-		ip, err := resolveHost(ctx, ep.Host)
+		ip, err := netutil.ResolveHost(ctx, ep.Host)
 		if err != nil {
 			return nil, nil, "", err
 		}
 		addr := net.JoinHostPort(ep.Host, strconv.Itoa(ep.Port))
 		return func(ctx context.Context) (net.Conn, error) { return d.DialContext(ctx, "tcp", addr) }, func() {}, ip, nil
 	case "ssh":
-		cred, err := im.sshCredential(ctx)
+		creds, err := im.sshCredentials(ctx, ep)
 		if err != nil {
 			return nil, nil, "", err
 		}
-		cl, err := sshx.Dial(ctx, ep.Host, withUser(cred, ep.User), sshx.Options{Port: ep.Port, Timeout: im.timeout, KnownHosts: im.knownHosts})
+		cl, _, err := sshx.DialFirst(ctx, ep.Host, creds, sshx.Options{Port: ep.Port, Timeout: im.timeout, KnownHosts: im.knownHosts})
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("SSH-Verbindung: %w", err)
 		}
@@ -224,7 +248,7 @@ func (im *importer) transport(ctx context.Context, ep endpoint) (dial func(conte
 			}
 		}
 		if ip == "" {
-			if ip, err = resolveHost(ctx, ep.Host); err != nil {
+			if ip, err = netutil.ResolveHost(ctx, ep.Host); err != nil {
 				cl.Close()
 				return nil, nil, "", err
 			}

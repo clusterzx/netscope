@@ -232,6 +232,9 @@ func (h *Host) loadConfig(ctx context.Context, p plugin.Plugin) (*Config, error)
 			stored[k] = v
 		}
 	}
+	if m, ok := p.(plugin.SettingsMigrator); ok {
+		stored = m.MigrateSettings(stored)
+	}
 	c.Settings = p.Schema().Normalize(stored)
 	if _, ok := p.(plugin.Runner); !ok {
 		c.Schedule = ""
@@ -478,7 +481,7 @@ func (h *Host) Publish(ctx context.Context, id string, n *plugin.Notification) e
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
 	pc := &plugin.PublishContext{PluginID: id, Settings: plugin.NewSettings(cfg.Settings), Log: h.Log.With("plugin", id),
-		Creds: vault.Provider{V: h.Vault}, Env: h.Env()}
+		Creds: h.CredentialProvider(), Env: h.Env()}
 	start := time.Now()
 	err := safeCall(func() error { return pub.Publish(ctx, pc, n) })
 	h.metrics.notification(id, err == nil, time.Since(start))

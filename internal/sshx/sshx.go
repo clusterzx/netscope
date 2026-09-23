@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -163,6 +164,40 @@ func Dial(ctx context.Context, host string, cred *plugin.Credential, opt Options
 	}
 	_ = conn.SetDeadline(time.Time{})
 	return &Client{c: ssh.NewClient(cc, chans, reqs), Host: host}, nil
+}
+
+// IsAuthError reports whether a Dial error means "credential rejected" (try the next
+// one) rather than a network or host key problem.
+func IsAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "unable to authenticate") || strings.Contains(s, "no supported methods remain")
+}
+
+// DialFirst tries the credentials in order and returns the first connection that
+// authenticates. Rejected credentials are skipped; other errors (network, host key)
+// end the attempt, since the next credential would fail the same way.
+func DialFirst(ctx context.Context, host string, creds []*plugin.Credential, opt Options) (*Client, *plugin.Credential, error) {
+	if len(creds) == 0 {
+		return nil, nil, plugin.ErrNoCredential
+	}
+	var rejected []string
+	for _, c := range creds {
+		cl, err := Dial(ctx, host, c, opt)
+		if err == nil {
+			return cl, c, nil
+		}
+		if ctx.Err() != nil {
+			return nil, nil, ctx.Err()
+		}
+		if !IsAuthError(err) {
+			return nil, nil, err
+		}
+		rejected = append(rejected, c.Name)
+	}
+	return nil, nil, fmt.Errorf("Anmeldung abgelehnt für %s", strings.Join(rejected, ", "))
 }
 
 // Close closes the connection.

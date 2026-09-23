@@ -1,12 +1,21 @@
 <!--
 	Create/edit dialog for a vault credential. Create: choose the type first, then the
 	type's schema form. Edit: type is fixed; stored secrets show "gesetzt" and are kept
-	(SECRET_MASK) unless replaced or removed.
+	(SECRET_MASK) unless replaced or removed. "Gilt für" edits the credential scope that
+	plugins use to pick credentials per target.
 	<CredentialForm bind:open credential={c | null} types={types} onsaved={(c) => …} />
 -->
 <script lang="ts">
 	import { api, ApiError, errorMessage, fieldErrors } from '$lib/api';
-	import type { Credential, CredentialType } from '$lib/api';
+	import type { Credential, CredentialType, PluginScope } from '$lib/api';
+	import ScopeEditor from '$lib/components/plugins/ScopeEditor.svelte';
+	import {
+		credentialScopeLevel,
+		credentialScopeSummary,
+		emptyScope,
+		normScope
+	} from '$lib/components/plugins/plugin';
+	import { groups } from '$lib/stores/catalog.svelte';
 	import { SchemaForm, schemaInitial, schemaPayload, validateSchema } from '$lib/components/schema';
 	import { Alert, Button, Icon, Input, Modal, Textarea } from '$lib/components/ui';
 
@@ -28,10 +37,20 @@
 	let errors = $state<Record<string, string>>({});
 	let formError = $state('');
 	let busy = $state(false);
+	let scope = $state<PluginScope>(emptyScope());
+	let showScope = $state(false);
+
+	const groupName = (id: number) => groups.value?.find((g) => g.id === id)?.name ?? `#${id}`;
+	const scopeText = $derived(credentialScopeSummary(scope, groupName));
+	const scopeErrors = $derived(
+		Object.fromEntries(Object.entries(errors).filter(([k]) => k.startsWith('scope')))
+	);
 
 	const type = $derived(types.find((t) => t.type === typeId));
 	const fields = $derived(type?.schema?.fields ?? []);
-	const schemaErrors = $derived(Object.fromEntries(Object.entries(errors).filter(([k]) => k !== 'name')));
+	const schemaErrors = $derived(
+		Object.fromEntries(Object.entries(errors).filter(([k]) => k !== 'name' && !k.startsWith('scope')))
+	);
 
 	// (re)initialise whenever the dialog opens
 	let wasOpen = false;
@@ -44,6 +63,11 @@
 	function init() {
 		errors = {};
 		formError = '';
+		scope = normScope(credential?.scope ?? emptyScope());
+		if (!scope.allSubnets && !scope.subnets?.length && credentialScopeLevel(scope) === 'everywhere')
+			scope.allSubnets = true;
+		showScope = credentialScopeLevel(scope) !== 'everywhere';
+		groups.load().catch(() => {});
 		if (credential) {
 			typeId = credential.type;
 			step = 'form';
@@ -84,7 +108,12 @@
 				name: name.trim(),
 				type: typeId,
 				description: description.trim(),
-				values: schemaPayload(fields, values)
+				values: schemaPayload(fields, values),
+				scope: {
+					...scope,
+					subnets: scope.allSubnets ? [] : scope.subnets,
+					query: scope.query?.trim() ?? ''
+				}
 			};
 			const saved = credential
 				? await api.put('/api/v1/credentials/{id}', { path: { id: credential.id }, body })
@@ -93,6 +122,7 @@
 			onsaved?.(saved);
 		} catch (err) {
 			errors = fieldErrors(err);
+			if (Object.keys(errors).some((k) => k.startsWith('scope'))) showScope = true;
 			if (err instanceof ApiError && /Name/.test(err.message) && !err.fields.length)
 				errors = { name: err.message };
 			// messages that belong to a field are shown there only
@@ -159,6 +189,30 @@
 			<div class="border-t border-border pt-4">
 				<SchemaForm {fields} bind:values errors={schemaErrors} idPrefix="cred-{typeId}" compact />
 			</div>
+			<section class="border-t border-border pt-4" aria-labelledby="cred-scope-title">
+				<div class="flex flex-wrap items-start justify-between gap-2">
+					<div class="min-w-0">
+						<h3 id="cred-scope-title" class="text-[0.8125rem] font-medium text-fg">Gilt für</h3>
+						<p class="text-sm break-words text-fg-muted">{scopeText}</p>
+					</div>
+					<Button
+						size="sm"
+						icon={showScope ? 'chevron-up' : 'edit'}
+						aria-expanded={showScope}
+						aria-controls="cred-scope"
+						onclick={() => (showScope = !showScope)}>{showScope ? 'Einklappen' : 'Anpassen'}</Button
+					>
+				</div>
+				<p class="mt-1 text-xs text-fg-subtle">
+					Plugins ohne eigene Auswahl nehmen pro Gerät automatisch die passenden Zugangsdaten – zuerst die dem
+					Gerät zugewiesenen, dann Gruppe, Tag oder Filter, dann Subnetz, zuletzt „überall“.
+				</p>
+				{#if showScope}
+					<div id="cred-scope" class="mt-4">
+						<ScopeEditor bind:value={scope} mode="credential" errors={scopeErrors} idPrefix="cred-scope" />
+					</div>
+				{/if}
+			</section>
 			<p class="flex items-start gap-1.5 text-xs text-fg-subtle">
 				<Icon name="lock" size={13} class="mt-px shrink-0" />
 				Secrets werden verschlüsselt gespeichert und danach nie wieder angezeigt.

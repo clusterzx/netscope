@@ -22,6 +22,7 @@ type CredentialMeta struct {
 	Description string            `json:"description"`
 	Public      map[string]string `json:"public"`
 	SecretsSet  []string          `json:"secretsSet"` // names of secret fields that have a value
+	Scope       plugin.Scope      `json:"scope"`      // where the credential applies
 	CreatedAt   time.Time         `json:"createdAt"`
 	UpdatedAt   time.Time         `json:"updatedAt"`
 	LastUsedAt  *time.Time        `json:"lastUsedAt,omitempty"`
@@ -34,6 +35,23 @@ type CredentialInput struct {
 	Type        string         `json:"type"`
 	Description string         `json:"description"`
 	Values      map[string]any `json:"values"`
+	// Scope limits where the credential applies (nil: everywhere on create, unchanged on update).
+	Scope *plugin.Scope `json:"scope,omitempty"`
+}
+
+// CredentialScope is the selection data of a credential (no values).
+type CredentialScope struct {
+	ID    int64
+	Name  string
+	Type  string
+	Scope plugin.Scope
+}
+
+func scopeOrDefault(s *plugin.Scope) plugin.Scope {
+	if s == nil {
+		return plugin.DefaultScope()
+	}
+	return *s
 }
 
 // ErrDuplicateName is returned when a credential name is already used.
@@ -87,8 +105,8 @@ func (v *Vault) CreateCredential(ctx context.Context, in CredentialInput) (int64
 		return 0, err
 	}
 	now := db.Now()
-	res, err := v.db.W.ExecContext(ctx, `INSERT INTO credentials(name, type, description, public, secret, key_id, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?)`, name, in.Type, in.Description, db.JSON(pub), blob, v.KeyID(), now, now)
+	res, err := v.db.W.ExecContext(ctx, `INSERT INTO credentials(name, type, description, public, secret, key_id, scope, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?)`, name, in.Type, in.Description, db.JSON(pub), blob, v.KeyID(), db.JSON(scopeOrDefault(in.Scope)), now, now)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return 0, ErrDuplicateName
@@ -120,8 +138,12 @@ func (v *Vault) UpdateCredential(ctx context.Context, id int64, in CredentialInp
 	if err != nil {
 		return err
 	}
-	_, err = v.db.W.ExecContext(ctx, `UPDATE credentials SET name=?, description=?, public=?, secret=?, key_id=?, updated_at=? WHERE id=?`,
-		name, in.Description, db.JSON(pub), blob, v.KeyID(), db.Now(), id)
+	scope := meta.Scope
+	if in.Scope != nil {
+		scope = *in.Scope
+	}
+	_, err = v.db.W.ExecContext(ctx, `UPDATE credentials SET name=?, description=?, public=?, secret=?, key_id=?, scope=?, updated_at=? WHERE id=?`,
+		name, in.Description, db.JSON(pub), blob, v.KeyID(), db.JSON(scope), db.Now(), id)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
 		return ErrDuplicateName
 	}
@@ -155,13 +177,14 @@ func (v *Vault) load(ctx context.Context, id int64) (*CredentialMeta, map[string
 	var (
 		m        CredentialMeta
 		pubJSON  string
+		scopeJS  string
 		blob     []byte
 		created  int64
 		updated  int64
 		lastUsed sql.NullInt64
 	)
-	err := v.db.R.QueryRowContext(ctx, `SELECT id, name, type, description, public, secret, created_at, updated_at, last_used_at
-		FROM credentials WHERE id = ?`, id).Scan(&m.ID, &m.Name, &m.Type, &m.Description, &pubJSON, &blob, &created, &updated, &lastUsed)
+	err := v.db.R.QueryRowContext(ctx, `SELECT id, name, type, description, public, secret, scope, created_at, updated_at, last_used_at
+		FROM credentials WHERE id = ?`, id).Scan(&m.ID, &m.Name, &m.Type, &m.Description, &pubJSON, &blob, &scopeJS, &created, &updated, &lastUsed)
 	if err != nil {
 		return nil, nil, nil, db.NotFound(err)
 	}
@@ -178,6 +201,7 @@ func (v *Vault) load(ctx context.Context, id int64) (*CredentialMeta, map[string
 		}
 	}
 	m.Public = pub
+	m.Scope = parseScope(scopeJS)
 	m.CreatedAt = db.Time(created)
 	m.UpdatedAt = db.Time(updated)
 	m.LastUsedAt = db.NullTime(lastUsed)
@@ -221,6 +245,45 @@ func (v *Vault) ListCredentials(ctx context.Context) ([]CredentialMeta, error) {
 	return out, nil
 }
 
+// CredentialScopes returns the scopes of all credentials (optionally of the given types)
+// without decrypting anything.
+func (v *Vault) CredentialScopes(ctx context.Context, types []string) ([]CredentialScope, error) {
+	q, args := "SELECT id, name, type, scope FROM credentials", []any{}
+	if len(types) > 0 {
+		q += " WHERE type IN (" + db.Placeholders(len(types)) + ")"
+		args = db.StringArgs(types)
+	}
+	rows, err := v.db.R.QueryContext(ctx, q+" ORDER BY name COLLATE NOCASE", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CredentialScope
+	for rows.Next() {
+		var (
+			c  CredentialScope
+			js string
+		)
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &js); err != nil {
+			return nil, err
+		}
+		c.Scope = parseScope(js)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func parseScope(js string) plugin.Scope {
+	var s plugin.Scope
+	if err := db.Unmarshal(js, &s); err != nil {
+		return plugin.DefaultScope()
+	}
+	if !s.AllSubnets && len(s.Subnets) == 0 && !s.DeviceRestricted() {
+		s.AllSubnets = true
+	}
+	return s
+}
+
 // Get decrypts a credential for a plugin and records the usage time.
 func (v *Vault) Get(ctx context.Context, id int64) (*plugin.Credential, error) {
 	m, pub, sec, err := v.load(ctx, id)
@@ -249,15 +312,4 @@ func (v *Vault) Check(ctx context.Context, id int64, allowed []string) error {
 		}
 	}
 	return fmt.Errorf("Credential %d hat Typ %s, erlaubt: %s", id, typ, strings.Join(allowed, ", "))
-}
-
-// Provider adapts the vault to plugin.CredentialProvider.
-type Provider struct{ V *Vault }
-
-// Get implements plugin.CredentialProvider.
-func (p Provider) Get(ctx context.Context, id int64) (*plugin.Credential, error) {
-	if id <= 0 {
-		return nil, plugin.ErrNoCredential
-	}
-	return p.V.Get(ctx, id)
 }

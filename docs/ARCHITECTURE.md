@@ -54,7 +54,7 @@ Benachrichtigungen plant und über Publisher zustellt.
 
 ## Datenbank
 
-Schema: `internal/db/migrations/0001_init.sql` (eingebettet, wird beim Start angewendet).
+Schema: `internal/db/migrations/*.sql` (eingebettet, beim Start der Reihe nach angewendet).
 Zeitstempel sind Unix-Millisekunden. Tabellen mit `first_seen/last_seen/gone_at` sind
 **temporal**: `gone_at IS NULL` ist der aktuelle Zustand, geschlossene Zeilen sind Historie –
 darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
@@ -62,7 +62,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 | Bereich | Tabellen |
 |---|---|
 | System | `settings`, `users`, `sessions`, `api_tokens`, `audit_log` |
-| Vault | `vault_meta` (Key-Prüfwert), `credentials` (öffentliche Felder + AES-GCM-Blob) |
+| Vault | `vault_meta` (Key-Prüfwert), `credentials` (öffentliche Felder + AES-GCM-Blob + Geltungsbereich `scope`) |
 | Plugins | `plugin_configs` (inkl. verschlüsselter Secret-Felder), `runs`, `run_logs` |
 | Netz | `subnets` |
 | Geräte | `devices` (manuelle Felder + effektive Werte), `device_macs`, `device_ips`*, `device_facts`* (Hostname/Hersteller/OS/Typ/Attribute je Quelle), `device_presence`, `external_refs`, `device_inventory`, `device_tags`, `groups`, `group_members`, `custom_fields`, `saved_views`, `relations` |
@@ -145,12 +145,12 @@ Prometheus-Metriken unter `/metrics`.
 | Bereich | Endpunkte |
 |---|---|
 | Auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `PUT /auth/password`, `GET/POST /tokens`, `DELETE /tokens/{id}` |
-| Geräte | `GET/POST /devices`, `GET/PATCH/DELETE /devices/{id}`, `POST /devices/bulk`, `POST /devices/merge`, `POST /devices/{id}/split`, `POST /devices/{id}/scan`, `POST /devices/{id}/actions/{plugin}/{action}`, Tabs: `…/ports`, `…/http`, `…/certificates`, `…/packages`, `…/containers`, `…/inventory`, `…/cves`, `…/health`, `…/events`, `…/timeline`, `…/relations`, `…/observations`, `…/timeseries`; `GET /tags`, `GET /certificates` |
+| Geräte | `GET/POST /devices`, `GET/PATCH/DELETE /devices/{id}`, `POST /devices/bulk`, `POST /devices/merge`, `POST /devices/{id}/split`, `POST /devices/{id}/scan`, `POST /devices/{id}/actions/{plugin}/{action}`, Tabs: `…/ports`, `…/http`, `…/certificates`, `…/packages`, `…/containers`, `…/inventory`, `…/cves`, `…/health`, `…/events`, `…/timeline`, `…/relations`, `…/observations`, `…/timeseries`, `…/credentials` (passende Zugangsdaten mit Rang und Grund); `GET /tags`, `GET /certificates` |
 | Stammdaten | `/subnets`, `/groups` (+ `/members`), `/custom-fields`, `/views` (CRUD) |
 | Plugins | `GET /plugins`, `GET /plugins/{id}`, `PUT /plugins/{id}/config`, `POST /plugins/{id}/run`, `POST /plugins/{id}/actions/{action}` (`?wait=0` antwortet sofort mit der Lauf-ID), `POST /plugins/{id}/test`, `GET /runs` (Filter `plugin`, `status`, `kind`, `before`, `scope=full`), `GET /runs/active`, `GET /runs/{id}`, `GET /runs/{id}/logs?after=`, `POST /runs/{id}/cancel` |
 | Events | `GET /events`, `GET /events/{id}`, `POST /events/ack`, `GET /events/types`, `GET /events/counts`, `GET /diff` |
 | Regeln | `/rules` (CRUD), `PUT /rules/order`, `POST /rules/test`, `POST /rules/{id}/test`, `GET /notifications` (Filter `status`, `publisher`, `event`, `rule`), `GET /publishers` |
-| Credentials | `/credentials` (CRUD, nie Secrets), `GET /credentials/types` |
+| Credentials | `/credentials` (CRUD mit `scope`, nie Secrets), `GET /credentials/types` |
 | Health | `GET /health/board`, `/health-checks` (CRUD), `POST /health-checks/{id}/run`, `…/outages`, `…/latency` |
 | Schwachstellen | `GET /vulnerabilities`, `GET /vulnerabilities/{cve}`, `POST /vulnerabilities/ignore`, `GET /vulnerabilities/status` |
 | Topologie | `GET /topology`, `GET/POST /topology/edges`, `DELETE /topology/edges/{id}` |

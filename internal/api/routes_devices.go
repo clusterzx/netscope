@@ -115,6 +115,9 @@ func (s *Server) registerDevices() {
 		Resp: inventory.ContainerData{}, handler: s.handleDeviceContainers})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/inventory", Tag: "Geräte", Summary: "Strukturiertes Inventar je Quelle (SSH, SNMP, UPnP …)",
 		Scope: scopeRead, Resp: map[string]any{}, handler: s.handleDeviceInventory})
+	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/credentials", Tag: "Geräte",
+		Summary: "Passende Zugangsdaten (nach Geltungsbereich, spezifischste zuerst)", Scope: scopeRead,
+		Resp: []deviceCredential{}, handler: s.handleDeviceCredentials})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/health", Tag: "Geräte", Summary: "Health-Checks des Geräts", Scope: scopeRead,
 		Resp: []healthcheck.Check{}, handler: s.handleDeviceHealth})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/events", Tag: "Geräte", Summary: "Events des Geräts", Scope: scopeRead,

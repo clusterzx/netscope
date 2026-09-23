@@ -2,11 +2,13 @@
 package netutil
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/netip"
 	"sort"
 	"strings"
+	"time"
 )
 
 // NormalizeMAC returns the MAC in lower-case colon notation (aa:bb:cc:dd:ee:ff).
@@ -210,4 +212,26 @@ func InterfaceFor(addr netip.Addr) string {
 		}
 	}
 	return ""
+}
+
+// ResolveHost returns the address of a host name (IPv4 preferred) or the literal IP.
+func ResolveHost(ctx context.Context, host string) (string, error) {
+	if a, err := netip.ParseAddr(host); err == nil {
+		return a.Unmap().String(), nil
+	}
+	lctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupNetIP(lctx, "ip", host)
+	if err != nil {
+		return "", fmt.Errorf("Hostname %s nicht auflösbar: %w", host, err)
+	}
+	for _, a := range addrs {
+		if a.Unmap().Is4() {
+			return a.Unmap().String(), nil
+		}
+	}
+	if len(addrs) > 0 {
+		return addrs[0].String(), nil
+	}
+	return "", fmt.Errorf("Hostname %s nicht auflösbar", host)
 }

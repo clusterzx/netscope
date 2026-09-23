@@ -10,7 +10,6 @@ import (
 	"netscope/internal/bus"
 	"netscope/internal/events"
 	"netscope/internal/plugin"
-	"netscope/internal/vault"
 )
 
 const (
@@ -125,7 +124,7 @@ func (h *Host) hookContext(id string, runID int64) *plugin.RunContext {
 		RunID: runID, PluginID: id, Trigger: TriggerHook, Settings: plugin.NewSettings(cfg.Settings), Scope: cfg.Scope,
 		Params: map[string]any{}, Concurrency: cfg.Concurrency, Log: h.Log.With("plugin", id),
 		Sink: &sink{h: h, pluginID: id, runID: 0}, Events: events.Emitter{S: h.Events, PluginID: id},
-		Creds: vault.Provider{V: h.Vault}, Inventory: h.Inventory, DB: h.DB, DataDir: h.dataDir(id), Env: h.Env(),
+		Creds: h.CredentialProvider(), Inventory: h.Inventory, DB: h.DB, DataDir: h.dataDir(id), Env: h.Env(),
 		OnLive: h.liveFunc(id),
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"sync"
 	"testing"
 
@@ -66,6 +68,28 @@ func (c Creds) Get(ctx context.Context, id int64) (*plugin.Credential, error) {
 		return cr, nil
 	}
 	return nil, plugin.ErrNoCredential
+}
+
+// Applicable implements plugin.CredentialProvider: every credential applies everywhere,
+// ordered by the allowed list (or by id).
+func (c Creds) Applicable(ctx context.Context, t plugin.CredentialTarget, types []string, allowed []int64) ([]plugin.CredentialMatch, error) {
+	var out []plugin.CredentialMatch
+	for id, cr := range c {
+		if len(types) > 0 && !slices.Contains(types, cr.Type) {
+			continue
+		}
+		if len(allowed) > 0 && !slices.Contains(allowed, id) {
+			continue
+		}
+		out = append(out, plugin.CredentialMatch{ID: id, Name: cr.Name, Type: cr.Type, Rank: plugin.RankEverywhere, Reason: "überall"})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if len(allowed) > 0 {
+			return slices.Index(allowed, out[i].ID) < slices.Index(allowed, out[j].ID)
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out, nil
 }
 
 // Inventory is an in-memory inventory reader.

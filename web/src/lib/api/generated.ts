@@ -73,6 +73,7 @@ export interface ApiCredentialView {
 	lastUsedAt?: string;
 	name: string;
 	public: Record<string, string>;
+	scope: PluginScope;
 	secretsSet: string[];
 	type: string;
 	updatedAt: string;
@@ -130,6 +131,15 @@ export interface ApiDeviceCounts {
 	online: number;
 	total: number;
 	unknown: number;
+}
+
+export interface ApiDeviceCredential {
+	id: number;
+	name: string;
+	rank: number;
+	reason: string;
+	type: string;
+	usedBy: ApiCredentialUse[];
 }
 
 export interface ApiDeviceList {
@@ -1485,6 +1495,7 @@ export interface TimeseriesSeries {
 export interface VaultCredentialInput {
 	description: string;
 	name: string;
+	scope?: PluginScope;
 	type: string;
 	values: Record<string, unknown>;
 }
@@ -1608,6 +1619,10 @@ export interface ApiPaths {
 	'/api/v1/devices/{id}/containers': {
 		/** Container und Images */
 		get: { query: { history?: boolean | null }; body: never; response: InventoryContainerData };
+	};
+	'/api/v1/devices/{id}/credentials': {
+		/** Passende Zugangsdaten (nach Geltungsbereich, spezifischste zuerst) */
+		get: { query: never; body: never; response: ApiDeviceCredential[] };
 	};
 	'/api/v1/devices/{id}/cves': {
 		/** CVEs eines Geräts */

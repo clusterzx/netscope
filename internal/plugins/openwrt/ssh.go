@@ -14,9 +14,10 @@ import (
 // maxOutput caps the output of the remote commands.
 const maxOutput = 8 << 20
 
-// fetchSSH reads "uci show dhcp" and the dnsmasq lease files over SSH (read-only).
-func fetchSSH(ctx context.Context, log *slog.Logger, host string, cred *plugin.Credential, opt sshx.Options) ([]lease, []uciSection, error) {
-	cl, err := sshx.Dial(ctx, host, cred, opt)
+// fetchSSH reads "uci show dhcp" and the dnsmasq lease files over SSH (read-only). The
+// credentials are tried in order until one is accepted.
+func fetchSSH(ctx context.Context, log *slog.Logger, host string, creds []*plugin.Credential, opt sshx.Options) ([]lease, []uciSection, error) {
+	cl, _, err := sshx.DialFirst(ctx, host, creds, opt)
 	if err != nil {
 		if errors.Is(err, sshx.ErrHostKeyChanged) {
 			return nil, nil, err

@@ -5,12 +5,16 @@ package openwrt
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"netscope/internal/netutil"
 	"netscope/internal/plugin"
 	"netscope/internal/sshx"
 )
@@ -29,8 +33,8 @@ func (p *Plugin) Info() plugin.Info {
 		ID:          "openwrt",
 		Kind:        plugin.KindImporter,
 		Name:        "OpenWrt DHCP",
-		Description: "Liest DHCP-Leases und statische Leases vom OpenWrt-/GL.iNet-Router (per SSH oder LuCI) und füllt damit Hostnamen und Adressen.",
-		Version:     "1.0.0",
+		Description: "Liest DHCP-Leases und statische Leases von OpenWrt-/GL.iNet-Routern (per SSH oder LuCI) und füllt damit Hostnamen und Adressen.",
+		Version:     "1.1.0",
 
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
@@ -49,15 +53,16 @@ var (
 // Schema implements plugin.Plugin.
 func (p *Plugin) Schema() plugin.Schema {
 	return plugin.Schema{Fields: []plugin.Field{
-		{Key: "host", Type: plugin.FieldString, Label: "Router", Default: "192.168.8.1", Required: true,
-			Description: "Hostname oder IP-Adresse des Routers.", Validation: &plugin.Validation{Format: "host"}},
+		{Key: "hosts", Type: plugin.FieldStringList, Label: "Router", Default: []string{"192.168.8.1"}, Required: true,
+			Description: "Hostname oder IP-Adresse, ein Router pro Zeile. Bei LuCI auch als URL, z. B. http://192.168.8.1:8080 (GL.iNet-Firmware 4.x); ohne URL wird http://<Router> verwendet."},
 		{Key: "method", Type: plugin.FieldEnum, Label: "Zugriff", Default: "ssh", Options: []plugin.Option{
 			{Value: "ssh", Label: "SSH (dhcp.leases und uci show dhcp)"},
 			{Value: "luci", Label: "LuCI (ubus JSON-RPC)"},
 		}},
-		{Key: "credential", Type: plugin.FieldCredentialRef, Label: "Zugangsdaten", Required: true,
+		{Key: "credentials", Type: plugin.FieldCredentialRef, Label: "Zugangsdaten", Multi: true,
 			CredentialTypes: []string{plugin.CredSSH, plugin.CredPassword},
-			Description:     "SSH: Credential vom Typ SSH oder Benutzer/Passwort. LuCI: Benutzer/Passwort (leerer Benutzer = root)."},
+			Description: "SSH: Credentials vom Typ SSH oder Benutzer/Passwort. LuCI: Benutzer/Passwort (leerer Benutzer = root). " +
+				"Leer = automatisch die passenden je Router nach dem Geltungsbereich des Credentials; abgelehnte werden übersprungen."},
 		{Key: "port", Type: plugin.FieldInt, Label: "SSH-Port", Default: 22, VisibleIf: visibleSSH,
 			Validation: &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(65535)}},
 		{Key: "host_key_policy", Type: plugin.FieldEnum, Label: "SSH-Hostschlüssel", Default: "tofu", VisibleIf: visibleSSH,
@@ -65,9 +70,6 @@ func (p *Plugin) Schema() plugin.Schema {
 				{Value: "tofu", Label: "Beim ersten Kontakt merken, Änderungen ablehnen"},
 				{Value: "insecure", Label: "Nicht prüfen (unsicher)"},
 			}},
-		{Key: "luci_url", Type: plugin.FieldString, Label: "LuCI-URL", Placeholder: "http://192.168.8.1", VisibleIf: visibleLuCI,
-			Description: "Leer = http://<Router>. Bei GL.iNet-Firmware 4.x läuft LuCI meist auf Port 8080 (http://192.168.8.1:8080).",
-			Validation:  &plugin.Validation{Format: "url"}},
 		{Key: "verify_tls", Type: plugin.FieldBool, Label: "TLS-Zertifikat prüfen", Default: false, VisibleIf: visibleLuCI, Advanced: true,
 			Description: "Nur bei HTTPS mit gültigem Zertifikat einschalten; OpenWrt nutzt standardmäßig ein selbstsigniertes."},
 		{Key: "import_static", Type: plugin.FieldBool, Label: "Statische Leases importieren", Default: true,
@@ -77,56 +79,164 @@ func (p *Plugin) Schema() plugin.Schema {
 	}}
 }
 
+// MigrateSettings implements plugin.SettingsMigrator: version 1.0 had a single "host",
+// "credential" and "luci_url".
+func (p *Plugin) MigrateSettings(stored map[string]any) map[string]any {
+	host, _ := stored["host"].(string)
+	luci, _ := stored["luci_url"].(string)
+	if _, has := stored["hosts"]; !has {
+		switch {
+		case stored["method"] == "luci" && strings.TrimSpace(luci) != "":
+			stored["hosts"] = []any{luci}
+		case strings.TrimSpace(host) != "":
+			stored["hosts"] = []any{host}
+		}
+	}
+	if c, ok := stored["credential"]; ok {
+		if _, has := stored["credentials"]; !has {
+			if id := plugin.NewSettings(map[string]any{"c": c}).CredentialID("c"); id > 0 {
+				stored["credentials"] = []any{id}
+			}
+		}
+	}
+	delete(stored, "host")
+	delete(stored, "luci_url")
+	delete(stored, "credential")
+	return stored
+}
+
+// ValidateSettings implements plugin.SettingsValidator.
+func (p *Plugin) ValidateSettings(s plugin.Settings) error {
+	for _, h := range s.StringList("hosts") {
+		if _, _, err := parseRouter(h, s.String("method")); err != nil {
+			return plugin.FieldErr("hosts", err.Error())
+		}
+	}
+	return nil
+}
+
+// Endpoints implements plugin.EndpointProvider.
+func (p *Plugin) Endpoints(s plugin.Settings) []string {
+	var out []string
+	for _, h := range s.StringList("hosts") {
+		if host, _, err := parseRouter(h, s.String("method")); err == nil {
+			out = append(out, host)
+		}
+	}
+	return out
+}
+
+// parseRouter splits a router entry into host name and LuCI URL (only for method luci:
+// the entry itself when it is a URL, else http://<host>).
+func parseRouter(entry, method string) (host, luciURL string, err error) {
+	entry = strings.TrimSpace(entry)
+	if strings.Contains(entry, "://") {
+		u, err := url.Parse(entry)
+		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") {
+			return "", "", fmt.Errorf("%q: http(s)-URL oder Hostname erwartet", entry)
+		}
+		if method != "luci" {
+			return "", "", fmt.Errorf("%q: URLs gibt es nur für den Zugriff per LuCI – für SSH Hostname oder IP angeben", entry)
+		}
+		return u.Hostname(), entry, nil
+	}
+	if entry == "" || (strings.ContainsAny(entry, " /:") && net.ParseIP(entry) == nil) {
+		return "", "", fmt.Errorf("%q: Hostname oder IP erwartet", entry)
+	}
+	return entry, "http://" + entry, nil
+}
+
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	s := rc.Settings
-	host := strings.TrimSpace(s.String("host"))
-	if host == "" {
+	routers := s.StringList("hosts")
+	if len(routers) == 0 {
 		return fmt.Errorf("kein Router konfiguriert")
 	}
-	credID := s.CredentialID("credential")
-	if credID == 0 {
-		return plugin.ErrNoCredential
-	}
-	cred, err := rc.Creds.Get(ctx, credID)
-	if err != nil {
-		return fmt.Errorf("Credential %d: %w", credID, err)
-	}
 	method := s.String("method")
+	types := []string{plugin.CredSSH, plugin.CredPassword}
+	if method == "luci" {
+		types = []string{plugin.CredPassword}
+	} else {
+		method = "ssh"
+	}
+	picker := &plugin.CredentialPicker{Creds: rc.Creds, Types: types, Allowed: s.CredentialIDs("credentials"), Log: rc.Log}
+	for _, k := range []string{"leases", "static", "observed"} {
+		rc.SetStat(k, 0)
+	}
+	var errs []error
+	for i, r := range routers {
+		err := p.importRouter(ctx, rc, picker, method, r)
+		if len(routers) > 1 {
+			rc.Progress(i+1, len(routers))
+		}
+		if err == nil {
+			continue
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if len(routers) == 1 {
+			return err
+		}
+		rc.AddStat("failed_routers", 1)
+		rc.Log.Warn("Router nicht gelesen", "router", r, "error", err)
+		errs = append(errs, fmt.Errorf("%s: %w", r, err))
+	}
+	if len(errs) == len(routers) {
+		return fmt.Errorf("kein Router gelesen: %w", errors.Join(errs...))
+	}
+	return nil
+}
+
+// importRouter reads one router, trying the applicable credentials in order.
+func (p *Plugin) importRouter(ctx context.Context, rc *plugin.RunContext, picker *plugin.CredentialPicker, method, entry string) error {
+	s := rc.Settings
+	host, luciURL, err := parseRouter(entry, method)
+	if err != nil {
+		return err
+	}
+	ip, _ := netutil.ResolveHost(ctx, host)
+	creds, err := picker.For(ctx, plugin.CredentialTarget{IP: ip})
+	if err != nil {
+		return err
+	}
+	if len(creds) == 0 {
+		return fmt.Errorf("keine passenden Zugangsdaten für %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w", host, plugin.ErrNoCredential)
+	}
 	var (
 		leases   []lease
 		sections []uciSection
 	)
 	switch method {
 	case "luci":
-		if err := cred.RequireType(plugin.CredPassword); err != nil {
-			return fmt.Errorf("LuCI-Zugriff: %w", err)
-		}
-		raw := s.String("luci_url")
-		if raw == "" {
-			raw = "http://" + host
-		}
-		endpoint, err := ubusEndpoint(raw)
+		endpoint, err := ubusEndpoint(luciURL)
 		if err != nil {
 			return err
 		}
 		c := newUbusClient(endpoint, s.Bool("verify_tls"), luciTimeout)
 		defer c.close()
-		user := cred.Get("username")
-		if user == "" {
-			user = "root"
+		for i, cred := range creds {
+			user := cred.Get("username")
+			if user == "" {
+				user = "root"
+			}
+			leases, sections, err = fetchLuCI(ctx, rc.Log, c, user, cred.Get("password"))
+			if errors.Is(err, errLoginRejected) && i < len(creds)-1 {
+				rc.Log.Info("LuCI-Anmeldung abgelehnt, nächste Zugangsdaten werden probiert", "router", host, "credential", cred.Name)
+				continue
+			}
+			break
 		}
-		leases, sections, err = fetchLuCI(ctx, rc.Log, c, user, cred.Get("password"))
 		if err != nil {
 			return err
 		}
 	default:
-		method = "ssh"
 		opt := sshx.Options{Port: s.Int("port")}
 		if s.String("host_key_policy") != "insecure" {
 			opt.KnownHosts = filepath.Join(rc.DataDir, "known_hosts")
 		}
-		leases, sections, err = fetchSSH(ctx, rc.Log, host, cred, opt)
+		leases, sections, err = fetchSSH(ctx, rc.Log, host, creds, opt)
 		if err != nil {
 			return err
 		}
@@ -134,12 +244,12 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 
 	hosts := staticHosts(sections)
 	entries := mergeEntries(leases, hosts, s.Bool("import_static"))
-	rc.SetStat("leases", len(leases))
-	rc.SetStat("static", len(hosts))
-	rc.SetStat("observed", 0)
+	rc.AddStat("leases", len(leases))
+	rc.AddStat("static", len(hosts))
 	rc.Log.Info("DHCP-Daten gelesen", "router", host, "zugriff", method, "leases", len(leases), "statisch", len(hosts))
 
 	create := s.Bool("create_missing")
+	single := len(s.StringList("hosts")) == 1
 	failed := 0
 	for i, e := range entries {
 		if err := ctx.Err(); err != nil {
@@ -147,7 +257,9 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		}
 		obs := entryObservation(e, host, method, create)
 		id, err := rc.Sink.Observe(ctx, obs)
-		rc.Progress(i+1, len(entries))
+		if single {
+			rc.Progress(i+1, len(entries))
+		}
 		if err != nil {
 			failed++
 			rc.Log.Warn("Lease konnte nicht gespeichert werden", "mac", e.MACs[0], "ip", obs.IP, "error", err)

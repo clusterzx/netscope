@@ -51,9 +51,10 @@ const (
 // Schema implements plugin.Plugin.
 func (p *Plugin) Schema() plugin.Schema {
 	return plugin.Schema{Fields: []plugin.Field{
-		{Key: "credentials", Type: plugin.FieldCredentialRef, Label: "Zugangsdaten", Multi: true, Required: true,
+		{Key: "credentials", Type: plugin.FieldCredentialRef, Label: "Zugangsdaten", Multi: true,
 			CredentialTypes: []string{plugin.CredSSH, plugin.CredPassword}, Group: "Verbindung",
-			Description: "Werden der Reihe nach probiert, bis eine Anmeldung klappt. Das funktionierende Credential wird pro Gerät gemerkt und beim nächsten Lauf zuerst verwendet."},
+			Description: "Leer = automatisch alle Zugangsdaten, deren Geltungsbereich das Gerät abdeckt. Sonst nur die ausgewählten. " +
+				"Probiert wird das spezifischste zuerst (Gerät vor Gruppe/Tag vor Subnetz vor überall); das funktionierende wird pro Gerät gemerkt und beim nächsten Lauf zuerst verwendet."},
 		{Key: "port", Type: plugin.FieldInt, Label: "SSH-Port", Default: 22, Group: "Verbindung",
 			Validation: &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(65535)}},
 		{Key: "require_open_port", Type: plugin.FieldBool, Label: "Nur Geräte mit offenem SSH-Port", Default: true, Group: "Verbindung",
@@ -159,13 +160,8 @@ func planTargets(devices []plugin.DeviceInfo, port int, requireOpen bool) (targe
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	cfg := loadConfig(rc.Settings, rc.DataDir)
-	if len(cfg.credIDs) == 0 {
-		return plugin.ErrNoCredential
-	}
-	creds := loadCredentials(ctx, rc, cfg.credIDs)
-	if len(creds) == 0 {
-		return errors.New("keines der konfigurierten Credentials ist verwendbar")
-	}
+	picker := &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredSSH, plugin.CredPassword}, Allowed: cfg.credIDs, Log: rc.Log,
+		Check: func(c *plugin.Credential) error { _, _, err := sshx.AuthMethods(c); return err }}
 	var subnets []netip.Prefix
 	if rc.Inventory != nil {
 		if list, err := rc.Inventory.Subnets(ctx); err != nil {
@@ -188,18 +184,22 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	}
 	script := "sh -c " + sshx.ShellQuote(buildScript(scriptOptions{Packages: cfg.packages, Docker: cfg.docker, CommandTimeout: cfg.commandTimeout}))
 	var (
-		ok, failed atomic.Int64
-		mu         sync.Mutex
-		done       int
+		ok, failed, noCred atomic.Int64
+		mu                 sync.Mutex
+		done               int
 	)
 	rc.Progress(0, len(targets))
 	runErr := plugin.ForEach(ctx, rc.Parallelism(), targets, func(ctx context.Context, t target) error {
-		err := p.scan(ctx, rc, cfg, creds, store, subnets, script, t)
+		err := p.scan(ctx, rc, cfg, picker, store, subnets, script, t)
 		switch {
 		case err == nil:
 			ok.Add(1)
 			rc.AddStat("scanned", 1)
 		case ctx.Err() != nil:
+		case errors.Is(err, errNoCredential):
+			noCred.Add(1)
+			rc.AddStat("no_credential", 1)
+			rc.Log.Debug("kein passendes Credential", "device", t.dev.Name, "device_id", t.dev.ID, "ip", t.ip)
 		default:
 			failed.Add(1)
 			rc.AddStat("failed", 1)
@@ -217,41 +217,36 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if runErr != nil {
 		return runErr
 	}
-	rc.Log.Info("SSH-Inventar abgeschlossen", "ok", ok.Load(), "failed", failed.Load(), "skipped", skipped)
-	if ok.Load() == 0 && failed.Load() > 0 {
+	rc.Log.Info("SSH-Inventar abgeschlossen", "ok", ok.Load(), "failed", failed.Load(), "skipped", skipped, "no_credential", noCred.Load())
+	if noCred.Load() > 0 {
+		rc.Log.Info("Geräte ohne passende Zugangsdaten übersprungen", "count", noCred.Load())
+	}
+	switch {
+	case ok.Load() == 0 && failed.Load() > 0:
 		return fmt.Errorf("kein Gerät per SSH inventarisiert (%d fehlgeschlagen)", failed.Load())
+	case ok.Load() == 0 && noCred.Load() > 0:
+		return fmt.Errorf("für keines der %d Geräte gibt es passende Zugangsdaten: %w", noCred.Load(), plugin.ErrNoCredential)
 	}
 	return nil
 }
 
-// loadCredentials decrypts the configured credentials and drops unusable ones.
-func loadCredentials(ctx context.Context, rc *plugin.RunContext, ids []int64) []*plugin.Credential {
-	var out []*plugin.Credential
-	for _, id := range ids {
-		c, err := rc.Creds.Get(ctx, id)
-		if err != nil {
-			rc.Log.Warn("Credential nicht verfügbar", "credential_id", id, "error", err)
-			continue
-		}
-		if _, _, err := sshx.AuthMethods(c); err != nil {
-			rc.Log.Warn("Credential unbrauchbar", "credential", c.Name, "error", err)
-			continue
-		}
-		out = append(out, c)
-	}
-	return out
-}
+// errNoCredential marks a device without applicable credential (skipped, not failed).
+var errNoCredential = errors.New("kein passendes Credential")
 
 // isAuthError reports whether a dial error means "credential rejected" (try the next
 // one) rather than a network or host key problem.
-func isAuthError(err error) bool {
-	s := err.Error()
-	return strings.Contains(s, "unable to authenticate") || strings.Contains(s, "no supported methods remain")
-}
+func isAuthError(err error) bool { return sshx.IsAuthError(err) }
 
 // scan inventories one device.
-func (p *Plugin) scan(ctx context.Context, rc *plugin.RunContext, cfg config, creds []*plugin.Credential, store *credStore,
+func (p *Plugin) scan(ctx context.Context, rc *plugin.RunContext, cfg config, picker *plugin.CredentialPicker, store *credStore,
 	subnets []netip.Prefix, script string, t target) error {
+	creds, err := picker.For(ctx, plugin.CredentialTarget{DeviceID: t.dev.ID, IP: t.ip})
+	if err != nil {
+		return err
+	}
+	if len(creds) == 0 {
+		return errNoCredential
+	}
 	ordered := orderedCredentials(store.get(t.dev.ID), creds, func(c *plugin.Credential) int64 { return c.ID })
 	var (
 		client   *sshx.Client

@@ -132,6 +132,37 @@ export function scopeSummary(s: PluginScope | null | undefined, groupName?: (id:
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** A scope that selects devices (groups, tags, single devices or a filter). */
+export function isDeviceScope(s: PluginScope | null | undefined): boolean {
+	return !isFullScope(s);
+}
+
+/** Short German description of a credential scope ("Überall", "Subnetz …", "Tag …"). */
+export function credentialScopeSummary(
+	s: PluginScope | null | undefined,
+	groupName?: (id: number) => string
+): string {
+	if (!s) return 'Überall';
+	const subnets = s.subnets ?? [];
+	if (isDeviceScope(s)) {
+		const text = scopeSummary({ ...s, allSubnets: false, subnets: [] }, groupName);
+		return !s.allSubnets && subnets.length ? `${text} · nur in ${subnets.join(', ')}` : text;
+	}
+	if (!s.allSubnets && subnets.length)
+		return (subnets.length === 1 ? 'Subnetz ' : 'Subnetze ') + subnets.join(', ');
+	return 'Überall';
+}
+
+/** How specific a credential scope is (plugins try the most specific credential first). */
+export function credentialScopeLevel(
+	s: PluginScope | null | undefined
+): 'device' | 'selection' | 'subnet' | 'everywhere' {
+	if (s?.devices?.length) return 'device';
+	if (isDeviceScope(s)) return 'selection';
+	if (s && !s.allSubnets && (s.subnets?.length ?? 0) > 0) return 'subnet';
+	return 'everywhere';
+}
+
 // ---------------------------------------------------------------- stats
 
 /** Display value of a run statistic. */

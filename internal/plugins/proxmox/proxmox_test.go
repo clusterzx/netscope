@@ -23,6 +23,7 @@ type pveServer struct {
 	*httptest.Server
 	mu       sync.Mutex
 	requests []string
+	bodies   map[string][]byte
 }
 
 func newPVE(t *testing.T) *pveServer {
@@ -43,7 +44,7 @@ func newPVE(t *testing.T) *pveServer {
 	for path, file := range routes {
 		bodies[path] = plugintest.Fixture(t, file)
 	}
-	s := &pveServer{}
+	s := &pveServer{bodies: bodies}
 	s.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.URL.Path
 		if r.URL.RawQuery != "" {
@@ -64,7 +65,9 @@ func newPVE(t *testing.T) *pveServer {
 			_, _ = w.Write([]byte(`{"data":null}`))
 			return
 		}
-		body, ok := bodies[key]
+		s.mu.Lock()
+		body, ok := s.bodies[key]
+		s.mu.Unlock()
 		if !ok {
 			w.WriteHeader(http.StatusNotImplemented)
 			_, _ = w.Write([]byte(`{"data":null}`))
@@ -74,6 +77,26 @@ func newPVE(t *testing.T) *pveServer {
 	}))
 	t.Cleanup(s.Close)
 	return s
+}
+
+// set replaces the answer of an API path.
+func (s *pveServer) set(key, body string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.bodies[key] = []byte(body)
+}
+
+// count returns how often a path was requested.
+func (s *pveServer) count(key string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, r := range s.requests {
+		if r == key {
+			n++
+		}
+	}
+	return n
 }
 
 func (s *pveServer) requested(key string) bool {
@@ -90,7 +113,7 @@ func (s *pveServer) requested(key string) bool {
 func runPVE(t *testing.T, srv *pveServer, settings map[string]any, secret string) ([]plugin.Observation, *plugin.RunContext, error) {
 	t.Helper()
 	p := &Plugin{}
-	vals := map[string]any{"url": srv.URL, "credential": 1}
+	vals := map[string]any{"urls": []any{srv.URL}, "credentials": []any{1}}
 	for k, v := range settings {
 		vals[k] = v
 	}
@@ -265,7 +288,7 @@ func TestRunUnreachable(t *testing.T) {
 	url := srv.URL
 	srv.Close()
 	p := &Plugin{}
-	rc, _, _ := plugintest.RunContext(t, p, map[string]any{"url": url, "credential": 1})
+	rc, _, _ := plugintest.RunContext(t, p, map[string]any{"urls": []any{url}, "credentials": []any{1}})
 	rc.Creds = plugintest.Creds{1: {ID: 1, Name: "pve", Type: plugin.CredAPIToken,
 		Public: map[string]string{"token_id": testTokenID}, Secret: map[string]string{"token": testSecret}}}
 	if err := p.Run(context.Background(), rc); err == nil || !strings.Contains(err.Error(), "nicht erreichbar") {
@@ -285,7 +308,7 @@ func TestRunWithoutPermissions(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	p := &Plugin{}
-	rc, sink, _ := plugintest.RunContext(t, p, map[string]any{"url": srv.URL, "credential": 1})
+	rc, sink, _ := plugintest.RunContext(t, p, map[string]any{"urls": []any{srv.URL}, "credentials": []any{1}})
 	rc.Creds = plugintest.Creds{1: {ID: 1, Name: "pve", Type: plugin.CredAPIToken,
 		Public: map[string]string{"token_id": testTokenID}, Secret: map[string]string{"token": testSecret}}}
 	if err := p.Run(context.Background(), rc); err == nil || !strings.Contains(err.Error(), "Leserechte") {
@@ -298,7 +321,7 @@ func TestRunWithoutPermissions(t *testing.T) {
 
 func TestRunWrongCredentialType(t *testing.T) {
 	p := &Plugin{}
-	rc, _, _ := plugintest.RunContext(t, p, map[string]any{"url": "https://pve.lan:8006", "credential": 1})
+	rc, _, _ := plugintest.RunContext(t, p, map[string]any{"urls": []any{"https://pve.lan:8006"}, "credentials": []any{1}})
 	rc.Creds = plugintest.Creds{1: {ID: 1, Name: "ssh", Type: plugin.CredSSH}}
 	if err := p.Run(context.Background(), rc); err == nil {
 		t.Fatal("expected error for wrong credential type")

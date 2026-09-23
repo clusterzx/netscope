@@ -235,12 +235,20 @@ func uciGetSections(values map[string]map[string]json.RawMessage) []uciSection {
 	return out
 }
 
+// errLoginRejected matches a rejected LuCI login (the next credential may pass).
+var errLoginRejected = errors.New("LuCI-Anmeldung abgelehnt")
+
+type loginError struct{ msg string }
+
+func (e *loginError) Error() string        { return e.msg }
+func (e *loginError) Is(target error) bool { return target == errLoginRejected }
+
 // fetchLuCI reads leases and static hosts through the ubus JSON-RPC API. A failing
 // uci get only loses the static hosts and is logged.
 func fetchLuCI(ctx context.Context, log *slog.Logger, c *ubusClient, user, password string) ([]lease, []uciSection, error) {
 	if err := c.login(ctx, user, password); err != nil {
 		if errAccessDenied(err) {
-			return nil, nil, fmt.Errorf("LuCI-Anmeldung als %q fehlgeschlagen – Benutzer und Passwort prüfen", user)
+			return nil, nil, &loginError{fmt.Sprintf("LuCI-Anmeldung als %q fehlgeschlagen – Benutzer und Passwort prüfen", user)}
 		}
 		return nil, nil, fmt.Errorf("LuCI %s nicht erreichbar: %w", c.endpoint, err)
 	}

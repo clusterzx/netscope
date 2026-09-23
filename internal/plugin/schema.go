@@ -142,6 +142,9 @@ func (s Schema) Check() error {
 	return nil
 }
 
+// Visible reports whether a field is shown (and used) for the given values (VisibleIf).
+func (s Schema) Visible(f Field, values map[string]any) bool { return fieldVisible(s, f, values) }
+
 // Field returns the field with the given key.
 func (s Schema) Field(key string) (Field, bool) {
 	for _, f := range s.Fields {

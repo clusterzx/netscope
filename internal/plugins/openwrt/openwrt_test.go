@@ -290,7 +290,7 @@ func checkRouterObservations(t *testing.T, obs []plugin.Observation, method stri
 
 func TestRunSSH(t *testing.T) {
 	srv := startSSH(t, "goodpass", routerReplies(t))
-	obs, rc, err := runWith(t, map[string]any{"host": "127.0.0.1", "port": srv.port, "credential": 1}, rootPassword)
+	obs, rc, err := runWith(t, map[string]any{"hosts": []any{"127.0.0.1"}, "port": srv.port, "credentials": []any{1}}, rootPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestRunSSH(t *testing.T) {
 
 func TestRunSSHOptions(t *testing.T) {
 	srv := startSSH(t, "goodpass", routerReplies(t))
-	obs, rc, err := runWith(t, map[string]any{"host": "127.0.0.1", "port": srv.port, "credential": 1,
+	obs, rc, err := runWith(t, map[string]any{"hosts": []any{"127.0.0.1"}, "port": srv.port, "credentials": []any{1},
 		"import_static": false, "create_missing": true, "host_key_policy": "insecure"}, rootPassword)
 	if err != nil {
 		t.Fatal(err)
@@ -335,13 +335,13 @@ func TestRunSSHErrors(t *testing.T) {
 	srv := startSSH(t, "goodpass", routerReplies(t))
 	bad := *rootPassword
 	bad.Secret = map[string]string{"password": "wrong"}
-	if _, _, err := runWith(t, map[string]any{"host": "127.0.0.1", "port": srv.port, "credential": 1}, &bad); err == nil {
+	if _, _, err := runWith(t, map[string]any{"hosts": []any{"127.0.0.1"}, "port": srv.port, "credentials": []any{1}}, &bad); err == nil {
 		t.Error("wrong password must fail")
 	}
 
 	// a host without uci and lease file is not an OpenWrt router
 	other := startSSH(t, "goodpass", map[string]sshReply{})
-	if _, _, err := runWith(t, map[string]any{"host": "127.0.0.1", "port": other.port, "credential": 1}, rootPassword); err == nil ||
+	if _, _, err := runWith(t, map[string]any{"hosts": []any{"127.0.0.1"}, "port": other.port, "credentials": []any{1}}, rootPassword); err == nil ||
 		!strings.Contains(err.Error(), "OpenWrt") {
 		t.Errorf("err = %v", err)
 	}
@@ -414,7 +414,7 @@ func (s *ubusServer) called() []string {
 func TestRunLuCI(t *testing.T) {
 	srv := startUbus(t, "ubus-login.json")
 	before := time.Now()
-	obs, _, err := runWith(t, map[string]any{"method": "luci", "luci_url": srv.URL + "/cgi-bin/luci/", "credential": 1}, rootPassword)
+	obs, _, err := runWith(t, map[string]any{"method": "luci", "hosts": []any{srv.URL + "/cgi-bin/luci/"}, "credentials": []any{1}}, rootPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,19 +436,19 @@ func TestRunLuCIErrors(t *testing.T) {
 	srv := startUbus(t, "ubus-login.json")
 	bad := *rootPassword
 	bad.Secret = map[string]string{"password": "wrong"}
-	_, _, err := runWith(t, map[string]any{"method": "luci", "luci_url": srv.URL, "credential": 1}, &bad)
+	_, _, err := runWith(t, map[string]any{"method": "luci", "hosts": []any{srv.URL}, "credentials": []any{1}}, &bad)
 	if err == nil || !strings.Contains(err.Error(), "Anmeldung") {
 		t.Errorf("wrong password: err = %v", err)
 	}
 
 	denied := startUbus(t, "ubus-login-denied.json")
-	_, _, err = runWith(t, map[string]any{"method": "luci", "luci_url": denied.URL, "credential": 1}, rootPassword)
+	_, _, err = runWith(t, map[string]any{"method": "luci", "hosts": []any{denied.URL}, "credentials": []any{1}}, rootPassword)
 	if err == nil || !strings.Contains(err.Error(), "Anmeldung") {
 		t.Errorf("denied login: err = %v", err)
 	}
 
 	sshCred := &plugin.Credential{ID: 1, Name: "key", Type: plugin.CredSSH, Public: map[string]string{"username": "root"}}
-	if _, _, err := runWith(t, map[string]any{"method": "luci", "luci_url": srv.URL, "credential": 1}, sshCred); err == nil {
+	if _, _, err := runWith(t, map[string]any{"method": "luci", "hosts": []any{srv.URL}, "credentials": []any{1}}, sshCred); err == nil {
 		t.Error("LuCI with an SSH credential must fail")
 	}
 }
@@ -494,5 +494,66 @@ func TestUCIGetSections(t *testing.T) {
 	}
 	if got := leaseFiles(sections); !reflect.DeepEqual(got, []string{"/tmp/dhcp.leases"}) {
 		t.Errorf("lease files: %v", got)
+	}
+}
+
+func TestMigrateSettings(t *testing.T) {
+	p := &Plugin{}
+	got := p.MigrateSettings(map[string]any{"host": "192.168.8.1", "credential": float64(2), "method": "ssh", "luci_url": ""})
+	if !reflect.DeepEqual(got, map[string]any{"hosts": []any{"192.168.8.1"}, "credentials": []any{int64(2)}, "method": "ssh"}) {
+		t.Errorf("ssh: %#v", got)
+	}
+	got = p.MigrateSettings(map[string]any{"host": "192.168.8.1", "method": "luci", "luci_url": "http://192.168.8.1:8080"})
+	if !reflect.DeepEqual(got["hosts"], []any{"http://192.168.8.1:8080"}) {
+		t.Errorf("luci: %#v", got)
+	}
+	got = p.MigrateSettings(map[string]any{"hosts": []any{"a", "b"}, "host": "c"})
+	if !reflect.DeepEqual(got, map[string]any{"hosts": []any{"a", "b"}}) {
+		t.Errorf("new keys win: %#v", got)
+	}
+}
+
+func TestValidateRouters(t *testing.T) {
+	p := &Plugin{}
+	for _, tc := range []struct {
+		method string
+		hosts  []any
+		ok     bool
+	}{
+		{"ssh", []any{"192.168.8.1", "router.lan"}, true},
+		{"ssh", []any{"http://192.168.8.1:8080"}, false},
+		{"luci", []any{"http://192.168.8.1:8080", "10.0.0.1"}, true},
+		{"luci", []any{"ftp://x"}, false},
+	} {
+		vals, err := p.Schema().Validate(map[string]any{"method": tc.method, "hosts": tc.hosts}, nil, nil)
+		if err == nil {
+			err = p.ValidateSettings(plugin.NewSettings(vals))
+		}
+		if (err == nil) != tc.ok {
+			t.Errorf("%s %v: err = %v", tc.method, tc.hosts, err)
+		}
+	}
+}
+
+func TestRunCredentialFallbackAndSeveralRouters(t *testing.T) {
+	srv := startSSH(t, "goodpass", routerReplies(t))
+	p := &Plugin{}
+	// automatic selection: the rejected credential is skipped; the second router is down
+	rc, sink, _ := plugintest.RunContext(t, p, map[string]any{"hosts": []any{"127.0.0.1", "127.0.0.2"}, "port": srv.port, "host_key_policy": "insecure"})
+	bad := *rootPassword
+	bad.Secret = map[string]string{"password": "wrong"}
+	good := *rootPassword
+	good.ID = 2
+	rc.Creds = plugintest.Creds{1: &bad, 2: &good}
+	if err := p.Run(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+	checkRouterObservations(t, sink.All(), "ssh")
+	if st := rc.Stats(); st["failed_routers"] != 1 || st["leases"] != 7 {
+		t.Errorf("stats: %v", st)
+	}
+	rc.Creds = plugintest.Creds{}
+	if err := p.Run(context.Background(), rc); !errors.Is(err, plugin.ErrNoCredential) {
+		t.Errorf("err = %v, want ErrNoCredential", err)
 	}
 }
