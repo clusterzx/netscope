@@ -268,13 +268,50 @@ func TestPlanTargets(t *testing.T) {
 		{ID: 4, IPs: []string{"10.0.0.4"}},
 		{ID: 5},
 	}
-	got, skipped := planTargets(devs, 22, true)
-	if skipped != 2 || len(got) != 3 || got[0].ip != "10.0.0.1" || got[1].ip != "10.0.0.33" || got[2].ip != "10.0.0.4" {
+	got, skipped := planTargets(devs, portPlan{port: 22, requireOpen: true})
+	if skipped != 2 || len(got) != 3 || got[0].ip != "10.0.0.1" || got[1].ip != "10.0.0.33" || got[2].ip != "10.0.0.4" || got[0].port != 22 {
 		t.Errorf("targets = %+v, skipped = %d", got, skipped)
 	}
-	got, skipped = planTargets(devs, 22, false)
+	got, skipped = planTargets(devs, portPlan{port: 22})
 	if skipped != 1 || len(got) != 4 {
 		t.Errorf("without port requirement: %+v, skipped = %d", got, skipped)
+	}
+}
+
+func TestPlanTargetsPorts(t *testing.T) {
+	overrides, err := parsePortOverrides([]string{" 10.0.5.0/24 = 2200 ", "10.0.5.9=2222", ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	devs := []plugin.DeviceInfo{
+		// explicit port: always tried, even without open port data
+		{ID: 1, PrimaryIP: "10.0.5.9", Ports: []plugin.PortRef{{IP: "10.0.5.9", Proto: "tcp", Port: 443}}},
+		{ID: 2, PrimaryIP: "10.0.5.10"},
+		// nmap found SSH on 2222 while 22 is closed
+		{ID: 3, PrimaryIP: "10.0.0.3", Ports: []plugin.PortRef{{IP: "10.0.0.3", Proto: "tcp", Port: 2222, Service: "ssh", Product: "OpenSSH"}}},
+		// 22 open and another SSH port: the configured port wins
+		{ID: 4, PrimaryIP: "10.0.0.4", Ports: []plugin.PortRef{{IP: "10.0.0.4", Proto: "tcp", Port: 2022, Service: "ssh"},
+			{IP: "10.0.0.4", Proto: "tcp", Port: 22, Service: "ssh"}}},
+	}
+	got, skipped := planTargets(devs, portPlan{port: 22, requireOpen: true, detect: true, overrides: overrides})
+	ports := map[int64]int{}
+	for _, g := range got {
+		ports[g.dev.ID] = g.port
+	}
+	if skipped != 0 || ports[1] != 2222 || ports[2] != 2200 || ports[3] != 2222 || ports[4] != 22 {
+		t.Errorf("ports = %v, skipped = %d", ports, skipped)
+	}
+	// without detection the device with SSH on 2222 only is skipped
+	if _, skipped := planTargets(devs[2:3], portPlan{port: 22, requireOpen: true}); skipped != 1 {
+		t.Errorf("detection off: skipped = %d", skipped)
+	}
+	for _, bad := range []string{"10.0.0.1", "10.0.0.1=0", "host=22", "10.0.0.0/33=22"} {
+		if _, err := parsePortOverrides([]string{bad}); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	if err := (&Plugin{}).ValidateSettings(plugin.NewSettings(map[string]any{"port_overrides": []any{"x"}})); err == nil {
+		t.Error("invalid override saved")
 	}
 }
 
@@ -333,7 +370,7 @@ func TestSchemaDefaults(t *testing.T) {
 		t.Errorf("empty credentials select automatically: %v", err)
 	}
 	cfg := loadConfig(plugin.NewSettings(p.Schema().Defaults()), "/data/plugins/ssh")
-	if cfg.port != 22 || !cfg.requireOpenPort || cfg.commandTimeout != 20*time.Second || !cfg.packages || !cfg.docker ||
+	if cfg.ports.port != 22 || !cfg.ports.requireOpen || !cfg.ports.detect || len(cfg.ports.overrides) != 0 || cfg.commandTimeout != 20*time.Second || !cfg.packages || !cfg.docker ||
 		cfg.maxOutput != 16<<20 || cfg.knownHosts != filepath.Join("/data/plugins/ssh", "known_hosts") {
 		t.Errorf("defaults = %+v", cfg)
 	}

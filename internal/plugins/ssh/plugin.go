@@ -56,9 +56,15 @@ func (p *Plugin) Schema() plugin.Schema {
 			Description: "Leer = automatisch alle Zugangsdaten, deren Geltungsbereich das Gerät abdeckt. Sonst nur die ausgewählten. " +
 				"Probiert wird das spezifischste zuerst (Gerät vor Gruppe/Tag vor Subnetz vor überall); das funktionierende wird pro Gerät gemerkt und beim nächsten Lauf zuerst verwendet."},
 		{Key: "port", Type: plugin.FieldInt, Label: "SSH-Port", Default: 22, Group: "Verbindung",
-			Validation: &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(65535)}},
+			Description: "Standard-Port für alle Geräte ohne abweichende Angabe.",
+			Validation:  &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(65535)}},
+		{Key: "port_overrides", Type: plugin.FieldStringList, Label: "Abweichende SSH-Ports", Group: "Verbindung",
+			Description: "Ein Eintrag pro Zeile: Adresse oder Netz = Port, z. B. 192.168.1.1=2222 oder 10.0.5.0/24=2200. " +
+				"Die spezifischste Angabe gewinnt; solche Geräte werden immer versucht."},
+		{Key: "detect_port", Type: plugin.FieldBool, Label: "SSH-Port aus dem Portscan übernehmen", Default: true, Group: "Verbindung",
+			Description: "Ist der Standard-Port zu, aber hat nmap auf dem Gerät SSH auf einem anderen Port erkannt (z. B. 2222), wird dieser verwendet."},
 		{Key: "require_open_port", Type: plugin.FieldBool, Label: "Nur Geräte mit offenem SSH-Port", Default: true, Group: "Verbindung",
-			Description: "Geräte überspringen, deren bekannte offene Ports den SSH-Port nicht enthalten. Geräte ohne Portdaten werden trotzdem versucht."},
+			Description: "Geräte überspringen, deren bekannte offene Ports weder den SSH-Port noch einen erkannten SSH-Dienst enthalten. Geräte ohne Portdaten werden trotzdem versucht."},
 		{Key: "command_timeout", Type: plugin.FieldDuration, Label: "Zeitlimit pro Kommando", Default: "20s", Group: "Verbindung",
 			Description: "Gilt für den Verbindungsaufbau und jedes einzelne Kommando auf dem Zielsystem.",
 			Validation:  &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(600)}},
@@ -79,29 +85,28 @@ func (p *Plugin) Schema() plugin.Schema {
 }
 
 type config struct {
-	credIDs         []int64
-	port            int
-	requireOpenPort bool
-	commandTimeout  time.Duration
-	packages        bool
-	docker          bool
-	knownHosts      string // "" disables host key checking
-	maxOutput       int
+	credIDs        []int64
+	ports          portPlan
+	commandTimeout time.Duration
+	packages       bool
+	docker         bool
+	knownHosts     string // "" disables host key checking
+	maxOutput      int
 }
 
 func loadConfig(s plugin.Settings, dataDir string) config {
 	c := config{
-		credIDs:         s.CredentialIDs("credentials"),
-		port:            s.Int("port"),
-		requireOpenPort: s.Bool("require_open_port"),
-		commandTimeout:  s.Duration("command_timeout"),
-		packages:        s.Bool("collect_packages"),
-		docker:          s.Bool("collect_docker"),
-		maxOutput:       s.Int("max_output_mb") << 20,
+		credIDs:        s.CredentialIDs("credentials"),
+		ports:          portPlan{port: s.Int("port"), requireOpen: s.Bool("require_open_port"), detect: s.Bool("detect_port")},
+		commandTimeout: s.Duration("command_timeout"),
+		packages:       s.Bool("collect_packages"),
+		docker:         s.Bool("collect_docker"),
+		maxOutput:      s.Int("max_output_mb") << 20,
 	}
-	if c.port < 1 || c.port > 65535 {
-		c.port = 22
+	if c.ports.port < 1 || c.ports.port > 65535 {
+		c.ports.port = 22
 	}
+	c.ports.overrides, _ = parsePortOverrides(s.StringList("port_overrides")) // validated on save
 	if c.commandTimeout <= 0 {
 		c.commandTimeout = 20 * time.Second
 	}
@@ -121,40 +126,17 @@ func (c config) scriptTimeout() time.Duration {
 }
 
 type target struct {
-	dev plugin.DeviceInfo
-	ip  string
+	dev  plugin.DeviceInfo
+	ip   string
+	port int
 }
 
-// planTargets selects the address to connect to and applies require_open_port.
-func planTargets(devices []plugin.DeviceInfo, port int, requireOpen bool) (targets []target, skipped int) {
-	for _, d := range devices {
-		ip := d.PrimaryIP
-		if ip == "" && len(d.IPs) > 0 {
-			ip = d.IPs[0]
-		}
-		if len(d.Ports) > 0 {
-			open := ""
-			for _, pr := range d.Ports {
-				if pr.Proto == "tcp" && pr.Port == port {
-					if open == "" || pr.IP == d.PrimaryIP {
-						open = pr.IP
-					}
-				}
-			}
-			if open != "" {
-				ip = open
-			} else if requireOpen {
-				skipped++
-				continue
-			}
-		}
-		if ip == "" {
-			skipped++
-			continue
-		}
-		targets = append(targets, target{dev: d, ip: ip})
+// ValidateSettings implements plugin.SettingsValidator.
+func (p *Plugin) ValidateSettings(s plugin.Settings) error {
+	if _, err := parsePortOverrides(s.StringList("port_overrides")); err != nil {
+		return &plugin.ValidationError{Errors: []plugin.FieldError{{Field: "port_overrides", Message: err.Error()}}}
 	}
-	return targets, skipped
+	return nil
 }
 
 // Run implements plugin.Runner.
@@ -176,11 +158,11 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if err != nil {
 		rc.Log.Warn("gemerkte Credentials nicht lesbar – beginne neu", "error", err)
 	}
-	targets, skipped := planTargets(rc.Targets.Devices, cfg.port, cfg.requireOpenPort)
+	targets, skipped := planTargets(rc.Targets.Devices, cfg.ports)
 	rc.SetStat("targets", len(targets))
 	rc.SetStat("skipped", skipped)
 	if skipped > 0 {
-		rc.Log.Info("Geräte ohne offenen SSH-Port übersprungen", "count", skipped, "port", cfg.port)
+		rc.Log.Info("Geräte ohne offenen SSH-Port übersprungen", "count", skipped, "port", cfg.ports.port)
 	}
 	script := "sh -c " + sshx.ShellQuote(buildScript(scriptOptions{Packages: cfg.packages, Docker: cfg.docker, CommandTimeout: cfg.commandTimeout}))
 	var (
@@ -203,7 +185,7 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		default:
 			failed.Add(1)
 			rc.AddStat("failed", 1)
-			rc.Log.Warn("SSH-Inventar fehlgeschlagen", "device", t.dev.Name, "device_id", t.dev.ID, "ip", t.ip, "error", err)
+			rc.Log.Warn("SSH-Inventar fehlgeschlagen", "device", t.dev.Name, "device_id", t.dev.ID, "ip", t.ip, "port", t.port, "error", err)
 		}
 		mu.Lock()
 		done++
@@ -254,7 +236,7 @@ func (p *Plugin) scan(ctx context.Context, rc *plugin.RunContext, cfg config, pi
 		rejected []string
 	)
 	for _, c := range ordered {
-		cl, err := sshx.Dial(ctx, t.ip, c, sshx.Options{Port: cfg.port, Timeout: cfg.commandTimeout, KnownHosts: cfg.knownHosts})
+		cl, err := sshx.Dial(ctx, t.ip, c, sshx.Options{Port: t.port, Timeout: cfg.commandTimeout, KnownHosts: cfg.knownHosts})
 		if err == nil {
 			client, used = cl, c
 			break
