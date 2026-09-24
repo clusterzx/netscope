@@ -443,3 +443,4 @@ Die Grafiken in diesem README (`docs/assets/*.svg`, hell und dunkel) erzeugt
 | [docs/PUBLISHERS.md](docs/PUBLISHERS.md) | Telegram, ntfy, E-Mail, Webhook und n8n einrichten; Payload-Formate |
 | [docs/FRONTEND.md](docs/FRONTEND.md) | Weboberfläche: Komponenten, API-Client, Stores, Konventionen |
 | [docs/FUTURE_REQUESTS.md](docs/FUTURE_REQUESTS.md) | Erfasste Wünsche für spätere Versionen |
+| [docs/BACKLOG.md](docs/BACKLOG.md) | Zurückgestellte Wünsche |

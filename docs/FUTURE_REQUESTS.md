@@ -6,94 +6,105 @@ kann.
 
 ---
 
-## FR-001: Empfindliche Geräte schonend scannen
+## FR-002: Mehrere NetScope-Instanzen bündeln (Zentrale und Standorte)
 
-**Status:** offen · erfasst am 23.09.2026
+**Status:** offen · erfasst am 24.09.2026
 
 ### Anlass
 
-Am 23.09.2026 wurden alle Scanner von Hand gleichzeitig gestartet (21:43 Uhr). Wenige
-Minuten später war der Proxmox-Host stromlos. Er hängt an der smarten Steckdose
-**„Proxmox-Büro“ (192.168.8.33)**, einem Shelly der zweiten Generation (ESP32, lwIP-Stack,
-Server-Header `ShellyHTTP/1.0.0`).
+Entfernte Netze werden heute über einen WireGuard-Tunnel von NetScope gescannt (z. B. das
+Rechenzentrum 192.168.1.0/24). Das funktioniert, hat aber prinzipielle Grenzen:
 
-Zeitleiste aus den Laufdaten von NetScope:
+- Durch den Tunnel gibt es keine MAC-Adressen, kein ARP, kein mDNS und kein SSDP.
+- Proxmox-VMs ohne Gast-Agent lassen sich deshalb nicht mit ihren gescannten IPs verbinden.
+- Geräte mit eigenem Standard-Gateway (VMs mit öffentlicher IP) antworten nicht in den
+  Tunnel zurück.
+- Jeder Host braucht Firewall-Freigaben für die Tunnel-Adresse (Ping, SSH).
 
-| Zeit | Ereignis |
+Die Idee: In jedem Netz läuft eine eigene NetScope-Instanz, die lokal scannt. Eine Instanz
+wird als Zentrale eingestellt und bündelt die anderen. Man kann gesammelt auf alles schauen
+oder gezielt auf einen Standort.
+
+### Festgelegt
+
+| Frage | Entscheidung |
 |---|---|
-| 21:43:16–23 | alle Scanner gestartet |
-| 21:43:57 | HTTP-Fingerprinting fertig |
-| 21:45:24 | nmap UDP fertig |
-| 21:45:42 | Proxmox-Import fertig – der Server lief noch |
-| danach | nur noch nmap TCP aktiv (`-sV`, `-O`, 35 Hosts) |
-| 21:50 | regulärer ICMP-Lauf fehlt – Server aus |
-| 21:53:55 | LXC startet neu, nmap-Lauf wird als „abgebrochen“ markiert |
+| Funktioniert ein Standort allein? | **Ja**, vollwertig mit Oberfläche, Scannern und Inventar – auch ohne Verbindung zur Zentrale. |
+| Wer benachrichtigt? | **Der Standort meldet seine Events an die Zentrale**, die Zentrale stellt über ihre Regeln und Publisher zu. |
+| Wo liegen Zugangsdaten? | **Nur am Standort.** Sie verlassen ihn nie. |
+| Darf die Zentrale am Standort etwas auslösen? | **Nein.** Die Zentrale liest nur; Scans, Einstellungen und Zugangsdaten werden am Standort gepflegt. |
 
-nmap lief an diesem Tag sieben Mal einzeln ohne Probleme. Wahrscheinlichste Erklärung: Die
-parallelen Scanner (HTTP, UDP, mDNS …) haben den Speicher der Steckdose ausgelastet, und die
-Dienst- und OS-Erkennung von nmap hat sie zum Absturz gebracht. Beim Neustart des Chips fällt
-das Relais ab, und der angeschlossene Server verliert den Strom. Nicht endgültig bewiesen –
-bestätigen lässt es sich über die Uptime in der Shelly-Oberfläche (Neustart gegen
-21:46–21:50).
+### Konzept
 
-### Problem
+**Rollen.** Jede Instanz hat unter *System → Einstellungen* eine Rolle: *eigenständig*
+(heutiges Verhalten), *Standort* (meldet an eine Zentrale) oder *Zentrale*.
 
-Mikrocontroller-Geräte mit Relais (Shelly, Tasmota, andere ESP8266/ESP32-Geräte) können
-unter aggressiven Scans abstürzen und dabei schalten. Das kann angeschlossene Geräte
-ausschalten – im schlimmsten Fall den Server, auf dem NetScope selbst läuft.
+**Datenfluss: Beobachtungen weiterreichen, keine Datenbank-Synchronisation.** Der Standort
+verarbeitet alles wie heute und schickt zusätzlich an die Zentrale:
 
-NetScope bietet dafür heute nur eine Notlösung: die Ausschlussliste von nmap (IP-Adressen
-unter *Einstellungen → Erweitert → Ausschlüsse*). nmap UDP, HTTP und TLS haben keine
-Ausschlüsse, und Plugin-Scopes können Geräte nur auswählen, nicht ausschließen.
+- seine **Beobachtungen** (die Ergebnisse der Plugins),
+- die **Lauf-Zusammenfassungen** (welche Netze ein Lauf abgedeckt hat – nötig, damit die
+  Zentrale Anwesenheit und Offline korrekt auswertet),
+- seine **Events**.
 
-Einschätzung der Scanner:
+Die Zentrale verarbeitet die Beobachtungen wie die eigenen, mit dem Standort als Etikett. Die
+Events des Standorts übernimmt sie, statt aus denselben Beobachtungen eigene zu erzeugen –
+sonst gäbe es jede Meldung doppelt. Ihre Regeln entscheiden dann über die Zustellung.
 
-| Belastung | Scanner |
-|---|---|
-| hoch | nmap TCP (Diensterkennung `-sV`, OS-Erkennung `-O`), nmap UDP |
-| mittel | HTTP-Fingerprinting (viele Anfragen), TLS |
-| gering | ICMP, ARP, mDNS, NetBIOS, UPnP, DNS, OUI |
+**Verbindung.**
 
-Betroffene Geräte im Heimnetz (Hersteller laut OUI: Espressif):
+- Der Standort baut die Verbindung nach außen auf (HTTPS, eigenes Token pro Standort mit der
+  einzigen Berechtigung „Daten einliefern“). Am Standort sind keine eingehenden Freigaben,
+  kein NAT und kein Tunnel nötig.
+- Ist die Zentrale nicht erreichbar, puffert der Standort Beobachtungen und Events in seiner
+  Datenbank und liefert sie nach.
+- Das Protokoll trägt eine Versionsnummer, damit Zentrale und Standorte nicht gleichzeitig
+  aktualisiert werden müssen.
 
-- 192.168.8.33 „Proxmox-Büro“ (Shelly Gen2, versorgt den Proxmox-Host)
-- 192.168.8.40 Shelly 3EM
-- 192.168.8.79 Tasmota „growswitchbig“
-- 192.168.8.212 smardencore
+**Datenmodell.**
 
-### Vorschlag
+- *Standort* wird ein eigener Begriff: an Subnetzen, Geräten, Beobachtungen und Events.
+- **IP-Adressen und Subnetze gelten pro Standort.** Dasselbe `192.168.1.0/24` kann es an
+  mehreren Standorten geben; ein IP-Treffer zählt nur innerhalb desselben Standorts.
+- MAC-Adressen und externe Referenzen (z. B. Proxmox-VMIDs mit Node) bleiben
+  standortübergreifend eindeutig.
+- Manuelle Angaben (Namen, Tags, Notizen) pflegt jede Instanz für ihre Sicht. Die Zentrale
+  schreibt nichts an die Standorte zurück.
 
-1. **Schalter pro Gerät „Schonend scannen“.** Er wird auf der Geräteseite und als
-   Massenaktion in der Geräteliste gesetzt und im Gerät gespeichert, als eigenes Feld statt
-   Tag.
-2. **Zentrale Umsetzung im Plugin-Host statt in jedem Plugin:**
-   - Plugins bekommen ein Merkmal `Intrusive` (bzw. eine Belastungsstufe) in `plugin.Info`.
-   - Für solche Plugins entfernt der Host schonend markierte Geräte aus den Zielen.
-   - Subnetz-Scanner bekommen deren Adressen als Ausschlüsse übergeben (nmap `--exclude`).
-   - Im Laufprotokoll steht: „N Geräte übersprungen (schonend)“.
-   - Betroffen: nmap, nmap UDP, HTTP, TLS. ICMP, ARP und die passiven Scanner bleiben
-     unverändert.
-3. **Automatischer Vorschlag.** Geräte mit OUI-Hersteller Espressif oder erkannten
-   IoT-Relais (HTTP-Server `ShellyHTTP`, `Tasmota`, Mongoose …) zeigen auf der Geräteseite
-   den Hinweis „Empfohlen: schonend scannen“. Eine Systemeinstellung
-   „ESP-Geräte automatisch schonen“ setzt den Schalter selbst.
-4. **Optional: leichter Modus statt Überspringen.** Nur wenige Ports, TCP-Connect-Scan ohne
-   `-sV`/`-O`, langsames Timing (T2), eine Verbindung gleichzeitig.
-5. **Optional: nie zwei belastende Plugins gleichzeitig auf demselben Gerät.** Laufen
-   mehrere belastende Plugins parallel, arbeitet der Host die Geräte pro Host nacheinander
-   ab – auch wenn jemand „alle Scanner“ von Hand startet.
+**Oberfläche der Zentrale.**
 
-**Abnahme:**
+- Standort-Auswahl im Kopf („Alle“, „Zuhause“, „Colo“ …) und `site:colo` in der
+  Filtersprache; jede Seite (Geräte, Topologie, Events, Schwachstellen, Berichte) lässt sich
+  so auf einen Standort einschränken.
+- Übersicht der Standorte: verbunden oder nicht, letzte Meldung, Puffergröße, Version,
+  Plugins mit Fehlern.
+- Direktlink in die Oberfläche des jeweiligen Standorts.
 
-- Tests: Der Host filtert schonende Geräte nur für belastende Plugins; nmap erhält die
-  Ausschlüsse; der Gerätemodus bleibt korrekt.
-- Oberfläche: Schalter und Hinweis auf der Geräteseite, Massenaktion in der Geräteliste.
-- Doku: README (Scanner-Tabelle), PLUGINS.md (`Intrusive`).
+**Standort ohne Oberfläche.** Optional kann ein Standort ohne Web-Oberfläche laufen und
+dient dann als reiner Sammler.
 
-### Übergangslösung bis dahin
+### Etappen
 
-- nmap: *Einstellungen → Erweitert → Ausschlüsse* – die Adressen der Geräte oben eintragen.
-- Shelly „Proxmox-Büro“: „Einschaltverhalten: letzten Zustand wiederherstellen“.
-- Server-BIOS: „Nach Stromausfall: einschalten“.
-- Am sichersten: den Server nicht über ein schaltbares Relais versorgen oder eine USV
-  vorschalten.
+1. Standort im Datenmodell (Subnetze und IP-Zuordnung pro Standort), Rollen,
+   Einliefer-Schnittstelle der Zentrale, Pufferung am Standort, Standort-Auswahl und
+   Standort-Übersicht.
+2. Events der Standorte in der Regel-Engine der Zentrale (Bedingung „Standort“), Direktlinks,
+   Übersicht der Plugin-Zustände aller Standorte.
+3. Standort ohne Oberfläche, gemeinsame Anmeldung (Single Sign-on) für die Direktlinks.
+
+### Offene Punkte
+
+- Zentrale länger nicht erreichbar: Events nur puffern, oder nach einer Wartezeit zusätzlich
+  über die Publisher des Standorts zustellen?
+- Dasselbe Gerät von zwei Standorten gesehen (z. B. per Tunnel und lokal): Welcher Standort
+  „besitzt“ es in der Zentrale?
+- Aufbewahrung: Gelten die Fristen der Zentrale auch für eingelieferte Daten?
+
+### Abnahme
+
+- Tests: gleiche IP an zwei Standorten ergibt zwei Geräte; gleiche MAC ergibt ein Gerät;
+  Anwesenheit in der Zentrale entspricht der am Standort; Pufferung und Nachlieferung nach
+  Verbindungsabbruch; keine doppelten Events.
+- Ende-zu-Ende: zwei Instanzen (Zuhause als Zentrale, Colo als Standort) mit einem
+  gemeinsamen Inventar in der Zentrale.
+- Doku: README (Abschnitt „Mehrere Standorte“), ARCHITECTURE (Rollen, Protokoll).
