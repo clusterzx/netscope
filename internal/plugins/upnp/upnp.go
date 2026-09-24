@@ -159,6 +159,11 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		}
 		rc.Log.Info("Keine Subnetze im Scope – nutze die lokal angeschlossenen Netze", "anzahl", len(targets.Subnets))
 	}
+	// multicast does not cross routers or tunnels: routed networks are skipped, not failed
+	targets, skipped := targets.LocalOnly(plugin.RoutedPrefixes(ctx, rc))
+	if len(skipped) > 0 {
+		rc.NotCovered(skipped...)
+	}
 	sessions, errs := buildSessions(targets, netutil.InterfaceFor)
 	for _, err := range errs {
 		rc.Log.Warn(err.Error())
@@ -166,6 +171,10 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if len(sessions) == 0 {
 		if len(errs) > 0 {
 			return errors.Join(errs...)
+		}
+		if len(skipped) > 0 {
+			rc.Log.Info("Nur geroutete Ziele – SSDP erreicht Geräte hinter Routern und Tunneln nicht", "subnets", len(skipped))
+			return nil
 		}
 		rc.Log.Info("Nichts zu tun: keine Netze oder Geräte im Scope")
 		return nil

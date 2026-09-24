@@ -149,9 +149,14 @@ func TestRun(t *testing.T) {
 		}
 	}
 
+	// pve1 answers the API: its address is the one of the URL (the test server), not the
+	// one it reports in /cluster/status
 	pve1 := obs[0]
-	if pve1.IP != "192.168.8.20" || pve1.Hostname != "pve1" || pve1.DeviceType != "hypervisor" || !pve1.Create {
+	if pve1.IP != "127.0.0.1" || pve1.Hostname != "pve1" || pve1.DeviceType != "hypervisor" || !pve1.Create {
 		t.Errorf("pve1: %+v", pve1)
+	}
+	if pve1.Power == nil || !pve1.Power.Running || !pve1.Power.Expected {
+		t.Errorf("pve1 power: %+v", pve1.Power)
 	}
 	if pve1.OS == nil || pve1.OS.Name != "Proxmox VE 8.2.4" {
 		t.Errorf("pve1 os: %+v", pve1.OS)
@@ -165,6 +170,9 @@ func TestRun(t *testing.T) {
 	pve2 := obs[1]
 	if pve2.IP != "192.168.8.21" || pve2.OS != nil || pve2.Inventory.(nodeInventory).Status != "offline" {
 		t.Errorf("pve2: %+v", pve2)
+	}
+	if pve2.Power == nil || pve2.Power.Running || !pve2.Power.Expected {
+		t.Errorf("pve2 power (offline node): %+v", pve2.Power)
 	}
 	if srv.requested("/api2/json/nodes/pve2/status") {
 		t.Error("status of the offline node must not be requested")
@@ -182,6 +190,9 @@ func TestRun(t *testing.T) {
 	}
 	if vm.Hostname != "docker-host" || vm.DeviceType != "vm" || !vm.Create {
 		t.Errorf("qemu 100: %+v", vm)
+	}
+	if vm.Power == nil || !vm.Power.Running || !vm.Power.Expected {
+		t.Errorf("qemu 100 power (running, onboot): %+v", vm.Power)
 	}
 	wantAttrs := map[string]string{"proxmox.vmid": "100", "proxmox.node": "pve1", "proxmox.type": "qemu"}
 	if !reflect.DeepEqual(vm.Attrs, wantAttrs) {
@@ -202,6 +213,9 @@ func TestRun(t *testing.T) {
 	win := byRef(obs, refGuest, "pve1/qemu/101")
 	if win == nil || !reflect.DeepEqual(win.MACs, []string{"bc:24:11:8f:01:2d"}) || win.IP != "" || win.Hostname != "win11" {
 		t.Fatalf("qemu 101: %+v", win)
+	}
+	if win.Power == nil || win.Power.Running {
+		t.Errorf("qemu 101 power (stopped): %+v", win.Power)
 	}
 	if srv.requested("/api2/json/nodes/pve1/qemu/101/agent/network-get-interfaces") {
 		t.Error("guest agent of a stopped VM must not be queried")

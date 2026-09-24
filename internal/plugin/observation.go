@@ -25,6 +25,10 @@ type Observation struct {
 	Present bool `json:"present,omitempty"`
 	// Create: create a device if none matches, even if not Present (importers).
 	Create bool `json:"create,omitempty"`
+	// Power is the run state reported by a hypervisor or orchestrator (nil = unknown). A
+	// stopped device goes offline at once; a running one counts as online only while no
+	// presence scanner tracks it – network scanners decide reachability.
+	Power *PowerState `json:"power,omitempty"`
 
 	Hostname   string     `json:"hostname,omitempty"`
 	Vendor     string     `json:"vendor,omitempty"`
@@ -53,6 +57,14 @@ type Observation struct {
 
 	// Raw is the plugin's raw output for this host (shown under "Rohdaten").
 	Raw string `json:"-"`
+}
+
+// PowerState is the run state of a device as its hypervisor sees it.
+type PowerState struct {
+	Running bool `json:"running"`
+	// Expected: the device is meant to run (e.g. autostart). Only then do state changes
+	// raise device.offline / device.online events; guests stopped on purpose stay quiet.
+	Expected bool `json:"expected,omitempty"`
 }
 
 // ExternalRef links a device to an object in a foreign system.

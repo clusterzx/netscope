@@ -222,6 +222,10 @@ func mapEvents(changes []plugin.Change, c config, lookup func(id int64) *plugin.
 			if dev != nil && c.quietTypes[strings.ToLower(dev.Type)] {
 				continue
 			}
+			power, byPower := ch.New.(*plugin.PowerChange)
+			if byPower && !power.Expected {
+				continue // stopped on purpose (no autostart)
+			}
 			ev := base
 			ev.Type = plugin.EvDeviceOffline
 			ev.Title = "Gerät weg: " + n
@@ -230,10 +234,17 @@ func mapEvents(changes []plugin.Change, c config, lookup func(id int64) *plugin.
 				ev.Payload["last_seen"] = t.Format(time.RFC3339)
 				ev.Message = "Zuletzt gesehen " + t.Local().Format("02.01.2006 15:04")
 			}
+			if byPower {
+				ev.Payload["power_source"] = power.Source
+				ev.Message = "Laut " + sourceLabel(power.Source) + " gestoppt, obwohl Autostart eingestellt ist."
+			}
 			emit(ev)
 		case plugin.ChangeDeviceOnline:
 			if dev != nil && c.quietTypes[strings.ToLower(dev.Type)] {
 				continue
+			}
+			if power, ok := ch.New.(*plugin.PowerChange); ok && !power.Expected {
+				continue // started on purpose (no autostart)
 			}
 			ev := base
 			ev.Type = plugin.EvDeviceOnline
@@ -605,4 +616,15 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	rc.SetStat("events", emitted)
 	rc.Log.Info("Zertifikatsablauf geprüft", "certificates", len(certs), "events", emitted)
 	return nil
+}
+
+// sourceLabel names the plugin that reported a power state.
+func sourceLabel(id string) string {
+	switch id {
+	case "proxmox":
+		return "Proxmox"
+	case "docker":
+		return "Docker"
+	}
+	return id
 }

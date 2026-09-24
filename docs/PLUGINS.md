@@ -106,6 +106,7 @@ gespeicherten Werte, bevor sie gegen das Schema normalisiert werden, und muss id
 | `Live(topic, typ, data)` | Live-Nachricht an die Oberfläche (SSE); nur freigegebene Topics (derzeit `health`) |
 | `PresenceIncomplete(prefixes…)` | Subnetze, die in diesem Lauf nicht zuverlässig gescannt wurden – dort zählt niemand als „verpasst“ |
 | `NotCovered(prefixes…)` | Subnetze, die das Plugin bewusst nicht bearbeitet (z. B. ARP in gerouteten Netzen) – wie oben, aber ohne Warnung |
+| `Targets.LocalOnly(plugin.RoutedPrefixes(ctx, rc))` | Ziele ohne geroutete Netze und Adressen dahinter – für Layer-2- und Multicast-Scanner (ARP, mDNS, SSDP); die übersprungenen Präfixe an `NotCovered` geben |
 | `Parallelism()` | konfigurierte Parallelität, mit `plugin.ForEach` nutzen |
 | `Env.PublicURL` | Basis-URL für Deep-Links |
 
@@ -155,6 +156,9 @@ DeviceID → MAC → Ref → IP.
 - `Present: true` – das Gerät hat *jetzt aktiv geantwortet*. Setzt Letztsichtung/online,
   zählt für die Anwesenheitserkennung und legt unbekannte Geräte an.
 - `Create: true` – unbekanntes Gerät auch ohne Anwesenheit anlegen (Importer).
+- `Power` – Laufzustand aus einem Hypervisor (`Running`, `Expected` = Autostart). Gestoppt setzt
+  das Gerät sofort offline; laufend zählt als online, solange kein Anwesenheits-Scanner das Gerät
+  verfolgt (Scanner entscheiden über die Erreichbarkeit). Events gibt es nur bei `Expected`.
 - Leere Felder bedeuten „keine Information“ und löschen nie etwas.
 
 **Vollständigkeit:** Damit der Core „Port geschlossen“, „Zertifikat weg“ usw. erkennen

@@ -172,6 +172,28 @@ func TestPresenceQuietTypes(t *testing.T) {
 	}
 }
 
+func TestPowerChanges(t *testing.T) {
+	c := defaultConfig(t)
+	devs := map[int64]*plugin.DeviceInfo{
+		1: {ID: 1, Name: "testvm", Type: "vm", State: "known"},
+		2: {ID: 2, Name: "mailcow", Type: "vm", State: "known"},
+	}
+	lookup := func(id int64) *plugin.DeviceInfo { return devs[id] }
+	kinds := func(string) plugin.Kind { return plugin.KindImporter }
+	since := time.Now().Add(-time.Hour)
+	changes := []plugin.Change{
+		// stopped and started on purpose (no autostart): quiet
+		{Type: plugin.ChangeDeviceOffline, DeviceID: 1, Old: since, New: &plugin.PowerChange{Source: "proxmox"}},
+		{Type: plugin.ChangeDeviceOnline, DeviceID: 1, At: time.Now(), Old: &since, New: &plugin.PowerChange{Running: true, Source: "proxmox"}},
+		// autostart guest stopped: reported
+		{Type: plugin.ChangeDeviceOffline, DeviceID: 2, Old: since, New: &plugin.PowerChange{Expected: true, Source: "proxmox"}},
+	}
+	got := mapEvents(changes, c, lookup, kinds)
+	if len(got) != 1 || got[0].DeviceID != 2 || got[0].Type != plugin.EvDeviceOffline || !strings.Contains(got[0].Message, "Proxmox") {
+		t.Fatalf("events: %+v", got)
+	}
+}
+
 func TestDampPresence(t *testing.T) {
 	ctx := context.Background()
 	d, err := db.Open(ctx, filepath.Join(t.TempDir(), "netscope.db"))

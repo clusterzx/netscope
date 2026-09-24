@@ -326,9 +326,15 @@ func (im *importer) run(ctx context.Context) error {
 	im.objects = int64(len(nodes) + len(guests))
 	rc.Progress(int(im.st.done.Load()), int(im.st.total.Add(im.objects)))
 
-	if len(nodes) == 1 && nodeIPs[nodes[0].Node] == "" {
+	// The node NetScope talks to is reached at the URL's address; what the node reports
+	// about itself comes from its /etc/hosts and may be outdated (e.g. a server that was
+	// moved) or a cluster-only network.
+	if local := localNode(status, nodes); local != "" {
 		if ip := hostIP(ctx, im.url); ip != "" {
-			nodeIPs[nodes[0].Node] = ip
+			if prev := nodeIPs[local]; prev != "" && prev != ip {
+				rc.Log.Info("Node meldet eine andere eigene Adresse – es gilt die aus der URL", "node", local, "gemeldet", prev, "url", ip)
+			}
+			nodeIPs[local] = ip
 		}
 	}
 	if im.lxc != nil {
@@ -378,6 +384,20 @@ func (im *importer) selectGuests(resources []resource) []resource {
 		return out[i].VMID < out[j].VMID
 	})
 	return out
+}
+
+// localNode returns the node that answered the API (marked local in /cluster/status, or
+// the only node).
+func localNode(status []clusterEntry, nodes []nodeEntry) string {
+	for _, e := range status {
+		if e.Type == "node" && e.Local.int() == 1 {
+			return e.Name
+		}
+	}
+	if len(nodes) == 1 {
+		return nodes[0].Node
+	}
+	return ""
 }
 
 // clusterInfo extracts the cluster name and node addresses from /cluster/status.
@@ -498,6 +518,14 @@ func nodeObservation(n nodeEntry, st *nodeStatus, cluster, ip string, create boo
 		}
 	}
 	obs.Inventory = inv
+	// a node the cluster reports online is running (even if it blocks ping); nodes are
+	// always meant to run, so an offline node raises device.offline
+	switch n.Status {
+	case "online":
+		obs.Power = &plugin.PowerState{Running: true, Expected: true}
+	case "offline":
+		obs.Power = &plugin.PowerState{Running: false, Expected: true}
+	}
 	return obs
 }
 
@@ -638,6 +666,14 @@ func guestObservation(r resource, cfg guestConfig, addrs []string, docker *lxcDo
 	}
 	if docker != nil {
 		obs.Containers = docker.inv
+	}
+	// run state from Proxmox; only guests with autostart raise events when they stop
+	expected := cfg != nil && cfg.str("onboot") == "1"
+	switch r.Status {
+	case "running":
+		obs.Power = &plugin.PowerState{Running: true, Expected: expected}
+	case "stopped":
+		obs.Power = &plugin.PowerState{Running: false, Expected: expected}
 	}
 	return obs
 }

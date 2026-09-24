@@ -53,6 +53,14 @@ type DeviceSnapshot struct {
 	Source   string `json:"source"`
 }
 
+// PowerChange is the New value of a device.online / device.offline change caused by a
+// hypervisor's run state (Observation.Power) instead of a scan.
+type PowerChange struct {
+	Running  bool   `json:"running"`
+	Expected bool   `json:"expected"` // the device is meant to run (autostart)
+	Source   string `json:"source"`   // plugin that reported the state, e.g. "proxmox"
+}
+
 // MACChange describes an IP that is now answered by a different MAC.
 type MACChange struct {
 	IP          string `json:"ip"`

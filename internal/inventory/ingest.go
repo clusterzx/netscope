@@ -163,7 +163,7 @@ func (g *ingest) process() error {
 		return fmt.Errorf("load device %d: %w", g.devID, err)
 	}
 	steps := []func() error{
-		g.applyMACs, g.applyIPs, g.applyPresence, g.applyFirstSeen, g.applyRef, g.applyFacts,
+		g.applyMACs, g.applyIPs, g.applyPresence, g.applyPower, g.applyFirstSeen, g.applyRef, g.applyFacts,
 		g.applyPorts, g.applyHTTP, g.applyTLS, g.applyPackages, g.applyContainers,
 		g.applyInventory, g.applyMetrics, g.applyRelations, g.applyManual,
 	}
@@ -431,18 +431,29 @@ func (g *ingest) applyIPs() error {
 		case err != nil:
 			return err
 		default:
-			set := "last_seen = ?, source = ?"
-			args := []any{g.nowMs(), g.plugin}
+			// Only confirmations count as a sighting: an answer (Present) or an import
+			// that reports the address (Create). A ping without reply or a DNS lookup
+			// must not refresh "last seen".
+			if !(o.Present || o.Create) && !(observedAt && mac != "") {
+				continue
+			}
+			var (
+				set  []string
+				args []any
+			)
+			if o.Present || o.Create {
+				set, args = append(set, "last_seen = ?", "source = ?"), append(args, g.nowMs(), g.plugin)
+			}
 			if observedAt && mac != "" {
-				set += ", mac = ?"
+				set = append(set, "mac = ?")
 				args = append(args, mac)
 			}
 			if o.Present && observedAt && g.run > 0 {
-				set += ", last_run_id = ?"
+				set = append(set, "last_run_id = ?")
 				args = append(args, g.run)
 			}
 			args = append(args, rowID)
-			if err := g.exec("UPDATE device_ips SET "+set+" WHERE id = ?", args...); err != nil {
+			if err := g.exec("UPDATE device_ips SET "+strings.Join(set, ", ")+" WHERE id = ?", args...); err != nil {
 				return err
 			}
 		}
@@ -479,6 +490,47 @@ func (g *ingest) applyPresence() error {
 	return g.exec(`INSERT INTO device_presence(device_id, plugin_id, last_seen, last_run_id, missed) VALUES (?,?,?,?,0)
 		ON CONFLICT(device_id, plugin_id) DO UPDATE SET last_seen = excluded.last_seen, last_run_id = excluded.last_run_id, missed = 0`,
 		g.devID, g.plugin, g.nowMs(), g.runID())
+}
+
+// applyPower applies a run state reported by a hypervisor (Observation.Power): a stopped
+// device goes offline at once; a running one counts as online only while no presence
+// scanner tracks it (scanners decide reachability, the hypervisor only whether it runs).
+func (g *ingest) applyPower() error {
+	p := g.obs.Power
+	if p == nil || g.obs.Present {
+		return nil
+	}
+	pc := &plugin.PowerChange{Running: p.Running, Expected: p.Expected, Source: g.plugin}
+	if !p.Running {
+		if !g.dev.online {
+			return nil
+		}
+		if err := g.exec("UPDATE devices SET online = 0, online_changed_at = ? WHERE id = ?", g.nowMs(), g.devID); err != nil {
+			return err
+		}
+		var last any
+		if t := db.NullTime(g.dev.lastSeen); t != nil {
+			last = *t
+		}
+		g.change(plugin.ChangeDeviceOffline, "", last, pc, false)
+		return nil
+	}
+	var tracked int
+	if err := g.tx.QueryRowContext(g.ctx, "SELECT COUNT(*) FROM device_presence WHERE device_id = ? AND plugin_id <> ?",
+		g.devID, g.plugin).Scan(&tracked); err != nil {
+		return err
+	}
+	if tracked > 0 {
+		return nil
+	}
+	if err := g.exec(`UPDATE devices SET last_seen = ?, online = 1,
+		online_changed_at = CASE WHEN online = 0 THEN ? ELSE online_changed_at END WHERE id = ?`, g.nowMs(), g.nowMs(), g.devID); err != nil {
+		return err
+	}
+	if !g.created && !g.dev.online && g.dev.lastSeen.Valid {
+		g.change(plugin.ChangeDeviceOnline, "", db.NullTime(g.dev.onlineChangedAt), pc, false)
+	}
+	return nil
 }
 
 func (g *ingest) applyFirstSeen() error {

@@ -205,26 +205,6 @@ func buildJobs(t plugin.Targets, routed []netip.Prefix, ifaceFor func(netip.Addr
 	return jobs, errs, skipped
 }
 
-// routedSubnets returns the subnets reached through a router or tunnel (from the targets
-// and, for device scans, from the subnet configuration).
-func routedSubnets(ctx context.Context, rc *plugin.RunContext, t plugin.Targets) []netip.Prefix {
-	var out []netip.Prefix
-	add := func(list []plugin.SubnetTarget) {
-		for _, s := range list {
-			if s.Routed && !slices.Contains(out, s.CIDR.Masked()) {
-				out = append(out, s.CIDR.Masked())
-			}
-		}
-	}
-	add(t.Subnets)
-	if t.DeviceMode && rc.Inventory != nil {
-		if list, err := rc.Inventory.Subnets(ctx); err == nil {
-			add(list)
-		}
-	}
-	return out
-}
-
 // localTargets returns the directly attached networks as targets (used when no subnet
 // is configured at all).
 func localTargets() plugin.Targets {
@@ -251,7 +231,7 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		rc.Log.Info("Keine Geräte mit IP-Adresse im Scope")
 		return nil
 	}
-	jobs, jobErrs, skipped := buildJobs(targets, routedSubnets(ctx, rc, targets), netutil.InterfaceFor)
+	jobs, jobErrs, skipped := buildJobs(targets, plugin.RoutedPrefixes(ctx, rc), netutil.InterfaceFor)
 	for _, err := range jobErrs {
 		rc.Log.Warn(err.Error())
 	}
