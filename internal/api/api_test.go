@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 	"netscope/internal/config"
 	"netscope/internal/db"
 	"netscope/internal/events"
+	"netscope/internal/federation"
 	"netscope/internal/inventory"
 	"netscope/internal/logging"
 	"netscope/internal/plugin"
@@ -72,10 +74,15 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	engine := rules.New(d, b, log, ev, inv, host, st, time.UTC)
+	fed, err := federation.New(ctx, federation.Deps{DB: d, Bus: b, Log: log, Vault: v, Inventory: inv, Events: ev, Settings: st,
+		Host: host, Version: "test", StartedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg := &config.Config{DataDir: dir, Location: time.UTC, Timezone: "UTC",
 		Proxies: []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8")}, TrustedProxies: []string{"127.0.0.0/8"}}
 	s := New(Deps{Config: cfg, DB: d, Bus: b, Log: log, Logs: ring, LevelVar: level, Auth: a, Vault: v, Settings: st, Inventory: inv,
-		Events: ev, Rules: engine, Host: host, Audit: audit.New(d), Version: "test", StartedAt: time.Now()})
+		Events: ev, Rules: engine, Host: host, Federation: fed, Audit: audit.New(d), Version: "test", StartedAt: time.Now()})
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 	jar, _ := cookiejar.New(nil)
@@ -364,5 +371,70 @@ func TestCredentialScopeAPI(t *testing.T) {
 	}
 	if resp, _ := h.do(t, "GET", "/api/v1/devices/999/credentials", nil); resp.StatusCode != 404 {
 		t.Errorf("unknown device: %d", resp.StatusCode)
+	}
+}
+
+func TestFederationIngest(t *testing.T) {
+	h := newHarness(t)
+	batch := map[string]any{"protocol": 1, "epoch": "e1", "instance": map[string]any{"version": "x"},
+		"items": []map[string]any{{"seq": 1, "kind": "observation", "at": time.Now(),
+			"data": map[string]any{"plugin": "arpscan", "device": 7, "obs": map[string]any{"ip": "10.1.1.7", "macs": []string{"02:00:00:00:10:07"}, "present": true}}}}}
+	if resp, _ := h.do(t, "POST", "/api/v1/federation/ingest", batch); resp.StatusCode != 401 {
+		t.Fatalf("without token: %d", resp.StatusCode)
+	}
+	if resp, body := h.do(t, "POST", "/api/v1/federation/ingest", batch, "Authorization", "Bearer nss_x"); resp.StatusCode != 404 ||
+		!strings.Contains(string(body), "not_central") {
+		t.Fatalf("not central: %d %s", resp.StatusCode, body)
+	}
+	h.login(t)
+	if resp, body := h.do(t, "PUT", "/api/v1/federation", map[string]any{"role": "central", "localName": "Zuhause"}, csrf, "1"); resp.StatusCode != 200 {
+		t.Fatalf("role: %d %s", resp.StatusCode, body)
+	}
+	resp, body := h.do(t, "POST", "/api/v1/sites", map[string]any{"name": "Colo"}, csrf, "1")
+	if resp.StatusCode != 201 {
+		t.Fatalf("create site: %d %s", resp.StatusCode, body)
+	}
+	var created struct {
+		Token string `json:"token"`
+	}
+	_ = json.Unmarshal(body, &created)
+
+	// the site token works for the ingest endpoint only (a fresh client without session)
+	anon := &harness{srv: h.srv, client: &http.Client{}}
+	if resp, _ := anon.do(t, "GET", "/api/v1/devices", nil, "Authorization", "Bearer "+created.Token); resp.StatusCode != 401 {
+		t.Fatalf("site token accepted by the regular API: %d", resp.StatusCode)
+	}
+	resp, body = anon.do(t, "POST", "/api/v1/federation/ingest", batch, "Authorization", "Bearer "+created.Token)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"acked":1`) {
+		t.Fatalf("ingest: %d %s", resp.StatusCode, body)
+	}
+	resp, body = anon.do(t, "POST", "/api/v1/federation/ingest", map[string]any{"protocol": 99, "items": []any{}},
+		"Authorization", "Bearer "+created.Token)
+	if resp.StatusCode != 409 || !strings.Contains(string(body), "Zentrale aktualisieren") {
+		t.Fatalf("newer protocol: %d %s", resp.StatusCode, body)
+	}
+
+	resp, body = h.do(t, "GET", "/api/v1/devices?site=colo", nil)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `"site":"Colo"`) || !strings.Contains(string(body), "10.1.1.7") {
+		t.Fatalf("devices of the site: %d %s", resp.StatusCode, body)
+	}
+	resp, body = h.do(t, "GET", "/api/v1/devices?site=local", nil)
+	if resp.StatusCode != 200 || strings.Contains(string(body), "10.1.1.7") {
+		t.Fatalf("local devices: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := h.do(t, "GET", "/api/v1/events?site=nirgends", nil); resp.StatusCode != 400 {
+		t.Fatalf("unknown site: %d", resp.StatusCode)
+	}
+	// scans of site devices are refused
+	var list struct {
+		Items []struct {
+			ID int64 `json:"id"`
+		} `json:"items"`
+	}
+	_, body = h.do(t, "GET", "/api/v1/devices?site=colo", nil)
+	_ = json.Unmarshal(body, &list)
+	resp, body = h.do(t, "POST", fmt.Sprintf("/api/v1/devices/%d/scan", list.Items[0].ID), map[string]any{"plugins": []string{"icmp"}}, csrf, "1")
+	if resp.StatusCode != 400 || !strings.Contains(string(body), "Standort Colo") {
+		t.Fatalf("scan of a site device: %d %s", resp.StatusCode, body)
 	}
 }

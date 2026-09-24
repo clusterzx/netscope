@@ -48,7 +48,15 @@
 		{#if d.displayName && d.hostname && d.displayName !== d.hostname}
 			<span class="hidden truncate text-xs text-fg-subtle xl:inline">{d.hostname}</span>
 		{/if}
+		{#if d.site}
+			<span
+				class="shrink-0 rounded bg-surface-3 px-1.5 text-[0.7rem] leading-5 font-medium text-fg-muted"
+				title="Geliefert vom Standort {d.site}">{d.site}</span
+			>
+		{/if}
 	</div>
+{:else if colKey === 'site'}
+	<span class="whitespace-nowrap {d.site ? '' : 'text-fg-subtle'}">{d.site || 'hier'}</span>
 {:else if colKey === 'ip'}
 	<span class="mono whitespace-nowrap">{d.ip || '–'}</span>
 	{#if (d.ips?.length ?? 0) > 1}<span class="text-xs text-fg-subtle"> +{d.ips.length - 1}</span>{/if}

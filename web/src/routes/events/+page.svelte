@@ -32,6 +32,7 @@
 	import type { Column, MultiOption, RowKey } from '$lib/components/ui';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { eventTypes } from '$lib/stores/catalog.svelte';
+	import { federation, siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -59,9 +60,17 @@
 	eventTypes.load().catch(() => {});
 
 	// ---------------------------------------------------------------- data
+	/** -1 = all sites, 0 = this instance, otherwise the id of the selected site */
+	const selectedSiteId = $derived(
+		siteFilter.value === ''
+			? -1
+			: siteFilter.value === 'local'
+				? 0
+				: (federation.sites.find((s) => s.slug === siteFilter.value)?.id ?? -1)
+	);
 	const data = new AsyncData<EventList>();
 	$effect(() => {
-		const query = apiQuery(filter, offset, limit);
+		const query = { ...apiQuery(filter, offset, limit), site: siteFilter.value || null };
 		data.run((signal) => api.get('/api/v1/events', { query, signal }));
 	});
 	const rows = $derived<Event[]>(data.data?.items ?? []);
@@ -88,7 +97,15 @@
 			const f = untrack(() => filter);
 			if (m.type === 'created') {
 				const ev = m.data as Event;
-				if (!matchesEvent(ev, f)) return;
+				if (
+					!matchesEvent(
+						ev,
+						f,
+						Date.now(),
+						untrack(() => selectedSiteId)
+					)
+				)
+					return;
 				if (untrack(() => offset) > 0) newCount++;
 				else {
 					flashIds.push(ev.id);
@@ -532,8 +549,13 @@
 						<a class="link block truncate" href="/devices/{ev.deviceId}"
 							>{ev.deviceName || `Gerät #${ev.deviceId}`}</a
 						>
-					{:else}
+					{:else if !ev.site}
 						<span class="text-fg-subtle">–</span>
+					{/if}
+					{#if ev.site}
+						<span class="block truncate text-xs text-fg-subtle" title="Gemeldet vom Standort {ev.site}"
+							>Standort {ev.site}</span
+						>
 					{/if}
 				{:else if col.key === 'ts'}
 					<RelativeTime value={ev.ts} class="text-fg-muted" />
@@ -610,7 +632,7 @@
 <AckModal
 	bind:open={ackOpen}
 	ids={ackIds}
-	filter={ackByFilter ? ackFilter(filter) : null}
+	filter={ackByFilter ? ackFilter(filter, Date.now(), siteFilter.value) : null}
 	count={ackByFilter ? (filter.acked === 'open' ? total : -1) : ackIds.length}
 	summary={ackByFilter ? filterSummary : ''}
 	ondone={afterAck}

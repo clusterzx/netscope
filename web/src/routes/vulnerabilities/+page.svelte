@@ -31,6 +31,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
@@ -103,7 +104,8 @@
 			ignored: ignored || null,
 			sort,
 			limit,
-			offset
+			offset,
+			site: siteFilter.value || null
 		};
 		list.run((signal) => api.get('/api/v1/vulnerabilities', { query, signal }));
 	});

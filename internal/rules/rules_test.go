@@ -372,3 +372,18 @@ func itoa(n int64) string {
 	b, _ := json.Marshal(n)
 	return string(b)
 }
+
+func TestSiteCondition(t *testing.T) {
+	e := &Engine{}
+	c := Conditions{Sites: []int64{0}}
+	if ok, _ := e.matchSites(c, EventInput{SiteID: 0}); !ok {
+		t.Fatal("event of this instance must match site 0")
+	}
+	if ok, _ := e.matchSites(c, EventInput{SiteID: 3}); ok {
+		t.Fatal("event of site 3 must not match site 0")
+	}
+	r := Rule{Name: "x", Conditions: Conditions{Sites: []int64{-1}}, Actions: []Action{{Publisher: "p"}}}
+	if err := r.Validate(nil); err == nil {
+		t.Fatal("negative site accepted")
+	}
+}

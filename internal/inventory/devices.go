@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"netscope/internal/db"
+	"netscope/internal/federation/wire"
 	"netscope/internal/netutil"
 	"netscope/internal/plugin"
 )
@@ -60,6 +61,10 @@ type DeviceRow struct {
 	Custom          map[string]any `json:"custom"`
 	HasNotes        bool           `json:"hasNotes"`
 	CreatedSource   string         `json:"createdSource"`
+	// SiteID and Site name the site that delivered the device (central instance; 0 and
+	// "" = this instance).
+	SiteID int64  `json:"siteId,omitempty"`
+	Site   string `json:"site,omitempty"`
 }
 
 // ListOptions controls List.
@@ -174,7 +179,8 @@ const deviceSelect = `SELECT d.id, d.display_name, d.hostname, d.hostname_source
 	(SELECT CASE MAX(CASE h.state WHEN 'down' THEN 3 WHEN 'degraded' THEN 2 WHEN 'up' THEN 1 ELSE 0 END)
 		WHEN 3 THEN 'down' WHEN 2 THEN 'degraded' WHEN 1 THEN 'up' WHEN 0 THEN 'unknown' END
 		FROM health_checks h WHERE h.device_id = d.id AND h.enabled = 1) AS health_state,
-	(SELECT r.parent_id FROM relations r WHERE r.child_id = d.id ORDER BY (r.kind = 'runs_on') DESC, r.last_seen DESC LIMIT 1) AS parent_id
+	(SELECT r.parent_id FROM relations r WHERE r.child_id = d.id ORDER BY (r.kind = 'runs_on') DESC, r.last_seen DESC LIMIT 1) AS parent_id,
+	IFNULL(d.site_id, 0), IFNULL((SELECT s.name FROM sites s WHERE s.id = d.site_id), '')
 	FROM devices d`
 
 // portCountSQL is the port count column of deviceSelect.
@@ -196,7 +202,7 @@ func scanDeviceRow(rows *sql.Rows) (DeviceRow, error) {
 	)
 	err := rows.Scan(&r.ID, &r.DisplayName, &r.Hostname, &r.HostnameSource, &r.IP, &r.MAC, &r.Vendor, &r.Model, &r.Type,
 		&r.OS, &r.OSSource, &r.Location, &r.Owner, &r.State, &r.Criticality, &r.Online, &onlineChanged, &first, &last,
-		&custom, &r.HasNotes, &r.CreatedSource, &r.PortCount, &maxCVSS, &r.CVECount, &certExp, &health, &parent)
+		&custom, &r.HasNotes, &r.CreatedSource, &r.PortCount, &maxCVSS, &r.CVECount, &certExp, &health, &parent, &r.SiteID, &r.Site)
 	if err != nil {
 		return r, err
 	}
@@ -549,6 +555,8 @@ type DeviceDetail struct {
 	// EffectiveSources names the source whose fact won per kind (hostname, vendor,
 	// model, type, os), following the configured priorities.
 	EffectiveSources map[string]string `json:"effectiveSources"`
+	// SiteRef is the NetScope site that delivers the device (central instance).
+	SiteRef *SiteRef `json:"siteRef,omitempty"`
 }
 
 // Get returns the full detail of a device.
@@ -561,6 +569,11 @@ func (s *Store) Get(ctx context.Context, id int64) (*DeviceDetail, error) {
 		MACList: []MACView{}, Presence: []PresenceView{}, Refs: []RefView{}, Counts: map[string]int{}}
 	if err := s.db.R.QueryRowContext(ctx, "SELECT notes FROM devices WHERE id = ?", id).Scan(&d.Notes); err != nil {
 		return nil, err
+	}
+	if d.SiteID > 0 {
+		if d.SiteRef, err = s.DeviceSite(ctx, id); err != nil {
+			return nil, err
+		}
 	}
 	eff, err := s.effectiveValues(ctx, s.db.R, id)
 	if err != nil {
@@ -893,7 +906,7 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 		if n, _ := res.RowsAffected(); n == 0 {
 			return db.ErrNotFound
 		}
-		return nil
+		return s.forwardOp(ctx, tx, wire.DeviceOp{Op: wire.OpDeleted, Device: id})
 	})
 	if err == nil {
 		s.publishDevice("deleted", id)
@@ -949,7 +962,18 @@ func (s *Store) CreateManual(ctx context.Context, name, ip, mac string) (int64, 
 				return err
 			}
 		}
-		return updatePrimary(ctx, tx, id)
+		if err := updatePrimary(ctx, tx, id); err != nil {
+			return err
+		}
+		if f := s.forwarder(); f != nil {
+			// the central instance learns the device; its name is manual data of this instance
+			o := &plugin.Observation{IP: ipN, Create: true}
+			if macN != "" {
+				o.MACs = []string{macN}
+			}
+			return f.Enqueue(ctx, tx, wire.KindObservation, time.UnixMilli(now), wire.Observation{Plugin: SourceManual, Device: id, Obs: o})
+		}
+		return nil
 	})
 	if err == nil {
 		s.publishDevice("created", id)
@@ -1040,6 +1064,9 @@ func (s *Store) Bulk(ctx context.Context, b BulkAction) (int, error) {
 					WHERE device_id = ? AND json_extract(payload, '$.device_name') IS NULL`, id, id)
 				if err == nil {
 					_, err = tx.ExecContext(ctx, "DELETE FROM devices WHERE id = ?", id)
+				}
+				if err == nil {
+					err = s.forwardOp(ctx, tx, wire.DeviceOp{Op: wire.OpDeleted, Device: id})
 				}
 			}
 			if err != nil {
@@ -1187,14 +1214,19 @@ func (s *Store) Device(ctx context.Context, id int64) (*plugin.DeviceInfo, error
 	return &list[0], nil
 }
 
-// Devices implements plugin.InventoryReader ("" = all devices not ignored).
+// Devices implements plugin.InventoryReader ("" = all devices not ignored). Plugins only
+// see the devices of this instance, never the ones delivered by sites.
 func (s *Store) Devices(ctx context.Context, query string) ([]plugin.DeviceInfo, error) {
 	var ids []int64
 	var err error
 	if strings.TrimSpace(query) == "" {
-		ids, err = queryIDs(ctx, s.db.R, "SELECT id FROM devices WHERE state <> 'ignored'")
+		ids, err = queryIDs(ctx, s.db.R, "SELECT id FROM devices WHERE state <> 'ignored' AND site_id IS NULL")
 	} else {
-		ids, err = s.MatchingIDs(ctx, query)
+		where, args, cerr := s.CompileQuery(ctx, query)
+		if cerr != nil {
+			return nil, cerr
+		}
+		ids, err = queryIDs(ctx, s.db.R, "SELECT d.id FROM devices d WHERE d.site_id IS NULL AND ("+where+")", args...)
 	}
 	if err != nil {
 		return nil, err

@@ -49,7 +49,7 @@ func (p *Plugin) Schema() plugin.Schema {
 	return plugin.Schema{Fields: []plugin.Field{
 		{Key: "file", Type: plugin.FieldString, Widget: "file", Label: "CSV-Datei", Required: true,
 			Description: "Erste Zeile = Spaltennamen, jede Zeile braucht eine MAC- oder IP-Adresse. Spalten: mac, macs, ip, ips, name (Anzeigename), hostname, " +
-				"type/typ, vendor/hersteller, model, os, location/standort, owner/besitzer, tags (getrennt durch ; oder |), state/zustand " +
+				"type/typ, vendor/hersteller, model, os, location/aufstellort/standort, owner/besitzer, tags (getrennt durch ; oder |), state/zustand " +
 				"(bekannt, unbekannt, ignoriert), criticality/kritikalität (niedrig, normal, hoch, kritisch), notes/notizen sowie cf.<schlüssel> " +
 				"oder custom:<schlüssel> für eigene Felder. Unbekannte Spalten (z. B. id, online, first_seen) werden ignoriert.",
 			Validation: &plugin.Validation{Format: "path"}},
@@ -60,7 +60,7 @@ func (p *Plugin) Schema() plugin.Schema {
 			{Value: "tab", Label: "Tabulator"},
 		}},
 		{Key: "overwrite", Type: plugin.FieldBool, Label: "Vorhandene Angaben überschreiben", Default: false,
-			Description: "Aus: Anzeigename, Typ, Standort, Besitzer, Notizen, Zustand, Kritikalität und eigene Felder werden nur gefüllt, wenn sie leer sind."},
+			Description: "Aus: Anzeigename, Typ, Aufstellort, Besitzer, Notizen, Zustand, Kritikalität und eigene Felder werden nur gefüllt, wenn sie leer sind."},
 		{Key: "create_missing", Type: plugin.FieldBool, Label: "Fehlende Geräte anlegen", Default: true,
 			Description: "Aus: Zeilen ohne passendes Gerät im Inventar werden übersprungen."},
 	}}

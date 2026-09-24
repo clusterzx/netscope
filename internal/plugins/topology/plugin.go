@@ -138,7 +138,14 @@ func (p *Plugin) rebuild(ctx context.Context, rc *plugin.RunContext) error {
 	if err != nil {
 		return fmt.Errorf("Topologie-Daten lesen: %w", err)
 	}
-	res := derive(in, opt)
+	res := result{keep: map[int64]bool{}}
+	for _, part := range in.split() {
+		r := derive(part, opt)
+		res.edges = append(res.edges, r.edges...)
+		for id := range r.keep {
+			res.keep[id] = true
+		}
+	}
 	st, err := writeEdges(ctx, rc.DB, in, res, start)
 	if err != nil {
 		return fmt.Errorf("Topologie speichern: %w", err)

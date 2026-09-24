@@ -338,6 +338,11 @@ func (s *Server) handleDeviceCredentials(w http.ResponseWriter, r *http.Request)
 		s.fail(w, r, err)
 		return
 	}
+	if ref, err := s.Inventory.DeviceSite(r.Context(), id); err != nil || ref != nil {
+		// credentials of a site device live at the site; ours are never used for it
+		s.respond(w, r, []deviceCredential{}, err)
+		return
+	}
 	list, err := s.Host.CredentialProvider().Applicable(r.Context(), plugin.CredentialTarget{DeviceID: id}, nil, nil)
 	if err != nil {
 		s.fail(w, r, err)

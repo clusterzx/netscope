@@ -80,8 +80,9 @@ export function apiQuery(f: EventFilter, offset: number, limit: number) {
 }
 
 /** Body.filter for POST /api/v1/events/ack – exactly the filter of the list (only open events are acked). */
-export function ackFilter(f: EventFilter, now = Date.now()) {
+export function ackFilter(f: EventFilter, now = Date.now(), site = '') {
 	return {
+		site: site || undefined,
 		types: f.types.length ? f.types : undefined,
 		categories: f.categories.length ? f.categories : undefined,
 		minSeverity: f.severity || undefined,
@@ -97,8 +98,10 @@ function typeMatches(type: string, patterns: string[]): boolean {
 	return patterns.some((p) => (p.endsWith('.*') ? type.startsWith(p.slice(0, -1)) : type === p));
 }
 
-/** Client-side check whether a (new) event matches the filter – mirrors the backend filter. */
-export function matchesEvent(ev: Event, f: EventFilter, now = Date.now()): boolean {
+/** Client-side check whether a (new) event matches the filter – mirrors the backend filter.
+ *  siteId: -1 = all sites, 0 = this instance, otherwise the site id. */
+export function matchesEvent(ev: Event, f: EventFilter, now = Date.now(), siteId = -1): boolean {
+	if (siteId >= 0 && (ev.siteId ?? 0) !== siteId) return false;
 	if (f.types.length && !typeMatches(ev.type, f.types)) return false;
 	if (f.categories.length && !f.categories.includes(ev.category)) return false;
 	if (f.severity && (severityRank[ev.severity] ?? 0) < (severityRank[f.severity] ?? 0)) return false;

@@ -16,6 +16,7 @@
 		StatCard,
 		StatusDot
 	} from '$lib/components/ui';
+	import { federation, siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
@@ -31,7 +32,8 @@
 
 	const data = new AsyncData<Dashboard>();
 	$effect(() => {
-		data.run((signal) => api.get('/api/v1/dashboard', { signal }));
+		const query = { site: siteFilter.value || null };
+		data.run((signal) => api.get('/api/v1/dashboard', { query, signal }));
 	});
 
 	// live refresh: coalesce bursts of messages into one reload
@@ -40,6 +42,11 @@
 	$effect(() => live.on('event', refresh));
 	$effect(() => live.on('plugin', refresh));
 	$effect(() => live.on('health', refresh));
+	$effect(() =>
+		live.on('system', (m) => {
+			if (m.type === 'sites') refresh();
+		})
+	);
 	$effect(() => live.onReconnect(refresh));
 	$effect(() => runs.onFinished(refresh));
 	$effect(() => () => refresh.cancel());
@@ -165,6 +172,43 @@
 			noch nicht als bekannt markiert
 		</StatCard>
 	</section>
+
+	{#if federation.role === 'central' && d?.sites?.length && !siteFilter.value}
+		<!-- sites of a central instance -->
+		<Card title="Standorte" icon="globe" class="mt-4" padding="sm">
+			{#snippet actions()}
+				<Button size="xs" variant="ghost" href="/sites" iconRight="arrow-right">Verwalten</Button>
+			{/snippet}
+			<ul class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+				{#each d.sites as s (s.id)}
+					{@const failed = (s.status?.plugins ?? []).filter(
+						(p) => p.status === 'failed' || p.status === 'timeout'
+					).length}
+					<li>
+						<button
+							type="button"
+							class="flex w-full items-start gap-2.5 rounded-md border border-border px-3 py-2 text-left hover:bg-surface-2"
+							onclick={() => (siteFilter.value = s.slug)}
+							title="Ansicht auf {s.name} einschränken"
+						>
+							<StatusDot status={s.connected ? 'online' : s.lastContact ? 'down' : 'idle'} class="mt-1.5" />
+							<span class="min-w-0 flex-1">
+								<span class="block truncate text-sm font-medium">{s.name}</span>
+								<span class="block text-xs text-fg-subtle">
+									{formatNumber(s.online)}/{formatNumber(s.devices)} online
+									{#if !s.connected}· {#if s.lastContact}zuletzt <RelativeTime
+												value={s.lastContact}
+											/>{:else}noch keine Meldung{/if}{/if}
+									{#if failed}· <span class="text-warn">{failed} Plugin-Fehler</span>{/if}
+									{#if s.status?.buffered}· {formatNumber(s.status.buffered)} gepuffert{/if}
+								</span>
+							</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		</Card>
+	{/if}
 
 	<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
 		<!-- events -->

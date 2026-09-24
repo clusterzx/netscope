@@ -7,6 +7,8 @@ export interface NavItem {
 	icon: IconName;
 	/** key for live counters shown as badge */
 	badge?: 'events';
+	/** only shown on a central instance */
+	central?: boolean;
 }
 
 export interface NavSection {
@@ -20,7 +22,8 @@ export const nav: NavSection[] = [
 		items: [
 			{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 			{ href: '/devices', label: 'Geräte', icon: 'devices' },
-			{ href: '/topology', label: 'Topologie', icon: 'topology' }
+			{ href: '/topology', label: 'Topologie', icon: 'topology' },
+			{ href: '/sites', label: 'Standorte', icon: 'globe', central: true }
 		]
 	},
 	{

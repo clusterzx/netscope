@@ -63,6 +63,8 @@ type PayloadEvent struct {
 	Link          string         `json:"link"`
 	Device        *PayloadDevice `json:"device"`  // null for events without device
 	Payload       map[string]any `json:"payload"` // type-specific fields, see the event catalog
+	// Site is the NetScope site that raised the event (only on a central instance).
+	Site string `json:"site,omitempty"`
 }
 
 // PayloadDevice is the device an event refers to.
@@ -122,6 +124,7 @@ func BuildPayload(n *plugin.Notification, sentAt time.Time) *Payload {
 			Escalated:     e.Escalated,
 			Link:          e.Link,
 			Payload:       e.Payload,
+			Site:          e.Site,
 		}
 		if pe.Payload == nil {
 			pe.Payload = map[string]any{}

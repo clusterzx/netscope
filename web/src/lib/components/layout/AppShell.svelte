@@ -9,6 +9,7 @@
 	import { runs } from '$lib/stores/runs.svelte';
 	import { eventCounts } from '$lib/stores/eventCounts.svelte';
 	import { meta, wireCatalogRefresh } from '$lib/stores/catalog.svelte';
+	import { federation } from '$lib/stores/federation.svelte';
 
 	let { children }: { children: Snippet } = $props();
 	let mobileOpen = $state(false);
@@ -20,6 +21,7 @@
 		eventCounts.init();
 		wireCatalogRefresh();
 		meta.load().catch(() => {});
+		federation.load().catch(() => {});
 		return () => live.disconnect();
 	});
 

@@ -28,6 +28,9 @@ type Store struct {
 
 	hookMu    sync.RWMutex
 	onChanges func([]plugin.Change)
+
+	fwdMu sync.RWMutex
+	fwd   Forwarder
 }
 
 type subnetEntry struct {

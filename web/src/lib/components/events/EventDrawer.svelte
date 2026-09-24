@@ -229,9 +229,14 @@
 						<span class="text-fg-subtle">–</span>
 					{/if}
 				</DescItem>
-				<DescItem label="Erzeugt von">
-					<a class="link" href="/plugins/{ev.pluginId}">{ev.pluginId}</a>
-				</DescItem>
+				{#if ev.site}
+					<DescItem label="Standort" hint="Event des NetScope-Standorts" value={ev.site} />
+					<DescItem label="Erzeugt von" hint="am Standort" value={ev.pluginId} mono />
+				{:else}
+					<DescItem label="Erzeugt von">
+						<a class="link" href="/plugins/{ev.pluginId}">{ev.pluginId}</a>
+					</DescItem>
+				{/if}
 				{#if ev.runId}
 					<DescItem label="Lauf">
 						{#if runInfo}

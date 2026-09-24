@@ -36,6 +36,10 @@ type Event struct {
 	AckedAt    *time.Time      `json:"ackedAt,omitempty"`
 	AckedBy    string          `json:"ackedBy,omitempty"`
 	AckNote    string          `json:"ackNote,omitempty"`
+	// SiteID and Site name the site that raised the event (central instance; 0 and "" =
+	// this instance).
+	SiteID int64  `json:"siteId,omitempty"`
+	Site   string `json:"site,omitempty"`
 }
 
 // DeviceLookup resolves device details for event payloads.
@@ -51,6 +55,15 @@ type Store struct {
 
 	mu       sync.RWMutex
 	handlers []func(Event)
+	forward  func(ctx context.Context, ev Event)
+}
+
+// SetForwarder registers the delivery of new events to a central instance (site role);
+// fn reports its own errors.
+func (s *Store) SetForwarder(fn func(ctx context.Context, ev Event)) {
+	s.mu.Lock()
+	s.forward = fn
+	s.mu.Unlock()
 }
 
 // New creates the store.
@@ -84,6 +97,13 @@ func (s *Store) Emit(ctx context.Context, pluginID string, in plugin.Event) (int
 	if at.IsZero() {
 		at = time.Now()
 	}
+	if in.DeviceID > 0 {
+		// events about devices of a site come from the site itself (see Import)
+		var site sql.NullInt64
+		if err := s.db.R.QueryRowContext(ctx, "SELECT site_id FROM devices WHERE id = ?", in.DeviceID).Scan(&site); err == nil && site.Valid {
+			return 0, nil
+		}
+	}
 	if in.DedupKey != "" {
 		window := in.DedupWindow
 		if window <= 0 {
@@ -114,38 +134,108 @@ func (s *Store) Emit(ctx context.Context, pluginID string, in plugin.Event) (int
 	if title == "" {
 		title = spec.Label
 	}
-	pb, err := json.Marshal(payload)
-	if err != nil {
-		return 0, err
-	}
-	var dev, run any
-	if in.DeviceID > 0 {
-		dev = in.DeviceID
-	}
-	if in.RunID > 0 {
-		run = in.RunID
-	}
-	res, err := s.db.W.ExecContext(ctx, `INSERT INTO events(ts, type, category, severity, device_id, plugin_id, run_id, title, message, payload, dedup_key)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`, at.UnixMilli(), in.Type, spec.Category, string(sev), dev, pluginID, run, title, in.Message, string(pb), in.DedupKey)
-	if err != nil {
-		return 0, err
-	}
-	id, _ := res.LastInsertId()
-	ev := Event{ID: id, TS: at, Type: in.Type, Label: spec.Label, Category: spec.Category, Severity: sev, DeviceID: in.DeviceID,
+	ev := Event{TS: at, Type: in.Type, Label: spec.Label, Category: spec.Category, Severity: sev, DeviceID: in.DeviceID,
 		PluginID: pluginID, RunID: in.RunID, Title: title, Message: in.Message, Payload: payload, DedupKey: in.DedupKey}
-	if n, ok := payload["device_name"].(string); ok {
+	return s.insert(ctx, &ev)
+}
+
+// insert stores an event and hands it to the bus, the rule engine and the delivery to a
+// central instance.
+func (s *Store) insert(ctx context.Context, ev *Event) (int64, error) {
+	pb, err := json.Marshal(ev.Payload)
+	if err != nil {
+		return 0, err
+	}
+	var dev, run, site any
+	if ev.DeviceID > 0 {
+		dev = ev.DeviceID
+	}
+	if ev.RunID > 0 {
+		run = ev.RunID
+	}
+	if ev.SiteID > 0 {
+		site = ev.SiteID
+	}
+	res, err := s.db.W.ExecContext(ctx, `INSERT INTO events(ts, type, category, severity, device_id, plugin_id, run_id, title, message, payload, dedup_key, site_id)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, ev.TS.UnixMilli(), ev.Type, ev.Category, string(ev.Severity), dev, ev.PluginID, run, ev.Title, ev.Message,
+		string(pb), ev.DedupKey, site)
+	if err != nil {
+		return 0, err
+	}
+	ev.ID, _ = res.LastInsertId()
+	if n, ok := ev.Payload["device_name"].(string); ok {
 		ev.DeviceName = n
 	}
 	if s.bus != nil {
-		s.bus.Publish(bus.TopicEvent, "created", ev)
+		s.bus.Publish(bus.TopicEvent, "created", *ev)
 	}
 	s.mu.RLock()
 	hs := append([]func(Event){}, s.handlers...)
+	fwd := s.forward
 	s.mu.RUnlock()
 	for _, h := range hs {
-		h(ev)
+		h(*ev)
 	}
-	return id, nil
+	if fwd != nil && ev.SiteID == 0 {
+		fwd(ctx, *ev)
+	}
+	return ev.ID, nil
+}
+
+// Imported is an event raised at a site.
+type Imported struct {
+	SiteID   int64
+	Site     string
+	DeviceID int64 // device here (0 = none or not known here)
+	At       time.Time
+	Type     string
+	Severity plugin.Severity
+	PluginID string
+	Title    string
+	Message  string
+	Payload  map[string]any
+	RemoteID int64 // event id at the site
+}
+
+// Import stores an event delivered by a site. The site has already deduplicated it; the
+// device fields of the payload are refreshed from the device here when it is known.
+func (s *Store) Import(ctx context.Context, in Imported) (int64, error) {
+	spec, ok := plugin.LookupEvent(in.Type)
+	if !ok {
+		return 0, fmt.Errorf("unbekannter Event-Typ %q", in.Type)
+	}
+	sev := in.Severity
+	if !sev.Valid() {
+		sev = spec.DefaultSeverity
+	}
+	payload := map[string]any{}
+	for k, v := range in.Payload {
+		payload[k] = v
+	}
+	if in.DeviceID > 0 && s.lookup != nil {
+		name, ip, mac, state, err := s.lookup.EventDevice(ctx, in.DeviceID)
+		switch {
+		case err == nil:
+			payload["device_name"], payload["device_ip"], payload["device_mac"], payload["device_state"] = name, ip, mac, state
+		case errors.Is(err, db.ErrNotFound):
+			in.DeviceID = 0
+		}
+	}
+	payload["site"] = in.Site
+	if in.RemoteID > 0 {
+		payload["site_event_id"] = in.RemoteID
+	}
+	at := in.At
+	if at.IsZero() {
+		at = time.Now()
+	}
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		title = spec.Label
+	}
+	ev := Event{TS: at, Type: in.Type, Label: spec.Label, Category: spec.Category, Severity: sev, DeviceID: in.DeviceID,
+		PluginID: in.PluginID, Title: title, Message: in.Message, Payload: payload, SiteID: in.SiteID, Site: in.Site}
+	return s.insert(ctx, &ev)
 }
 
 // Emitter adapts the store to plugin.EventEmitter for one plugin.
@@ -172,6 +262,8 @@ type Filter struct {
 	Limit       int
 	Offset      int
 	IDs         []int64
+	// Site restricts to the events of one site (0 = this instance, nil = all).
+	Site *int64
 }
 
 func (f Filter) where() (string, []any) {
@@ -234,6 +326,14 @@ func (f Filter) where() (string, []any) {
 		conds = append(conds, "e.id IN ("+db.Placeholders(len(f.IDs))+")")
 		args = append(args, db.Int64Args(f.IDs)...)
 	}
+	if f.Site != nil {
+		if *f.Site == 0 {
+			conds = append(conds, "e.site_id IS NULL")
+		} else {
+			conds = append(conds, "e.site_id = ?")
+			args = append(args, *f.Site)
+		}
+	}
 	if len(conds) == 0 {
 		return "1=1", nil
 	}
@@ -242,8 +342,9 @@ func (f Filter) where() (string, []any) {
 
 const selectEvent = `SELECT e.id, e.ts, e.type, e.category, e.severity, IFNULL(e.device_id, 0), e.plugin_id, IFNULL(e.run_id, 0), e.title,
 	e.message, e.payload, e.dedup_key, e.acked_at, e.acked_by, e.ack_note,
-	COALESCE(NULLIF(d.display_name, ''), NULLIF(d.hostname, ''), NULLIF(d.primary_ip, ''), json_extract(e.payload, '$.device_name'), '')
-	FROM events e LEFT JOIN devices d ON d.id = e.device_id`
+	COALESCE(NULLIF(d.display_name, ''), NULLIF(d.hostname, ''), NULLIF(d.primary_ip, ''), json_extract(e.payload, '$.device_name'), ''),
+	IFNULL(e.site_id, 0), IFNULL(st.name, '')
+	FROM events e LEFT JOIN devices d ON d.id = e.device_id LEFT JOIN sites st ON st.id = e.site_id`
 
 func scanEvent(rows *sql.Rows) (Event, error) {
 	var (
@@ -254,7 +355,7 @@ func scanEvent(rows *sql.Rows) (Event, error) {
 		sev     string
 	)
 	if err := rows.Scan(&e.ID, &ts, &e.Type, &e.Category, &sev, &e.DeviceID, &e.PluginID, &e.RunID, &e.Title, &e.Message,
-		&payload, &e.DedupKey, &acked, &e.AckedBy, &e.AckNote, &e.DeviceName); err != nil {
+		&payload, &e.DedupKey, &acked, &e.AckedBy, &e.AckNote, &e.DeviceName, &e.SiteID, &e.Site); err != nil {
 		return e, err
 	}
 	e.TS, e.Severity, e.AckedAt = db.Time(ts), plugin.Severity(sev), db.NullTime(acked)

@@ -621,7 +621,7 @@ func (g *ingest) resolveRef(r plugin.DeviceRef) (int64, error) {
 	case r.Ref != nil:
 		err = g.tx.QueryRowContext(g.ctx, "SELECT device_id FROM external_refs WHERE source = ? AND ref = ?", r.Ref.Source, r.Ref.ID).Scan(&id)
 	case r.IP != "":
-		id, _, err = ipOwner(g.ctx, g.tx, r.IP)
+		id, _, err = ipOwnerIn(g.ctx, g.tx, r.IP, g.devScope())
 	default:
 		return 0, nil
 	}
@@ -693,6 +693,12 @@ func (g *ingest) applyManual() error {
 	m := g.obs.Manual
 	if m == nil {
 		return nil
+	}
+	if g.site > 0 && m.Overwrite {
+		// imports of a site only fill empty fields: manual data here is curated here
+		c := *m
+		c.Overwrite = false
+		m = &c
 	}
 	var cur struct {
 		displayName, location, owner, notes, crit, state, custom string

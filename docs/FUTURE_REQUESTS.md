@@ -8,7 +8,8 @@ kann.
 
 ## FR-002: Mehrere NetScope-Instanzen bündeln (Zentrale und Standorte)
 
-**Status:** offen · erfasst am 24.09.2026
+**Status:** umgesetzt am 24.09.2026 · erfasst am 24.09.2026 – Bedienung im README
+(„Mehrere Standorte“), Technik in ARCHITECTURE („Verbund“)
 
 ### Anlass
 
@@ -99,6 +100,35 @@ dient dann als reiner Sammler.
 - Dasselbe Gerät von zwei Standorten gesehen (z. B. per Tunnel und lokal): Welcher Standort
   „besitzt“ es in der Zentrale?
 - Aufbewahrung: Gelten die Fristen der Zentrale auch für eingelieferte Daten?
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Offene Punkte entschieden:**
+  - Zentrale länger nicht erreichbar: Der Standort puffert (bis 250 000 Einträge, Events
+    bleiben immer erhalten) und liefert nach. Eine Ersatzzustellung gibt es nicht; wer sie
+    will, legt am Standort eigene Regeln an – der Standort arbeitet ohnehin eigenständig.
+  - Dasselbe Gerät von zwei Standorten: MAC und externe Referenz gelten global, also ein
+    Gerät; es gehört dem Standort, der es zuerst geliefert hat. Über die IP allein wird nie
+    standortübergreifend zugeordnet.
+  - Aufbewahrung: Es gelten die Fristen der Zentrale, auch für eingelieferte Daten.
+- **Anwesenheit:** Statt Lauf-Zusammenfassungen liefert der Standort die Ergebnisse seiner
+  Auswertung (Offline-Wechsel, IP-Wechsel). So gilt seine Einstellung „offline nach N
+  verpassten Läufen“, und die Zentrale muss seine Scan-Bereiche nicht kennen.
+- **Erstabgleich:** Beim ersten Kontakt und nach Lücken schickt der Standort seinen
+  vollständigen Bestand (Zustand je Quelle als Beobachtungen) und am Ende die Liste seiner
+  Geräte; Geräte, die er nicht mehr hat, entfernt die Zentrale.
+- **Identität:** Löschen, Zusammenführen und Aufteilen am Standort werden in der Zentrale
+  nachvollzogen. Nach einer Wiederherstellung am Standort ordnet die Zentrale alle Geräte
+  neu zu (die Geräte-IDs sind dann andere).
+- **Zusätzlich:** Events `site.down`/`site.up`, Standort-Kennzeichen in allen Publishern,
+  Topologie je Standort, Anbindung per Umgebungsvariablen, Fingerprint-Pinning für selbst
+  signierte Zertifikate der Zentrale.
+- **Nicht umgesetzt:** gemeinsame Anmeldung (Single Sign-on) für die Direktlinks. Sie würde
+  der Zentrale eine Sitzung am Standort geben und widerspricht damit der Festlegung, dass die
+  Zentrale am Standort nichts auslösen darf. Die Direktlinks öffnen den Standort mit seiner
+  eigenen Anmeldung.
+- Das manuelle Gerätefeld „Standort“ heißt jetzt „Aufstellort“, damit es nicht mit den
+  NetScope-Standorten verwechselt wird (CSV-Spalte „Standort“ wird weiter erkannt).
 
 ### Abnahme
 

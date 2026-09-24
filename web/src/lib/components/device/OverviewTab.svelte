@@ -341,7 +341,10 @@
 			{/if}
 		</Card>
 
-		<CredentialsCard deviceId={d.id} {version} {active} />
+		{#if !d.siteRef}
+			<!-- credentials of a site device live at the site -->
+			<CredentialsCard deviceId={d.id} {version} {active} />
+		{/if}
 
 		{#if d.refs?.length}
 			<Card title="Externe Referenzen" icon="external" padding="none">

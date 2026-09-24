@@ -82,6 +82,7 @@ func (s *Server) registerDevices() {
 	idp := []param{{Name: "history", Type: "boolean", Desc: "auch historische Einträge"}}
 	s.add(&route{Method: "GET", Path: "/api/v1/devices", Tag: "Geräte", Summary: "Geräteliste mit Filter-Query-Sprache", Scope: scopeRead,
 		Params: []param{{Name: "q", Desc: "Filter, z. B. tag:iot port:22 os:linux cve>=7 seen<24h"}, {Name: "sort", Desc: "Feld, - für absteigend"},
+			{Name: "site", Desc: "nur ein Standort (Zentrale): Kürzel, local = diese Instanz"},
 			{Name: "limit", Type: "integer"}, {Name: "offset", Type: "integer"}, {Name: "ports", Type: "boolean", Desc: "Portliste mitliefern"}},
 		Resp: deviceList{}, handler: s.handleDevices})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices", Tag: "Geräte", Summary: "Gerät manuell anlegen", Scope: scopeWrite,
@@ -141,7 +142,7 @@ func (s *Server) registerDevices() {
 func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	q := r.URL.Query()
-	res, err := s.Inventory.List(r.Context(), inventory.ListOptions{Query: q.Get("q"), Sort: q.Get("sort"), Limit: qInt(r, "limit", 0),
+	res, err := s.Inventory.List(r.Context(), inventory.ListOptions{Query: withSite(q.Get("q"), q.Get("site")), Sort: q.Get("sort"), Limit: qInt(r, "limit", 0),
 		Offset: qInt(r, "offset", 0), WithPorts: qBool(r, "ports")})
 	if err != nil {
 		s.fail(w, r, err)
@@ -296,6 +297,10 @@ func (s *Server) handleScanDevice(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	if err := s.siteDeviceError(r.Context(), id, "Scans"); err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	var req scanRequest
 	if err := decode(r, &req); err != nil {
 		s.fail(w, r, err)
@@ -336,6 +341,10 @@ func (s *Server) handleDeviceAction(w http.ResponseWriter, r *http.Request) {
 	}
 	var req actionRequest
 	if err := decode(r, &req); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if err := s.siteDeviceError(r.Context(), id, "Aktionen"); err != nil {
 		s.fail(w, r, err)
 		return
 	}

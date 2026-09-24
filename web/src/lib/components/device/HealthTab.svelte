@@ -20,7 +20,8 @@
 		deviceIp?: string;
 		version: number;
 		active: boolean;
-		oncreate: () => void;
+		/** missing for devices of a NetScope site: their checks run at the site */
+		oncreate?: () => void;
 	}
 
 	let { deviceId, deviceIp, version, active, oncreate }: Props = $props();
@@ -78,7 +79,9 @@
 	<div class="flex flex-wrap items-center gap-2">
 		<h2 class="flex-1 text-sm font-semibold">Health-Checks</h2>
 		<Button size="sm" href="/health" variant="ghost" iconRight="arrow-right">Statusboard</Button>
-		<Button size="sm" variant="primary" icon="plus" onclick={oncreate}>Health-Check anlegen</Button>
+		{#if oncreate}
+			<Button size="sm" variant="primary" icon="plus" onclick={oncreate}>Health-Check anlegen</Button>
+		{/if}
 	</div>
 
 	{#if data.error && !data.data}
@@ -90,10 +93,14 @@
 			<EmptyState
 				icon="activity"
 				title="Keine Health-Checks"
-				description="Überwacht Dienste dieses Geräts per TCP, HTTP, TLS oder Ping mit Verfügbarkeit und Ausfallhistorie."
+				description={oncreate
+					? 'Überwacht Dienste dieses Geräts per TCP, HTTP, TLS oder Ping mit Verfügbarkeit und Ausfallhistorie.'
+					: 'Health-Checks für Geräte eines Standorts werden am Standort angelegt; ihre Ausfälle kommen als Events hierher.'}
 			>
 				{#snippet actions()}
-					<Button variant="primary" icon="plus" onclick={oncreate}>Health-Check anlegen</Button>
+					{#if oncreate}
+						<Button variant="primary" icon="plus" onclick={oncreate}>Health-Check anlegen</Button>
+					{/if}
 				{/snippet}
 			</EmptyState>
 		</div>

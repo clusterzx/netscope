@@ -17,6 +17,7 @@
 		Button,
 		EmptyState,
 		ErrorState,
+		Icon,
 		Menu,
 		PageHeader,
 		RelativeTime,
@@ -207,7 +208,12 @@
 	let paramsAction = $state<DeviceAction | null>(null);
 	let actionBusy = $state(false);
 
-	const deviceActions = $derived(metaStore.value?.deviceActions ?? []);
+	/** the device comes from a NetScope site: scans and actions run there, not here */
+	const site = $derived(d?.siteRef);
+	const siteLink = $derived(
+		site?.url && site.remoteId ? `${site.url.replace(/\/$/, '')}/devices/${site.remoteId}` : site?.url || ''
+	);
+	const deviceActions = $derived(site ? [] : (metaStore.value?.deviceActions ?? []));
 	const wol = $derived(deviceActions.find((a) => a.plugin === 'wol'));
 
 	async function runAction(a: DeviceAction, params: Record<string, unknown> = {}) {
@@ -246,8 +252,9 @@
 	async function remove() {
 		const ok = await confirm({
 			title: `„${title}“ löschen?`,
-			message:
-				'Alle Daten des Geräts (Ports, Zertifikate, Pakete, Historie …) werden gelöscht. Events bleiben erhalten. Ist das Gerät weiter im Netz aktiv, legt der nächste Scan es neu an.',
+			message: site
+				? `Das Gerät wird nur in dieser Zentrale gelöscht. Solange der Standort ${site.name} es kennt, liefert er es mit der nächsten Beobachtung erneut.`
+				: 'Alle Daten des Geräts (Ports, Zertifikate, Pakete, Historie …) werden gelöscht. Events bleiben erhalten. Ist das Gerät weiter im Netz aktiv, legt der nächste Scan es neu an.',
 			confirmLabel: 'Löschen',
 			danger: true
 		});
@@ -277,7 +284,9 @@
 				]
 			: []),
 		{ separator: true, label: 'Gerät' },
-		{ label: 'Health-Check anlegen …', icon: 'activity', onclick: () => (healthOpen = true) },
+		...(site
+			? []
+			: [{ label: 'Health-Check anlegen …', icon: 'activity' as const, onclick: () => (healthOpen = true) }]),
 		{ label: 'Notiz bearbeiten', icon: 'note', onclick: editNotes },
 		{
 			label: 'MAC-Adressen abspalten …',
@@ -341,6 +350,9 @@
 			<Badge tone={criticalityTone(d.criticality)} title="Kritikalität">
 				Kritikalität: {criticalityLabel[d.criticality] ?? d.criticality}
 			</Badge>
+			{#if site}<Badge tone="accent" title="Geliefert vom NetScope-Standort {site.name}"
+					>Standort {site.name}</Badge
+				>{/if}
 			{#if d.type}<Badge variant="outline" title="Gerätetyp">{deviceTypeName(d.type)}</Badge>{/if}
 			{#if d.healthState}
 				<Badge tone={healthTone(d.healthState)} dot title="Health-Checks">
@@ -381,7 +393,17 @@
 					<Button icon="edit" label="Manuelle Daten bearbeiten" onclick={() => (editOpen = true)}
 						><span class="hidden sm:inline">Bearbeiten</span></Button
 					>
-					<Button variant="primary" icon="radar" onclick={() => (scanOpen = true)}>Scan jetzt</Button>
+					{#if !site}
+						<Button variant="primary" icon="radar" onclick={() => (scanOpen = true)}>Scan jetzt</Button>
+					{:else if siteLink}
+						<a
+							href={siteLink}
+							target="_blank"
+							rel="noopener"
+							class="inline-flex h-8.5 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-accent-fg shadow-sm hover:bg-accent-hover"
+							><Icon name="external" size={16} />Am Standort öffnen</a
+						>
+					{/if}
 					<Menu
 						label="Weitere Aktionen"
 						icon="more-vertical"
@@ -406,6 +428,13 @@
 			{#snippet actions()}
 				<Button size="sm" href="/devices">Zur Geräteliste</Button>
 			{/snippet}
+		</Alert>
+	{/if}
+
+	{#if site && !gone}
+		<Alert tone="info" class="mb-4">
+			Dieses Gerät liefert der Standort <strong>{site.name}</strong>. Scans, Aktionen und Health-Checks laufen
+			dort; hier gepflegte Angaben (Name, Tags, Notizen …) gelten nur für die Zentrale.
 		</Alert>
 	{/if}
 
@@ -447,7 +476,7 @@
 							deviceIp={d.ip}
 							{version}
 							active={tab === 'health'}
-							oncreate={() => (healthOpen = true)}
+							oncreate={site ? undefined : () => (healthOpen = true)}
 						/>
 					{:else if t.id === 'history'}
 						<HistoryTab deviceId={id} {version} active={tab === 'history'} />

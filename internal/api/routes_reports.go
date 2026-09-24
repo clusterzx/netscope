@@ -9,6 +9,7 @@ import (
 
 	"netscope/internal/db"
 	"netscope/internal/events"
+	"netscope/internal/federation"
 	"netscope/internal/inventory"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
@@ -56,7 +57,9 @@ type dashboard struct {
 	Certificates    []inventory.CertView  `json:"certificates"`
 	ActiveRuns      []*pluginhost.RunView `json:"activeRuns"`
 	Subnets         []inventory.Subnet    `json:"subnets"`
-	GeneratedAt     time.Time             `json:"generatedAt"`
+	// Sites are the connected NetScope sites (central instance).
+	Sites       []federation.Site `json:"sites"`
+	GeneratedAt time.Time         `json:"generatedAt"`
 }
 
 type topCVE struct {
@@ -67,7 +70,8 @@ type topCVE struct {
 
 func (s *Server) registerReports() {
 	s.add(&route{Method: "GET", Path: "/api/v1/reports/inventory", Tag: "Reports", Summary: "Inventar-Export (csv, json, pdf)", Scope: scopeRead,
-		Params: []param{{Name: "format", Desc: "csv | json | pdf"}, {Name: "q", Desc: "Geräte-Filter"}}, Content: "application/octet-stream",
+		Params:  []param{{Name: "format", Desc: "csv | json | pdf"}, {Name: "q", Desc: "Geräte-Filter"}, {Name: "site", Desc: "nur ein Standort (Zentrale)"}},
+		Content: "application/octet-stream",
 		handler: s.handleInventoryReport})
 	s.add(&route{Method: "GET", Path: "/api/v1/reports/changes", Tag: "Reports", Summary: "Änderungsbericht für einen Zeitraum (json, md, pdf)",
 		Scope: scopeRead, Params: []param{{Name: "from"}, {Name: "to"}, {Name: "format", Desc: "json | md | pdf"}},
@@ -78,7 +82,7 @@ func (s *Server) registerReports() {
 
 func (s *Server) registerDashboard() {
 	s.add(&route{Method: "GET", Path: "/api/v1/dashboard", Tag: "Dashboard", Summary: "Kennzahlen für das Dashboard", Scope: scopeRead,
-		Resp: dashboard{}, handler: s.handleDashboard})
+		Params: []param{{Name: "site", Desc: "Geräte, Events und CVEs nur eines Standorts (Zentrale)"}}, Resp: dashboard{}, handler: s.handleDashboard})
 }
 
 func (s *Server) handleInventoryReport(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +90,7 @@ func (s *Server) handleInventoryReport(w http.ResponseWriter, r *http.Request) {
 	if format == "" {
 		format = "csv"
 	}
-	devs, err := reports.Inventory(r.Context(), s.Inventory, r.URL.Query().Get("q"))
+	devs, err := reports.Inventory(r.Context(), s.Inventory, withSite(r.URL.Query().Get("q"), r.URL.Query().Get("site")))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -241,21 +245,35 @@ func (s *Server) handleSendReport(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	d := dashboard{GeneratedAt: time.Now(), CVEs: map[string]int{"critical": 0, "high": 0, "medium": 0, "low": 0}, TopCVEs: []topCVE{}}
+	d := dashboard{GeneratedAt: time.Now(), CVEs: map[string]int{"critical": 0, "high": 0, "medium": 0, "low": 0}, TopCVEs: []topCVE{},
+		Sites: []federation.Site{}}
+	site, err := s.siteFilter(ctx, r.URL.Query().Get("site"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	devWhere, devArgs := "1=1", []any{}
+	if site != nil {
+		if *site == 0 {
+			devWhere = "site_id IS NULL"
+		} else {
+			devWhere, devArgs = "site_id = ?", []any{*site}
+		}
+	}
 	if err := s.DB.R.QueryRowContext(ctx, `SELECT COUNT(*), IFNULL(SUM(online = 1 AND state <> 'ignored'), 0),
 		IFNULL(SUM(online = 0 AND state <> 'ignored'), 0), IFNULL(SUM(first_seen >= ? AND state <> 'ignored'), 0),
-		IFNULL(SUM(state = 'unknown'), 0), IFNULL(SUM(state = 'ignored'), 0) FROM devices`, time.Now().Add(-24*time.Hour).UnixMilli()).
+		IFNULL(SUM(state = 'unknown'), 0), IFNULL(SUM(state = 'ignored'), 0) FROM devices WHERE `+devWhere,
+		append([]any{time.Now().Add(-24 * time.Hour).UnixMilli()}, devArgs...)...).
 		Scan(&d.Devices.Total, &d.Devices.Online, &d.Devices.Offline, &d.Devices.New24h, &d.Devices.Unknown, &d.Devices.Ignored); err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	var err error
 	if d.OpenEvents, err = s.Events.OpenCounts(ctx); err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	no := false
-	if d.CriticalEvents, _, err = s.Events.List(ctx, events.Filter{MinSeverity: plugin.SevHigh, Acked: &no, Limit: 10}); err != nil {
+	if d.CriticalEvents, _, err = s.Events.List(ctx, events.Filter{MinSeverity: plugin.SevHigh, Acked: &no, Limit: 10, Site: site}); err != nil {
 		s.fail(w, r, err)
 		return
 	}
@@ -298,7 +316,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := s.DB.R.QueryContext(ctx, `SELECT c.cve_id, MAX(IFNULL(c.cvss_score, 0)), COUNT(DISTINCT c.device_id) FROM device_cves c
 		WHERE c.gone_at IS NULL AND NOT EXISTS (SELECT 1 FROM cve_ignores i WHERE i.device_id = c.device_id AND i.cve_id = c.cve_id)
-		GROUP BY c.cve_id ORDER BY 2 DESC, 3 DESC`)
+		AND c.device_id IN (SELECT id FROM devices WHERE `+devWhere+`)
+		GROUP BY c.cve_id ORDER BY 2 DESC, 3 DESC`, devArgs...)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -332,6 +351,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if d.Subnets, err = s.Inventory.ListSubnets(ctx); err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	if s.Federation != nil && s.Federation.Role() == federation.RoleCentral {
+		if d.Sites, err = s.Federation.Sites(ctx); err != nil {
+			s.fail(w, r, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, d)
 }

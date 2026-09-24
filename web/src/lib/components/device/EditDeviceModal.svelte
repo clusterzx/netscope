@@ -240,7 +240,7 @@
 
 		<fieldset class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 			<legend class="mb-2 text-xs font-semibold tracking-wider text-fg-subtle uppercase">Einordnung</legend>
-			<Input label="Standort" bind:value={location} maxlength={200} placeholder="z. B. Keller, Rack 1" />
+			<Input label="Aufstellort" bind:value={location} maxlength={200} placeholder="z. B. Keller, Rack 1" />
 			<Input label="Besitzer" bind:value={owner} maxlength={200} />
 			<Select
 				label="Kritikalität"

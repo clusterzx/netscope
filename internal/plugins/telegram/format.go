@@ -312,6 +312,9 @@ func deviceLine(e plugin.EventView) string {
 			parts = append(parts, escape(ip))
 		}
 	}
+	if site := clip(oneLine(e.Site), maxNameRunes); site != "" {
+		parts = append(parts, escape("Standort "+site))
+	}
 	return strings.Join(parts, " · ")
 }
 

@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -235,6 +236,26 @@ func (v *Vault) Decrypt(blob []byte) ([]byte, error) {
 	return decryptWith(v.key, blob)
 }
 
+// SealString encrypts a secret for a setting "<name>.secret" (base64 text, re-encrypted
+// by Rotate).
+func (v *Vault) SealString(plain string) (string, error) {
+	blob, err := v.Encrypt([]byte(plain))
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(blob), nil
+}
+
+// OpenString decrypts a value produced by SealString.
+func (v *Vault) OpenString(sealed string) (string, error) {
+	blob, err := base64.StdEncoding.DecodeString(sealed)
+	if err != nil {
+		return "", err
+	}
+	p, err := v.Decrypt(blob)
+	return string(p), err
+}
+
 // Rotate re-encrypts every secret with newKey in one transaction. With a file-based key
 // the new key is written to <file>.new before the transaction and moved into place
 // afterwards, so a crash in between is recovered by Open. With an env-based key the
@@ -305,6 +326,30 @@ func (v *Vault) Rotate(ctx context.Context, newKey Key) error {
 				return fmt.Errorf("plugin %v: %w", r.id, err)
 			}
 			if _, err := tx.ExecContext(ctx, "UPDATE plugin_configs SET secrets = ?, secrets_key_id = ? WHERE plugin_id = ?", nb, newKey.ID(), r.id); err != nil {
+				return err
+			}
+		}
+		// settings "<name>.secret" hold a JSON string with a base64 blob (e.g. the token a
+		// site uses at its central instance)
+		sets, err := load("SELECT key, value FROM settings WHERE key LIKE '%.secret'")
+		if err != nil {
+			return err
+		}
+		for _, r := range sets {
+			var enc string
+			if err := json.Unmarshal(r.blob, &enc); err != nil || enc == "" {
+				continue
+			}
+			blob, err := base64.StdEncoding.DecodeString(enc)
+			if err != nil {
+				return fmt.Errorf("setting %v: %w", r.id, err)
+			}
+			nb, err := reencrypt(blob)
+			if err != nil {
+				return fmt.Errorf("setting %v: %w", r.id, err)
+			}
+			val, _ := json.Marshal(base64.StdEncoding.EncodeToString(nb))
+			if _, err := tx.ExecContext(ctx, "UPDATE settings SET value = ?, updated_at = ? WHERE key = ?", string(val), db.Now(), r.id); err != nil {
 				return err
 			}
 		}

@@ -25,6 +25,7 @@
 		Toggle
 	} from '$lib/components/ui';
 	import { groups, subnets, tags, eventTypes } from '$lib/stores/catalog.svelte';
+	import { federation } from '$lib/stores/federation.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { SEVERITIES } from '$lib/api';
@@ -125,6 +126,11 @@
 	const typesForPayload = $derived(matchedTypes(draft.conditions.eventTypes ?? [], eventTypes.value ?? []));
 
 	// ---------------------------------------------------------------- condition helpers
+	let siteIds = $state<string[]>(untrack(() => (draft.conditions.sites ?? []).map(String)));
+	const siteOptions = $derived([
+		{ value: '0', label: federation.localName, description: 'Events dieser Zentrale' },
+		...federation.sites.map((s) => ({ value: String(s.id), label: s.name, description: 'NetScope-Standort' }))
+	]);
 	let groupIds = $state<string[]>(untrack(() => (draft.conditions.groups ?? []).map(String)));
 	const groupOptions = $derived(
 		(groups.value ?? []).map((g) => ({
@@ -223,6 +229,7 @@
 	function discard() {
 		draft = initial();
 		groupIds = (draft.conditions.groups ?? []).map(String);
+		siteIds = (draft.conditions.sites ?? []).map(String);
 		baseline = JSON.stringify(rulePayload(draft));
 		serverErrors = {};
 		formError = '';
@@ -337,6 +344,19 @@
 						error={err('conditions.minSeverity')}
 					/>
 				</div>
+
+				{#if federation.role === 'central' && (federation.sites.length || siteIds.length)}
+					<MultiSelect
+						id="rule-sites"
+						label="Standorte (einer davon)"
+						options={siteOptions}
+						bind:value={siteIds}
+						onchange={(v) => (draft.conditions.sites = v.length ? v.map(Number) : undefined)}
+						placeholder="alle Standorte"
+						hint="Events der Standorte kommen mit ihrem Gerät hierher; leer = Events von überall."
+						error={err('conditions.sites')}
+					/>
+				{/if}
 
 				<fieldset class="flex flex-col gap-3">
 					<legend class="mb-1 text-sm font-semibold text-fg">Gerät</legend>

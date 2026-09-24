@@ -65,6 +65,7 @@ var columnAliases = map[string]string{
 	"betriebssystem": colOS,
 	"location":       colLocation,
 	"standort":       colLocation,
+	"aufstellort":    colLocation,
 	"ort":            colLocation,
 	"raum":           colLocation,
 	"owner":          colOwner,

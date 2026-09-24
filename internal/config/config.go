@@ -26,6 +26,8 @@ type Config struct {
 	// itself) takes precedence. The file is generated on first start if missing.
 	MasterKeyFile  string   `yaml:"master_key_file"`
 	TrustedProxies []string `yaml:"trusted_proxies"`
+	// UI serves the web interface; false leaves only the API (a site that just collects).
+	UI bool `yaml:"ui"`
 
 	// Derived / env-only values (not written to the file).
 	MasterKey     string         `yaml:"-"` // from NETSCOPE_MASTER_KEY
@@ -33,6 +35,11 @@ type Config struct {
 	Path          string         `yaml:"-"`
 	Proxies       []netip.Prefix `yaml:"-"`
 	Location      *time.Location `yaml:"-"`
+	// Central instance of a site, from NETSCOPE_CENTRAL_URL, NETSCOPE_CENTRAL_TOKEN and
+	// NETSCOPE_CENTRAL_FINGERPRINT. When set, the site settings cannot be changed in the UI.
+	CentralURL         string `yaml:"-"`
+	CentralToken       string `yaml:"-"`
+	CentralFingerprint string `yaml:"-"`
 }
 
 // Default returns the default configuration.
@@ -46,6 +53,7 @@ func Default() Config {
 		MasterKeyFile: "",
 		TrustedProxies: []string{"127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12",
 			"192.168.0.0/16", "fc00::/7"},
+		UI: true,
 	}
 }
 
@@ -115,6 +123,12 @@ func applyEnv(cfg *Config) {
 	str("NETSCOPE_MASTER_KEY_FILE", &cfg.MasterKeyFile)
 	str("NETSCOPE_MASTER_KEY", &cfg.MasterKey)
 	str("NETSCOPE_ADMIN_PASSWORD", &cfg.AdminPassword)
+	str("NETSCOPE_CENTRAL_URL", &cfg.CentralURL)
+	str("NETSCOPE_CENTRAL_TOKEN", &cfg.CentralToken)
+	str("NETSCOPE_CENTRAL_FINGERPRINT", &cfg.CentralFingerprint)
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("NETSCOPE_UI"))); v != "" {
+		cfg.UI = v != "false" && v != "0" && v != "no" && v != "off"
+	}
 	if v := os.Getenv("NETSCOPE_TRUSTED_PROXIES"); v != "" {
 		cfg.TrustedProxies = splitList(v)
 	}
@@ -139,6 +153,9 @@ func (c *Config) finish() error {
 	}
 	if c.MasterKeyFile == "" {
 		c.MasterKeyFile = filepath.Join(c.DataDir, "master.key")
+	}
+	if (c.CentralURL == "") != (c.CentralToken == "") {
+		return errors.New("NETSCOPE_CENTRAL_URL und NETSCOPE_CENTRAL_TOKEN nur gemeinsam setzen")
 	}
 	if _, err := ParseLevel(c.LogLevel); err != nil {
 		return err

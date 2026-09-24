@@ -446,6 +446,9 @@ func eventTable(events []plugin.EventView, loc *time.Location) string {
 		if e.DeviceIP != "" && e.DeviceIP != name {
 			b.WriteString(`<div style="font-family:` + mMono + `;font-size:12px;color:` + mSubtle + `;">` + esc(e.DeviceIP) + "</div>")
 		}
+		if e.Site != "" {
+			b.WriteString(`<div style="font-size:12px;color:` + mSubtle + `;">Standort ` + esc(e.Site) + "</div>")
+		}
 		b.WriteString("</td>")
 		at := ""
 		if !e.At.IsZero() {

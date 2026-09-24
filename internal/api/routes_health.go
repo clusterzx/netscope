@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"netscope/internal/inventory"
@@ -56,7 +57,8 @@ func (s *Server) registerHealth() {
 
 func (s *Server) registerTopology() {
 	s.add(&route{Method: "GET", Path: "/api/v1/topology", Tag: "Topologie", Summary: "Topologie-Graph (Knoten und Kanten)", Scope: scopeRead,
-		Params: []param{{Name: "subnet"}, {Name: "tag"}, {Name: "q", Desc: "Geräte-Filter"}, {Name: "containers", Type: "boolean"},
+		Params: []param{{Name: "subnet"}, {Name: "tag"}, {Name: "q", Desc: "Geräte-Filter"}, {Name: "site", Desc: "nur ein Standort (Zentrale)"},
+			{Name: "containers", Type: "boolean"},
 			{Name: "ignored", Type: "boolean"}}, Resp: inventory.Graph{}, handler: s.handleTopology})
 	s.add(&route{Method: "GET", Path: "/api/v1/topology/edges", Tag: "Topologie", Summary: "Manuelle Kanten", Scope: scopeRead,
 		Resp: []inventory.Relation{}, handler: s.handleManualEdges})
@@ -145,6 +147,13 @@ func (s *Server) handleSaveCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	c.ID = id
+	if c.DeviceID > 0 && strings.TrimSpace(c.Target) == "" {
+		// the check would run from here against an address of the site's network
+		if err := s.siteDeviceError(r.Context(), c.DeviceID, "Health-Checks"); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+	}
 	if err := healthcheck.SaveCheck(r.Context(), s.DB, &c); err != nil {
 		s.fail(w, r, err)
 		return
@@ -256,7 +265,7 @@ func (s *Server) handleCheckLatency(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	g, err := s.Inventory.Graph(r.Context(), inventory.GraphFilter{Subnet: q.Get("subnet"), Tag: q.Get("tag"), Query: q.Get("q"),
+	g, err := s.Inventory.Graph(r.Context(), inventory.GraphFilter{Subnet: q.Get("subnet"), Tag: q.Get("tag"), Query: withSite(q.Get("q"), q.Get("site")),
 		IncludeContainers: qBool(r, "containers"), IncludeIgnored: qBool(r, "ignored")})
 	s.respond(w, r, g, err)
 }

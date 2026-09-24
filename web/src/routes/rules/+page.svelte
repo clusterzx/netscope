@@ -21,6 +21,7 @@
 	import { actionSummary, conditionSummary } from '$lib/components/rules/rule';
 	import { eventTypes, groups } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
+	import { federation } from '$lib/stores/federation.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { setParams } from '$lib/utils/url';
@@ -46,6 +47,8 @@
 	const pubs = $derived(publishers.value ?? []);
 	const catalog = $derived(eventTypes.value ?? []);
 	const groupName = (id: number) => groups.value?.find((g) => g.id === id)?.name ?? `#${id}`;
+	const siteName = (id: number) =>
+		id === 0 ? federation.localName : (federation.site(id)?.name ?? `#${id}`);
 	const anyPublisher = $derived(pubs.some((p) => p.enabled));
 
 	// ---------------------------------------------------------------- enable
@@ -278,7 +281,9 @@
 							{#if r.description}<p class="text-sm text-fg-muted">{r.description}</p>{/if}
 							<dl class="grid grid-cols-[3.5rem_1fr] gap-x-2 gap-y-0.5 text-sm">
 								<dt class="text-fg-subtle">Wenn</dt>
-								<dd class="min-w-0">{conditionSummary(r.conditions, catalog, groupName).join(' · ')}</dd>
+								<dd class="min-w-0">
+									{conditionSummary(r.conditions, catalog, groupName, siteName).join(' · ')}
+								</dd>
 								<dt class="text-fg-subtle">Dann</dt>
 								<dd class="min-w-0">
 									{#each r.actions ?? [] as a, ai (ai)}

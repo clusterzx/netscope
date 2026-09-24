@@ -117,12 +117,18 @@ export function publisherName(id: string, publishers: PublisherInfo[]): string {
 export function conditionSummary(
 	c: RuleConditions,
 	catalog: EventSpec[],
-	groupName?: (id: number) => string
+	groupName?: (id: number) => string,
+	siteName?: (id: number) => string
 ): string[] {
 	const parts: string[] = [];
 	const types = c.eventTypes ?? [];
 	parts.push(types.length ? types.map((t) => eventTypeName(t, catalog)).join(' oder ') : 'jedes Event');
 	if (c.minSeverity) parts.push(`ab Schweregrad ${severityLabel[c.minSeverity] ?? c.minSeverity}`);
+	if (c.sites?.length)
+		parts.push(
+			(c.sites.length === 1 ? 'Standort ' : 'Standorte ') +
+				c.sites.map((s) => siteName?.(s) ?? (s === 0 ? 'diese Instanz' : `#${s}`)).join(', ')
+		);
 	if (c.onlyUnknown) parts.push('nur nicht bekannte Geräte');
 	if (c.deviceStates?.length)
 		parts.push('Gerätezustand ' + c.deviceStates.map((s) => stateLabel[s] ?? s).join('/'));

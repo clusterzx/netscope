@@ -64,7 +64,7 @@
 			hint={d.type ? hint('type') : undefined}
 		/>
 		<DescItem label="Betriebssystem" value={d.os} hint={d.os ? hint('os') : undefined} />
-		<DescItem label="Standort" value={d.location} />
+		<DescItem label="Aufstellort" value={d.location} />
 		<DescItem label="Besitzer" value={d.owner} />
 		<DescItem label="Eltern-Gerät">
 			{#if d.parentId}

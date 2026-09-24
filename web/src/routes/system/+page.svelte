@@ -4,6 +4,7 @@
 	import AuditTab from '$lib/components/system/AuditTab.svelte';
 	import BackupsTab from '$lib/components/system/BackupsTab.svelte';
 	import CustomFieldsTab from '$lib/components/system/CustomFieldsTab.svelte';
+	import FederationTab from '$lib/components/system/FederationTab.svelte';
 	import GroupsTab from '$lib/components/system/GroupsTab.svelte';
 	import LogsTab from '$lib/components/system/LogsTab.svelte';
 	import OverviewTab from '$lib/components/system/OverviewTab.svelte';
@@ -70,6 +71,8 @@
 				<OverviewTab />
 			{:else if tab.id === 'settings'}
 				<SettingsTab />
+			{:else if tab.id === 'federation'}
+				<FederationTab />
 			{:else if tab.id === 'account'}
 				<AccountTab />
 			{:else if tab.id === 'tokens'}

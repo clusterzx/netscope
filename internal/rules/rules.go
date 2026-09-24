@@ -45,6 +45,9 @@ type Conditions struct {
 	DeviceStates []string      `json:"deviceStates,omitempty"`
 	Payload      []PayloadCond `json:"payload,omitempty"`
 	TimeWindow   *TimeWindow   `json:"timeWindow,omitempty"`
+	// Sites limits the rule to events of these NetScope sites (central instance);
+	// 0 is this instance.
+	Sites []int64 `json:"sites,omitempty"`
 }
 
 // QuietHours delay or drop notifications in a time range.
@@ -147,6 +150,11 @@ func (r *Rule) Validate(publisherExists func(string) bool) error {
 			continue
 		}
 		c.Subnets[i] = p.String()
+	}
+	for _, id := range c.Sites {
+		if id < 0 {
+			add("conditions.sites", "ungültiger Standort %d", id)
+		}
 	}
 	for _, st := range c.DeviceStates {
 		if st != "known" && st != "unknown" && st != "ignored" {
@@ -515,6 +523,21 @@ type EventInput struct {
 	Payload  map[string]any
 	At       time.Time
 	DedupKey string
+	SiteID   int64 // 0 = this instance
+}
+
+// matchSites reports whether the event comes from one of the rule's sites (0 = this
+// instance); applies is false when the rule has no site condition.
+func (e *Engine) matchSites(c Conditions, ev EventInput) (ok, applies bool) {
+	if len(c.Sites) == 0 {
+		return true, false
+	}
+	for _, id := range c.Sites {
+		if id == ev.SiteID {
+			return true, true
+		}
+	}
+	return false, true
 }
 
 // match evaluates the conditions; it returns all condition results (for explanations).
@@ -539,6 +562,13 @@ func (e *Engine) match(ctx context.Context, c Conditions, ev EventInput, dev *De
 	if c.MinSeverity != "" {
 		ok := ev.Severity.Rank() >= plugin.Severity(c.MinSeverity).Rank()
 		add("Schweregrad", ok, fmt.Sprintf("%s ≥ %s", ev.Severity, c.MinSeverity))
+	}
+	if ok, applies := e.matchSites(c, ev); applies {
+		names := make([]string, 0, len(c.Sites))
+		for _, id := range c.Sites {
+			names = append(names, e.siteName(ctx, id))
+		}
+		add("Standort", ok, fmt.Sprintf("%s in [%s]", e.siteName(ctx, ev.SiteID), strings.Join(names, ", ")))
 	}
 	needsDevice := len(c.Tags) > 0 || len(c.Groups) > 0 || len(c.Subnets) > 0 || c.DeviceQuery != "" || c.OnlyUnknown || len(c.DeviceStates) > 0
 	if needsDevice && dev == nil {

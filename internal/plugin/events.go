@@ -128,6 +128,8 @@ const (
 	EvNVDSyncFailed         = "nvd.sync_failed"
 	EvTunnelDown            = "tunnel.down"
 	EvTunnelUp              = "tunnel.up"
+	EvSiteDown              = "site.down"
+	EvSiteUp                = "site.up"
 )
 
 var deviceFields = []PayloadField{
@@ -196,6 +198,10 @@ var catalog = []EventSpec{
 		[]PayloadField{{"tunnel", "string", "Name des Tunnels"}, {"credential_id", "number", "Credential des Tunnels"}, {"subnets", "list", "Subnetze hinter dem Tunnel"}, {"endpoint", "string", "Gegenstelle"}, {"error", "string", "Fehler (leer = keine Antwort der Gegenstelle)"}}},
 	{EvTunnelUp, "system", "Tunnel wieder verbunden", "Ein getrennter WireGuard-Tunnel steht wieder.", SevInfo, "core",
 		[]PayloadField{{"tunnel", "string", "Name des Tunnels"}, {"credential_id", "number", "Credential des Tunnels"}, {"subnets", "list", "Subnetze hinter dem Tunnel"}, {"down_seconds", "number", "Dauer der Unterbrechung"}}},
+	{EvSiteDown, "system", "Standort meldet sich nicht", "Ein NetScope-Standort hat sich mehrere Minuten nicht bei der Zentrale gemeldet (Netz, Dienst oder Token). Er puffert seine Daten und liefert sie nach.", SevHigh, "core",
+		[]PayloadField{{"site", "string", "Name des Standorts"}, {"site_id", "number", "Standort"}, {"last_contact", "string", "Letzte Meldung (RFC3339)"}}},
+	{EvSiteUp, "system", "Standort meldet sich wieder", "Ein NetScope-Standort liefert wieder an die Zentrale.", SevInfo, "core",
+		[]PayloadField{{"site", "string", "Name des Standorts"}, {"site_id", "number", "Standort"}, {"down_seconds", "number", "Dauer ohne Meldung"}}},
 }
 
 // Catalog returns the event type catalog sorted by category and type.

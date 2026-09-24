@@ -152,7 +152,19 @@ func (e *Engine) device(ctx context.Context, id int64) (*DeviceContext, error) {
 
 func toInput(ev events.Event) EventInput {
 	return EventInput{ID: ev.ID, Type: ev.Type, Severity: ev.Severity, DeviceID: ev.DeviceID, RunID: ev.RunID, Title: ev.Title,
-		Message: ev.Message, Payload: ev.Payload, At: ev.TS, DedupKey: ev.DedupKey}
+		Message: ev.Message, Payload: ev.Payload, At: ev.TS, DedupKey: ev.DedupKey, SiteID: ev.SiteID}
+}
+
+// siteName names a site for explanations (0 = this instance).
+func (e *Engine) siteName(ctx context.Context, id int64) string {
+	if id == 0 {
+		return "diese Instanz"
+	}
+	var name string
+	if err := e.db.R.QueryRowContext(ctx, "SELECT name FROM sites WHERE id = ?", id).Scan(&name); err != nil {
+		return fmt.Sprintf("Standort %d", id)
+	}
+	return name
 }
 
 // Evaluate matches one stored event against all enabled rules and plans notifications.
@@ -435,7 +447,7 @@ func (e *Engine) BuildNotification(ctx context.Context, id int64, kind, priority
 		link, devLink := eventLinks(base, ev)
 		v := plugin.EventView{ID: ev.ID, Type: ev.Type, Label: ev.Label, Category: ev.Category, Severity: ev.Severity, Title: ev.Title,
 			Message: ev.Message, At: ev.TS, DeviceID: ev.DeviceID, DeviceName: ev.DeviceName, Link: link, DeviceLink: devLink,
-			Payload: ev.Payload, Escalated: kind == plugin.NotifyEscalation, Acknowledged: ev.AckedAt != nil}
+			Payload: ev.Payload, Site: ev.Site, Escalated: kind == plugin.NotifyEscalation, Acknowledged: ev.AckedAt != nil}
 		if ip, ok := ev.Payload["device_ip"].(string); ok {
 			v.DeviceIP = ip
 		}
@@ -607,6 +619,8 @@ type SimInput struct {
 	Message  string         `json:"message,omitempty"`
 	Payload  map[string]any `json:"payload,omitempty"`
 	Deliver  bool           `json:"deliver,omitempty"` // actually send a test message
+	// SiteID simulates an event of a site (central instance); a device of a site sets it.
+	SiteID int64 `json:"siteId,omitempty"`
 }
 
 // SimResult explains the outcome of a simulation.
@@ -641,7 +655,16 @@ func (e *Engine) Simulate(ctx context.Context, r *Rule, in SimInput) (*SimResult
 		payload[k] = v
 	}
 	ev := events.Event{Type: in.Type, Label: spec.Label, Category: spec.Category, Severity: sev, DeviceID: in.DeviceID, PluginID: "simulation",
-		Title: in.Title, Message: in.Message, Payload: payload, TS: e.nowFn()}
+		Title: in.Title, Message: in.Message, Payload: payload, TS: e.nowFn(), SiteID: in.SiteID}
+	if in.DeviceID > 0 {
+		var site sql.NullInt64
+		if err := e.db.R.QueryRowContext(ctx, "SELECT site_id FROM devices WHERE id = ?", in.DeviceID).Scan(&site); err == nil && site.Valid {
+			ev.SiteID = site.Int64
+		}
+	}
+	if ev.SiteID > 0 {
+		ev.Site = e.siteName(ctx, ev.SiteID)
+	}
 	if ev.Title == "" {
 		ev.Title = spec.Label + " (Simulation)"
 	}

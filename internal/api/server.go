@@ -23,6 +23,7 @@ import (
 	"netscope/internal/config"
 	"netscope/internal/db"
 	"netscope/internal/events"
+	"netscope/internal/federation"
 	"netscope/internal/inventory"
 	"netscope/internal/logging"
 	"netscope/internal/plugin"
@@ -49,9 +50,11 @@ type Deps struct {
 	Rules     *rules.Engine
 	Host      *pluginhost.Host
 	Tunnels   *tunnel.Manager // nil in tests without tunnels
-	Audit     *audit.Log
-	Version   string
-	StartedAt time.Time
+	// Federation joins this instance with a central instance or sites (nil in tests).
+	Federation *federation.Service
+	Audit      *audit.Log
+	Version    string
+	StartedAt  time.Time
 	// Restore is called with the path of a validated database file; the application
 	// swaps the database and restarts its services.
 	Restore func(path string)
@@ -104,6 +107,7 @@ func New(d Deps) *Server {
 	s.registerDevices()
 	s.registerMeta()
 	s.registerTunnels()
+	s.registerFederation()
 	s.registerPlugins()
 	s.registerEvents()
 	s.registerRules()

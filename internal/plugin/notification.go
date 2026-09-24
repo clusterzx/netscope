@@ -39,23 +39,25 @@ const (
 
 // EventView is an event prepared for publishers.
 type EventView struct {
-	ID           int64          `json:"id"`
-	Type         string         `json:"type"`
-	Label        string         `json:"label"`
-	Category     string         `json:"category"`
-	Severity     Severity       `json:"severity"`
-	Title        string         `json:"title"`
-	Message      string         `json:"message,omitempty"`
-	At           time.Time      `json:"at"`
-	DeviceID     int64          `json:"deviceId,omitempty"`
-	DeviceName   string         `json:"deviceName,omitempty"`
-	DeviceIP     string         `json:"deviceIp,omitempty"`
-	DeviceMAC    string         `json:"deviceMac,omitempty"`
-	Link         string         `json:"link,omitempty"`
-	DeviceLink   string         `json:"deviceLink,omitempty"`
-	Payload      map[string]any `json:"payload,omitempty"`
-	Escalated    bool           `json:"escalated,omitempty"`
-	Acknowledged bool           `json:"acknowledged,omitempty"`
+	ID         int64          `json:"id"`
+	Type       string         `json:"type"`
+	Label      string         `json:"label"`
+	Category   string         `json:"category"`
+	Severity   Severity       `json:"severity"`
+	Title      string         `json:"title"`
+	Message    string         `json:"message,omitempty"`
+	At         time.Time      `json:"at"`
+	DeviceID   int64          `json:"deviceId,omitempty"`
+	DeviceName string         `json:"deviceName,omitempty"`
+	DeviceIP   string         `json:"deviceIp,omitempty"`
+	DeviceMAC  string         `json:"deviceMac,omitempty"`
+	Link       string         `json:"link,omitempty"`
+	DeviceLink string         `json:"deviceLink,omitempty"`
+	Payload    map[string]any `json:"payload,omitempty"`
+	// Site is the NetScope site that raised the event (central instance).
+	Site         string `json:"site,omitempty"`
+	Escalated    bool   `json:"escalated,omitempty"`
+	Acknowledged bool   `json:"acknowledged,omitempty"`
 }
 
 // Notification is what a publisher delivers. Events are bundled per rule action.
@@ -107,6 +109,9 @@ func (n *Notification) PlainText() string {
 		}
 		if e.DeviceIP != "" {
 			fmt.Fprintf(&b, " (%s)", e.DeviceIP)
+		}
+		if e.Site != "" {
+			fmt.Fprintf(&b, " · Standort %s", e.Site)
 		}
 		if e.Message != "" {
 			fmt.Fprintf(&b, "\n  %s", e.Message)

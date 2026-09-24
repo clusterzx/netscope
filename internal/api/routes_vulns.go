@@ -42,7 +42,8 @@ func (s *Server) registerVulns() {
 		Scope: scopeRead, Params: []param{{Name: "min", Type: "number", Desc: "Mindest-CVSS"}, {Name: "q", Desc: "CVE-ID oder Beschreibung"},
 			{Name: "product"}, {Name: "device", Type: "integer"}, {Name: "ignored", Type: "boolean", Desc: "auch als irrelevant markierte"},
 			{Name: "sort", Desc: "score | published | devices | cve | first_seen, - für absteigend"}, {Name: "limit", Type: "integer"},
-			{Name: "offset", Type: "integer"}}, Resp: vulnList{}, handler: s.handleVulns})
+			{Name: "offset", Type: "integer"}, {Name: "site", Desc: "nur ein Standort (Zentrale): Kürzel, local = diese Instanz"}},
+		Resp: vulnList{}, handler: s.handleVulns})
 	s.add(&route{Method: "GET", Path: "/api/v1/vulnerabilities/status", Tag: "Schwachstellen", Summary: "NVD-Sync-Status und Übersicht",
 		Scope: scopeRead, Resp: vulnStatus{}, handler: s.handleVulnStatus})
 	s.add(&route{Method: "POST", Path: "/api/v1/vulnerabilities/ignore", Tag: "Schwachstellen", Summary: "CVE für ein Gerät als irrelevant markieren (oder zurücknehmen)",
@@ -62,6 +63,12 @@ func (s *Server) handleVulns(w http.ResponseWriter, r *http.Request) {
 			f.MinScore = n
 		}
 	}
+	site, err := s.siteFilter(r.Context(), q.Get("site"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	f.Site = site
 	items, total, err := cve.ListVulnerabilities(r.Context(), s.DB, f)
 	if err != nil {
 		s.fail(w, r, err)

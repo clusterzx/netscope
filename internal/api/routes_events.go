@@ -29,6 +29,7 @@ type eventFilter struct {
 	Text        string     `json:"text,omitempty"`
 	From        *time.Time `json:"from,omitempty"`
 	To          *time.Time `json:"to,omitempty"`
+	Site        string     `json:"site,omitempty"`
 }
 
 type ackResponse struct {
@@ -45,7 +46,8 @@ func (s *Server) registerEvents() {
 	s.add(&route{Method: "GET", Path: "/api/v1/events", Tag: "Events", Summary: "Events mit Filter", Scope: scopeRead,
 		Params: []param{{Name: "type", Desc: "kommagetrennt, Muster wie port.* erlaubt"}, {Name: "category"}, {Name: "severity", Desc: "Mindest-Schweregrad"},
 			{Name: "device", Type: "integer"}, {Name: "run", Type: "integer"}, {Name: "acked", Type: "boolean"}, {Name: "from"}, {Name: "to"},
-			{Name: "q"}, {Name: "limit", Type: "integer"}, {Name: "offset", Type: "integer"}},
+			{Name: "q"}, {Name: "site", Desc: "nur ein Standort (Zentrale): Kürzel, local = diese Instanz"},
+			{Name: "limit", Type: "integer"}, {Name: "offset", Type: "integer"}},
 		Resp: eventList{}, handler: s.handleEvents})
 	s.add(&route{Method: "GET", Path: "/api/v1/events/types", Tag: "Events", Summary: "Katalog der Event-Typen", Scope: scopeRead,
 		Resp: []plugin.EventSpec{}, handler: s.handleEventTypes})
@@ -79,6 +81,10 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		f.Acked = &b
 	}
 	var err error
+	if f.Site, err = s.siteFilter(r.Context(), q.Get("site")); err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	if f.From, err = s.qTime(r, "from"); err != nil {
 		s.fail(w, r, err)
 		return
@@ -125,6 +131,10 @@ func (s *Server) handleAck(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.Filter.To != nil {
 			f.To = *req.Filter.To
+		}
+		if f.Site, err = s.siteFilter(r.Context(), req.Filter.Site); err != nil {
+			s.fail(w, r, err)
+			return
 		}
 		n, err = s.Events.AckFilter(r.Context(), f, actorName(r), req.Note)
 	default:

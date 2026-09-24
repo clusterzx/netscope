@@ -37,6 +37,20 @@ export type Dashboard = G.ApiDashboard;
 export type DashboardPluginStatus = G.ApiPluginStatus;
 export type TopCVE = G.ApiTopCVE;
 
+// ---------------------------------------------------------------- federation
+
+export type FederationRole = 'standalone' | 'site' | 'central';
+export type FederationView = G.ApiFederationView;
+export type FederationSettings = G.FederationSettingsView;
+export type FederationSettingsInput = G.FederationSettingsInput;
+export type FederationSiteStatus = G.FederationSiteStatus;
+export type FederationTestResult = G.FederationTestResult;
+export type SiteRef = G.ApiSiteRef;
+export type Site = G.FederationSite;
+export type SiteInput = G.FederationSiteInput;
+export type SiteCreated = G.ApiSiteCreated;
+export type DeviceSiteRef = G.InventorySiteRef;
+
 // ---------------------------------------------------------------- inventory
 
 export type DeviceRow = G.InventoryDeviceRow;

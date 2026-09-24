@@ -22,7 +22,7 @@ const labels: Record<string, string> = {
 	images: 'Images',
 	interfaces: 'Interfaces',
 	kernel: 'Kernel',
-	location: 'Standort',
+	location: 'Aufstellort',
 	contact: 'Kontakt',
 	memory: 'Arbeitsspeicher',
 	model: 'Modell',

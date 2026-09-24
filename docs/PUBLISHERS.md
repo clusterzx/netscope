@@ -496,6 +496,7 @@ geprüft.
 | `events[].link` | URL | Deep-Link auf das Event |
 | `events[].device` | Objekt/`null` | `id`, `name`, `ip`, `mac`, `link` – `null` bei Events ohne Gerät (z. B. `plugin.failed`) |
 | `events[].payload` | Objekt | typspezifische Felder laut Event-Katalog (z. B. `port`, `proto`, `cve`, `cvss`) |
+| `events[].site` | Text | nur in einer Zentrale: NetScope-Standort, der das Event gemeldet hat (fehlt bei eigenen Events); auch als `payload.site` |
 | `text` | Text | fertige Klartextdarstellung der ganzen Benachrichtigung |
 | `body` | Text | Markdown-Text bei Berichten und Tests, sonst `""` |
 

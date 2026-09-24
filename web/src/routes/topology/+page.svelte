@@ -24,6 +24,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { subnets, tags } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
+	import { siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -81,7 +82,8 @@
 			tag: tag || null,
 			q: q || null,
 			containers: containers || null,
-			ignored: ignored || null
+			ignored: ignored || null,
+			site: siteFilter.value || null
 		};
 		data.run(async (signal) => {
 			try {

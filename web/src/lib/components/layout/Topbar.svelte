@@ -3,6 +3,7 @@
 	import GlobalSearch from './GlobalSearch.svelte';
 	import LiveIndicator from './LiveIndicator.svelte';
 	import RunsIndicator from './RunsIndicator.svelte';
+	import SiteSwitcher from './SiteSwitcher.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import UserMenu from './UserMenu.svelte';
 
@@ -20,6 +21,7 @@
 		<GlobalSearch />
 	</div>
 	<div class="flex items-center gap-1">
+		<SiteSwitcher />
 		<RunsIndicator />
 		<LiveIndicator />
 		<ThemeToggle />

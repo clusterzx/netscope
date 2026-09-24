@@ -98,7 +98,7 @@ gespeicherten Werte, bevor sie gegen das Schema normalisiert werden, und muss id
 | `Sink` | `Observe(ctx, *Observation)` – schreibt **sofort** (eine Transaktion pro Aufruf) |
 | `Events` | `Emit(ctx, Event)` – nur Processor |
 | `Creds` | `Get(ctx, id)` – entschlüsselt ein Vault-Credential; `Applicable(ctx, target, types, allowed)` – passende Credentials für ein Ziel, spezifischste zuerst |
-| `Inventory` | Lesezugriff auf Geräte (`Devices(query)`, `DeviceByIP` …) |
+| `Inventory` | Lesezugriff auf Geräte (`Devices(query)`, `DeviceByIP` …) – in einer Zentrale nur die eigenen Geräte, nie die der Standorte (deren Adressen gehören zu anderen Netzen) |
 | `DB` | direkter DB-Zugriff – **nur Processor** für eigene Tabellen |
 | `DataDir` | persistentes Verzeichnis des Plugins (`/data/plugins/<id>`) |
 | `Log` | `slog`-Logger; Einträge landen im Laufprotokoll (UI) |

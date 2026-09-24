@@ -14,6 +14,7 @@
 	import { Button, EmptyState, ErrorState, Menu, PageHeader, Pagination, Table } from '$lib/components/ui';
 	import type { RowKey } from '$lib/components/ui';
 	import { customFields } from '$lib/stores/catalog.svelte';
+	import { siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { formatNumber } from '$lib/utils/format';
@@ -58,7 +59,7 @@
 	let lastGood = $state<DeviceList | null>(null);
 
 	$effect(() => {
-		const query = { q, sort, limit, offset, ports: needPorts };
+		const query = { q, sort, limit, offset, ports: needPorts, site: siteFilter.value };
 		data.run(async (signal) => {
 			try {
 				const res = await api.get('/api/v1/devices', { query, signal });
@@ -108,7 +109,10 @@
 	}
 
 	let createOpen = $state(false);
-	const exportQuery = $derived(q ? `&q=${encodeURIComponent(q)}` : '');
+	const exportQuery = $derived(
+		(q ? `&q=${encodeURIComponent(q)}` : '') +
+			(siteFilter.value ? `&site=${encodeURIComponent(siteFilter.value)}` : '')
+	);
 </script>
 
 <PageHeader title="Geräte" description="Inventar aller entdeckten und manuell angelegten Geräte">

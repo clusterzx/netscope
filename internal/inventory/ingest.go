@@ -22,17 +22,39 @@ var ErrNoIdentity = errors.New("Beobachtung ohne Identität (MAC, IP, Geräte-ID
 // Observe applies one observation (see plugin.Observation) inside a single transaction
 // and returns the device id (0 if the observation did not match and may not create).
 func (s *Store) Observe(ctx context.Context, pluginID string, runID int64, obs *plugin.Observation) (int64, error) {
+	return s.observe(ctx, pluginID, runID, obs, observeOpts{})
+}
+
+// observeOpts describe an observation delivered by a site (central instance).
+type observeOpts struct {
+	site   int64     // site of the observation, 0 = this instance
+	remote int64     // device id at the site
+	at     time.Time // time of the observation at the site (zero = now)
+}
+
+func (s *Store) observe(ctx context.Context, pluginID string, runID int64, obs *plugin.Observation, opt observeOpts) (int64, error) {
 	if obs == nil {
 		return 0, errors.New("nil observation")
 	}
 	o := normalizeObservation(obs)
-	if o.DeviceID == 0 && len(o.MACs) == 0 && o.IP == "" && o.Ref == nil {
+	if o.DeviceID == 0 && len(o.MACs) == 0 && o.IP == "" && o.Ref == nil && opt.remote == 0 {
 		return 0, ErrNoIdentity
 	}
+	now := opt.at
+	if now.IsZero() {
+		now = time.Now()
+	}
+	fwd := s.forwarder()
 	var g *ingest
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
-		g = &ingest{s: s, ctx: ctx, tx: tx, plugin: pluginID, run: runID, now: time.Now(), obs: o}
-		return g.process()
+		g = &ingest{s: s, ctx: ctx, tx: tx, plugin: pluginID, run: runID, now: now, obs: o, site: opt.site, remote: opt.remote}
+		if err := g.process(); err != nil {
+			return err
+		}
+		if fwd != nil && g.devID > 0 && opt.site == 0 {
+			return g.forward(fwd)
+		}
+		return nil
 	})
 	if err != nil {
 		return 0, fmt.Errorf("observe %s: %w", describeTarget(o), err)
@@ -115,6 +137,7 @@ type deviceRow struct {
 	firstSeen       sql.NullInt64
 	lastSeen        sql.NullInt64
 	state           string
+	site            sql.NullInt64 // site owning the device (central instance)
 }
 
 type ingest struct {
@@ -125,11 +148,32 @@ type ingest struct {
 	run     int64
 	now     time.Time
 	obs     *plugin.Observation
+	site    int64 // site that delivered the observation (0 = this instance)
+	remote  int64 // device id at that site
 	devID   int64
 	created bool
 	dev     deviceRow
 	changes []plugin.Change
 	merged  []int64
+}
+
+// scope is the site whose addresses the observation's addresses are matched against.
+func (g *ingest) scope() any { return siteArg(g.site) }
+
+// devScope is the site owning the resolved device (its addresses belong to that site).
+func (g *ingest) devScope() any {
+	if g.dev.site.Valid {
+		return g.dev.site.Int64
+	}
+	return nil
+}
+
+// siteArg is the value of devices.site_id for a site (NULL = this instance).
+func siteArg(site int64) any {
+	if site > 0 {
+		return site
+	}
+	return nil
 }
 
 func (g *ingest) nowMs() int64 { return g.now.UnixMilli() }
@@ -158,9 +202,15 @@ func (g *ingest) process() error {
 	if g.devID == 0 {
 		return nil
 	}
-	if err := g.tx.QueryRowContext(g.ctx, "SELECT online, online_changed_at, first_seen, last_seen, state FROM devices WHERE id = ?", g.devID).
-		Scan(&g.dev.online, &g.dev.onlineChangedAt, &g.dev.firstSeen, &g.dev.lastSeen, &g.dev.state); err != nil {
+	if err := g.tx.QueryRowContext(g.ctx, "SELECT online, online_changed_at, first_seen, last_seen, state, site_id FROM devices WHERE id = ?", g.devID).
+		Scan(&g.dev.online, &g.dev.onlineChangedAt, &g.dev.firstSeen, &g.dev.lastSeen, &g.dev.state, &g.dev.site); err != nil {
 		return fmt.Errorf("load device %d: %w", g.devID, err)
+	}
+	if g.site > 0 && g.remote > 0 {
+		if err := g.exec(`INSERT INTO site_devices(site_id, remote_id, device_id) VALUES (?,?,?)
+			ON CONFLICT(site_id, remote_id) DO UPDATE SET device_id = excluded.device_id`, g.site, g.remote, g.devID); err != nil {
+			return err
+		}
 	}
 	steps := []func() error{
 		g.applyMACs, g.applyIPs, g.applyPresence, g.applyPower, g.applyFirstSeen, g.applyRef, g.applyFacts,
@@ -215,10 +265,23 @@ func snapshot(ctx context.Context, q db.Querier, id int64) (*plugin.DeviceSnapsh
 	return snap, err
 }
 
-// resolve finds or creates the device: DeviceID > MAC > external ref > IP.
+// resolve finds or creates the device: DeviceID > MAC > external ref > IP. An
+// observation delivered by a site first uses the device the site's device id is mapped
+// to; otherwise it may match any device except the ones the same site delivered under
+// another id (the site has already told them apart).
 func (g *ingest) resolve() error {
 	o := g.obs
 	ctx, tx := g.ctx, g.tx
+	if g.site > 0 && g.remote > 0 {
+		id, err := siteDevice(ctx, tx, g.site, g.remote)
+		if err != nil {
+			return err
+		}
+		if id > 0 {
+			g.devID = id
+			return nil
+		}
+	}
 	if o.DeviceID > 0 {
 		var id int64
 		if err := tx.QueryRowContext(ctx, "SELECT id FROM devices WHERE id = ?", o.DeviceID).Scan(&id); err != nil {
@@ -227,9 +290,19 @@ func (g *ingest) resolve() error {
 		g.devID = id
 		return nil
 	}
+	// devices delivered by the same site under another id are different devices
+	other := func(col string) string { return "" }
+	var otherArgs []any
+	if g.site > 0 {
+		other = func(col string) string {
+			return " AND NOT EXISTS (SELECT 1 FROM site_devices x WHERE x.device_id = " + col + " AND x.site_id = ?)"
+		}
+		otherArgs = []any{g.site}
+	}
 	for _, mac := range o.MACs {
 		var id int64
-		err := tx.QueryRowContext(ctx, "SELECT device_id FROM device_macs WHERE mac = ?", mac).Scan(&id)
+		err := tx.QueryRowContext(ctx, "SELECT m.device_id FROM device_macs m WHERE m.mac = ?"+other("m.device_id"),
+			append([]any{mac}, otherArgs...)...).Scan(&id)
 		if err == nil {
 			g.devID = id
 			return nil
@@ -240,7 +313,8 @@ func (g *ingest) resolve() error {
 	}
 	if o.Ref != nil && o.Ref.Source != "" && o.Ref.ID != "" {
 		var id int64
-		err := tx.QueryRowContext(ctx, "SELECT device_id FROM external_refs WHERE source = ? AND ref = ?", o.Ref.Source, o.Ref.ID).Scan(&id)
+		err := tx.QueryRowContext(ctx, "SELECT r.device_id FROM external_refs r WHERE r.source = ? AND r.ref = ?"+other("r.device_id"),
+			append([]any{o.Ref.Source, o.Ref.ID}, otherArgs...)...).Scan(&id)
 		if err == nil {
 			g.devID = id
 			return nil
@@ -250,7 +324,7 @@ func (g *ingest) resolve() error {
 		}
 	}
 	if o.IP != "" {
-		owner, ownerMACs, err := ipOwner(ctx, tx, o.IP)
+		owner, ownerMACs, err := ipOwnerExcept(ctx, tx, o.IP, g.site, g.site > 0)
 		if err != nil {
 			return err
 		}
@@ -273,8 +347,8 @@ func (g *ingest) resolve() error {
 	if o.Present {
 		lastSeen, online = g.nowMs(), 1
 	}
-	res, err := tx.ExecContext(ctx, `INSERT INTO devices(created_source, first_seen, last_seen, online, online_changed_at, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?)`, g.plugin, first, lastSeen, online, g.nowMs(), g.nowMs(), g.nowMs())
+	res, err := tx.ExecContext(ctx, `INSERT INTO devices(site_id, created_source, first_seen, last_seen, online, online_changed_at, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?)`, g.scope(), g.plugin, first, lastSeen, online, g.nowMs(), g.nowMs(), g.nowMs())
 	if err != nil {
 		return err
 	}
@@ -283,11 +357,35 @@ func (g *ingest) resolve() error {
 	return nil
 }
 
-// ipOwner returns the device currently holding ip and how many MACs it has.
+// ipOwner returns the device of this instance currently holding ip and how many MACs it
+// has. Addresses of sites are separate address spaces (see ipOwnerIn).
 func ipOwner(ctx context.Context, q db.Querier, ip string) (int64, int, error) {
+	return ipOwnerExcept(ctx, q, ip, 0, false)
+}
+
+// ipOwnerIn returns the holder of ip among the devices of a site (0 = this instance).
+func ipOwnerIn(ctx context.Context, q db.Querier, ip string, site any) (int64, int, error) {
 	var id int64
-	err := q.QueryRowContext(ctx, `SELECT device_id FROM device_ips WHERE ip = ? AND gone_at IS NULL
-		ORDER BY last_seen DESC LIMIT 1`, ip).Scan(&id)
+	err := q.QueryRowContext(ctx, `SELECT i.device_id FROM device_ips i JOIN devices d ON d.id = i.device_id
+		WHERE i.ip = ? AND i.gone_at IS NULL AND d.site_id IS ? ORDER BY i.last_seen DESC LIMIT 1`, ip, site).Scan(&id)
+	return ipOwnerMACs(ctx, q, id, err)
+}
+
+// ipOwnerExcept is ipOwnerIn for a site; with exceptMapped, devices the site already
+// delivered under an id are skipped (they are known to be other devices).
+func ipOwnerExcept(ctx context.Context, q db.Querier, ip string, site int64, exceptMapped bool) (int64, int, error) {
+	if !exceptMapped {
+		return ipOwnerIn(ctx, q, ip, siteArg(site))
+	}
+	var id int64
+	err := q.QueryRowContext(ctx, `SELECT i.device_id FROM device_ips i JOIN devices d ON d.id = i.device_id
+		WHERE i.ip = ? AND i.gone_at IS NULL AND d.site_id IS ?
+		AND NOT EXISTS (SELECT 1 FROM site_devices x WHERE x.device_id = i.device_id AND x.site_id = ?)
+		ORDER BY i.last_seen DESC LIMIT 1`, ip, siteArg(site), site).Scan(&id)
+	return ipOwnerMACs(ctx, q, id, err)
+}
+
+func ipOwnerMACs(ctx context.Context, q db.Querier, id int64, err error) (int64, int, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, nil
 	}
@@ -350,8 +448,9 @@ func (g *ingest) applyIPs() error {
 	}
 	for _, ip := range ips {
 		observedAt := ip == o.IP
-		// Is the IP held by another device?
-		rows, err := g.tx.QueryContext(g.ctx, `SELECT id, device_id, mac FROM device_ips WHERE ip = ? AND gone_at IS NULL AND device_id <> ?`, ip, g.devID)
+		// Is the IP held by another device of the same site?
+		rows, err := g.tx.QueryContext(g.ctx, `SELECT i.id, i.device_id, i.mac FROM device_ips i JOIN devices d ON d.id = i.device_id
+			WHERE i.ip = ? AND i.gone_at IS NULL AND i.device_id <> ? AND d.site_id IS ?`, ip, g.devID, g.devScope())
 		if err != nil {
 			return err
 		}
@@ -421,8 +520,12 @@ func (g *ingest) applyIPs() error {
 			if o.Present && observedAt {
 				runID = g.runID()
 			}
+			var subnet any
+			if !g.dev.site.Valid {
+				subnet = g.s.subnetFor(ip) // subnets are the ones of this instance
+			}
 			if err := g.exec(`INSERT INTO device_ips(device_id, ip, ip_key, mac, subnet_id, source, first_seen, last_seen, last_run_id)
-				VALUES (?,?,?,?,?,?,?,?,?)`, g.devID, ip, netutil.IPKey(ip), rowMAC, g.s.subnetFor(ip), g.plugin, g.nowMs(), g.nowMs(), runID); err != nil {
+				VALUES (?,?,?,?,?,?,?,?,?)`, g.devID, ip, netutil.IPKey(ip), rowMAC, subnet, g.plugin, g.nowMs(), g.nowMs(), runID); err != nil {
 				return err
 			}
 			if !g.created {

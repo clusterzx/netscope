@@ -176,7 +176,9 @@ func (s *Store) reassignSubnets(ctx context.Context) error {
 	if err := s.reloadSubnets(ctx); err != nil {
 		return err
 	}
-	rows, err := s.db.R.QueryContext(ctx, "SELECT id, ip FROM device_ips WHERE gone_at IS NULL")
+	// addresses of site devices belong to the site's subnets, not to ours
+	rows, err := s.db.R.QueryContext(ctx, `SELECT i.id, i.ip FROM device_ips i JOIN devices d ON d.id = i.device_id
+		WHERE i.gone_at IS NULL AND d.site_id IS NULL`)
 	if err != nil {
 		return err
 	}
@@ -395,6 +397,12 @@ func (s *Store) ResolveTargets(ctx context.Context, scope plugin.Scope, mode plu
 			}
 		}
 	}
+	// devices of sites are scanned there, never from here (their addresses are not ours)
+	if len(ids) > 0 {
+		if ids, err = s.localIDs(ctx, ids); err != nil {
+			return t, err
+		}
+	}
 	devs, err := s.DeviceInfos(ctx, ids)
 	if err != nil {
 		return t, err
@@ -414,6 +422,24 @@ func (s *Store) ResolveTargets(ctx context.Context, scope plugin.Scope, mode plu
 		t.Devices = []plugin.DeviceInfo{}
 	}
 	return t, nil
+}
+
+// localIDs keeps the ids of devices of this instance (not delivered by a site).
+func (s *Store) localIDs(ctx context.Context, ids []int64) ([]int64, error) {
+	var sited int
+	if err := s.db.R.QueryRowContext(ctx, "SELECT COUNT(*) FROM devices WHERE site_id IS NOT NULL").Scan(&sited); err != nil || sited == 0 {
+		return ids, err
+	}
+	var out []int64
+	for start := 0; start < len(ids); start += 500 {
+		chunk := ids[start:min(start+500, len(ids))]
+		list, err := queryIDs(ctx, s.db.R, "SELECT id FROM devices WHERE site_id IS NULL AND id IN ("+db.Placeholders(len(chunk))+")", db.Int64Args(chunk)...)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, list...)
+	}
+	return out, nil
 }
 
 func deviceInSubnets(d plugin.DeviceInfo, subnets []plugin.SubnetTarget) bool {

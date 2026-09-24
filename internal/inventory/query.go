@@ -24,7 +24,7 @@ type QueryField struct {
 // QueryFields lists the fields of the filter query language.
 func QueryFields() []QueryField {
 	return []QueryField{
-		{"(Text)", "", "Freitext in Name, Hostname, IP, MAC, Hersteller, Modell, OS, Standort, Besitzer, Notizen, Tags", "nas"},
+		{"(Text)", "", "Freitext in Name, Hostname, IP, MAC, Hersteller, Modell, OS, Aufstellort, Besitzer, Notizen, Tags", "nas"},
 		{"tag", ":", "Tag (Platzhalter * erlaubt)", "tag:iot"},
 		{"group", ":", "Mitglied einer Gruppe (manuell oder regelbasiert)", "group:server"},
 		{"port", ": = > < >= <=", "Offener Port, optional mit /tcp oder /udp", "port:22 port:161/udp"},
@@ -56,7 +56,8 @@ func QueryFields() []QueryField {
 		{"health", ":", "Zustand eines Health-Checks: up | down | degraded | unknown", "health:down"},
 		{"source", ":", "Plugin, das Daten geliefert hat", "source:proxmox"},
 		{"parent", ":", "Eltern-Gerät (ID oder Name)", "parent:pve1"},
-		{"location", ":", "Standort", "location:keller"},
+		{"location", ":", "Aufstellort (manuelles Feld)", "location:keller"},
+		{"site", ":", "NetScope-Standort, der das Gerät liefert (Zentrale); local = diese Instanz", "site:colo"},
 		{"owner", ":", "Besitzer", "owner:anna"},
 		{"id", ": > <", "Geräte-ID", "id:42"},
 		{"cf.<feld>", ": = > < >= <=", "Custom Field", "cf.rack:A1"},
@@ -83,7 +84,7 @@ var knownFields = map[string]bool{}
 func init() {
 	for _, f := range []string{"tag", "group", "port", "service", "product", "version", "os", "vendor", "model", "type", "name",
 		"hostname", "ip", "subnet", "mac", "state", "crit", "criticality", "is", "online", "has", "cve", "cvss", "seen", "first",
-		"cert", "app", "title", "container", "package", "pkg", "health", "source", "parent", "location", "owner", "notes", "id"} {
+		"cert", "app", "title", "container", "package", "pkg", "health", "source", "parent", "location", "owner", "notes", "id", "site"} {
 		knownFields[f] = true
 	}
 }
@@ -647,6 +648,21 @@ func (c *compiler) term(t term, v string) (string, []any, error) {
 		p := likePattern(v, false)
 		return exists(`SELECT 1 FROM relations r JOIN devices pd ON pd.id = r.parent_id WHERE r.child_id = d.id
 			AND (pd.display_name LIKE ?`+likeEsc+` OR pd.hostname LIKE ?`+likeEsc+`)`, p, p)
+	case "site":
+		if op != ":" && op != "=" {
+			return "", nil, fmt.Errorf("site unterstützt nur ':'")
+		}
+		switch strings.ToLower(v) {
+		case "local", "lokal":
+			return "d.site_id IS NULL", nil, nil
+		case "*":
+			return "d.site_id IS NOT NULL", nil, nil
+		}
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return "d.site_id = ?", []any{n}, nil
+		}
+		p := likePattern(v, false)
+		return "d.site_id IN (SELECT st.id FROM sites st WHERE st.slug LIKE ?" + likeEsc + " OR st.name LIKE ?" + likeEsc + ")", []any{p, p}, nil
 	case "id":
 		n, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {

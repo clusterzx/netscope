@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"netscope/internal/db"
+	"netscope/internal/federation/wire"
 	"netscope/internal/netutil"
 )
 
@@ -72,6 +73,7 @@ func (s *Store) mergeInto(ctx context.Context, tx *sql.Tx, target int64, sources
 			{"INSERT OR IGNORE INTO cve_ignores(device_id, cve_id, note, created_by, created_at) SELECT ?, cve_id, note, created_by, created_at FROM cve_ignores WHERE device_id = ?", []any{target, src}},
 			{"UPDATE events SET device_id = ? WHERE device_id = ?", []any{target, src}},
 			{"UPDATE health_checks SET device_id = ? WHERE device_id = ?", []any{target, src}},
+			{"UPDATE site_devices SET device_id = ? WHERE device_id = ?", []any{target, src}},
 		}
 		for _, st := range steps {
 			if err := exec(st.q, st.args...); err != nil {
@@ -235,7 +237,10 @@ func (s *Store) Merge(ctx context.Context, target int64, sources []int64) error 
 		return errors.New("keine Quellgeräte angegeben")
 	}
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
-		return s.mergeInto(ctx, tx, target, sources, time.Now().UnixMilli())
+		if err := s.mergeInto(ctx, tx, target, sources, time.Now().UnixMilli()); err != nil {
+			return err
+		}
+		return s.forwardOp(ctx, tx, wire.DeviceOp{Op: wire.OpMerged, Device: target, Sources: sources})
 	})
 	if err != nil {
 		return err
@@ -315,7 +320,7 @@ func (s *Store) Split(ctx context.Context, id int64, macs []string) (int64, erro
 				return err
 			}
 		}
-		return nil
+		return s.forwardOp(ctx, tx, wire.DeviceOp{Op: wire.OpSplit, Device: id, New: newID, MACs: norm})
 	})
 	if err != nil {
 		return 0, err

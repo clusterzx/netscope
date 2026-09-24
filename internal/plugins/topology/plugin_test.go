@@ -654,3 +654,27 @@ func TestInfoAndSchema(t *testing.T) {
 		t.Error("run without database must fail")
 	}
 }
+
+func TestSitesAreDerivedSeparately(t *testing.T) {
+	f := newFixture(t)
+	// this instance and the site "colo" both use 192.168.1.0/24 with gateway .1
+	f.subnet("192.168.1.0/24", "192.168.1.1")
+	f.exec(`INSERT INTO sites(id, name, slug, token_hash, token_prefix, created_at, updated_at, status) VALUES (7, 'Colo', 'colo', 'h', 'p', 1, 1, ?)`,
+		`{"status":{"subnets":[{"cidr":"192.168.1.0/24","gateway":"192.168.1.1","enabled":true}]}}`)
+	f.device("home-gw", "mac:02:00:00:00:01:01", "ip:192.168.1.1")
+	f.device("home-pc", "mac:02:00:00:00:01:10", "ip:192.168.1.10")
+	colo := func(name, mac, ip string) {
+		f.subnets = map[int64]netip.Prefix{} // site addresses belong to no subnet here
+		id := f.device(name, "mac:"+mac, "ip:"+ip)
+		f.exec("UPDATE devices SET site_id = 7 WHERE id = ?", id)
+		// the site device was seen later: a global address map would pick it as gateway
+		f.exec("UPDATE device_ips SET last_seen = 99 WHERE device_id = ?", id)
+	}
+	colo("colo-gw", "02:00:00:00:07:01", "192.168.1.1")
+	colo("colo-vm", "02:00:00:00:07:10", "192.168.1.10")
+	f.run(nil)
+	want := []string{"l3 colo-gw>colo-vm |", "l3 home-gw>home-pc |"}
+	if got := f.edges(); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("edges\n got: %v\nwant: %v", got, want)
+	}
+}

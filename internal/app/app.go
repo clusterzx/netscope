@@ -22,6 +22,7 @@ import (
 	"netscope/internal/config"
 	"netscope/internal/db"
 	"netscope/internal/events"
+	"netscope/internal/federation"
 	"netscope/internal/inventory"
 	"netscope/internal/logging"
 	"netscope/internal/pluginhost"
@@ -42,6 +43,7 @@ type services struct {
 	host    *pluginhost.Host
 	rules   *rules.Engine
 	tunnels *tunnel.Manager
+	fed     *federation.Service
 	srv     *http.Server
 }
 
@@ -146,19 +148,33 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	}
 	inv.OnChanges(host.DispatchChanges)
 	ev.OnEvent(engine.OnEvent)
+	fed, err := federation.New(ctx, federation.Deps{DB: d, Bus: b, Log: log.With("component", "federation"), Vault: v, Inventory: inv,
+		Events: ev, Settings: st, Host: host, Config: cfg, Version: version, StartedAt: started})
+	if err != nil {
+		return fail(err)
+	}
+	ui := webui.Handler()
+	if !cfg.UI {
+		ui = headless()
+		log.Info("Weboberfläche abgeschaltet (NETSCOPE_UI=false) – nur die API ist erreichbar")
+	}
 	server := api.New(api.Deps{Config: cfg, DB: d, Bus: b, Log: log, Logs: ring, LevelVar: level, Auth: authSvc, Vault: v, Settings: st,
-		Inventory: inv, Events: ev, Rules: engine, Host: host, Tunnels: tunnels, Audit: audit.New(d), Version: version, StartedAt: started,
+		Inventory: inv, Events: ev, Rules: engine, Host: host, Tunnels: tunnels, Federation: fed, Audit: audit.New(d), Version: version, StartedAt: started,
 		Restore: func(path string) {
 			select {
 			case restore <- path:
 			default:
 			}
-		}, UI: webui.Handler()})
+		}, UI: ui})
 	srv := &http.Server{Addr: cfg.Listen, Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second,
 		ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
 	tunnels.Start(ctx)
 	host.Start(ctx)
 	engine.Start(ctx)
+	fed.Start(ctx)
+	if role := fed.Role(); role != federation.RoleStandalone {
+		log.Info("Verbund aktiv", "role", role)
+	}
 	go func() {
 		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
@@ -181,12 +197,12 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	}()
 	select {
 	case err := <-errCh:
-		stop(&services{db: d, host: host, rules: engine, tunnels: tunnels}, log)
+		stop(&services{db: d, host: host, rules: engine, tunnels: tunnels, fed: fed}, log)
 		return nil, fmt.Errorf("HTTP-Server: %w", err)
 	case <-time.After(200 * time.Millisecond):
 	}
 	log.Info("NetScope bereit", "listen", cfg.Listen, "plugins", len(host.IDs()))
-	return &services{db: d, host: host, rules: engine, tunnels: tunnels, srv: srv}, nil
+	return &services{db: d, host: host, rules: engine, tunnels: tunnels, fed: fed, srv: srv}, nil
 }
 
 // stop shuts down in order: HTTP, rule engine, plugins (running runs are cancelled),
@@ -201,6 +217,9 @@ func stop(s *services, log *slog.Logger) {
 	}
 	if s.rules != nil {
 		s.rules.Stop()
+	}
+	if s.fed != nil {
+		s.fed.Stop()
 	}
 	if s.host != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -241,6 +260,10 @@ func swapDatabase(cfg *config.Config, staged string, log *slog.Logger) error {
 		if err == nil {
 			_, err = vault.Open(ctx, d, key, src)
 		}
+		if err == nil {
+			// a site starts its next delivery with a reset: device ids changed
+			err = settings.SetJSON(ctx, d.W, federation.KeyRestored, true)
+		}
 		d.Close()
 	}
 	if err != nil {
@@ -271,4 +294,13 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+// headless answers requests for the web UI when it is switched off.
+func headless() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, "NetScope läuft ohne Weboberfläche (NETSCOPE_UI=false). API-Dokumentation: /api/docs\n")
+	})
 }

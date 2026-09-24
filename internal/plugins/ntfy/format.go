@@ -167,6 +167,9 @@ func eventBlock(e plugin.EventView, md bool, loc *time.Location) string {
 	if ip := clip(oneLine(e.DeviceIP), 64); ip != "" && ip != e.DeviceName {
 		info = append(info, ip)
 	}
+	if site := clip(oneLine(e.Site), maxNameRunes); site != "" {
+		info = append(info, "Standort "+site)
+	}
 	if !e.At.IsZero() {
 		info = append(info, e.At.In(loc).Format("02.01. 15:04"))
 	}

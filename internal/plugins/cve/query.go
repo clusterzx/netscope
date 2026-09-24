@@ -42,6 +42,8 @@ type Filter struct {
 	Sort   string `json:"sort,omitempty"`
 	Limit  int    `json:"limit,omitempty"` // default 100, max 1000
 	Offset int    `json:"offset,omitempty"`
+	// Site restricts to the devices of a NetScope site (0 = this instance, nil = all).
+	Site *int64 `json:"site,omitempty"`
 }
 
 // VulnRow is one CVE with the devices it currently affects.
@@ -251,6 +253,14 @@ func ListVulnerabilities(ctx context.Context, d *db.DB, f Filter) ([]VulnRow, in
 	if f.DeviceID > 0 {
 		conds = append(conds, "c.device_id = ?")
 		args = append(args, f.DeviceID)
+	}
+	if f.Site != nil {
+		if *f.Site == 0 {
+			conds = append(conds, "c.device_id IN (SELECT id FROM devices WHERE site_id IS NULL)")
+		} else {
+			conds = append(conds, "c.device_id IN (SELECT id FROM devices WHERE site_id = ?)")
+			args = append(args, *f.Site)
+		}
 	}
 	from := ` FROM device_cves c
 		LEFT JOIN nvd_cves n ON n.id = c.cve_id

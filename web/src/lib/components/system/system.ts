@@ -23,6 +23,12 @@ export const SYSTEM_TABS: SystemTab[] = [
 		icon: 'system',
 		description: 'Systemweite Einstellungen und Log-Level'
 	},
+	{
+		id: 'federation',
+		label: 'Verbund',
+		icon: 'globe',
+		description: 'Mehrere NetScope-Instanzen bündeln: Standorte liefern an eine Zentrale'
+	},
 	{ id: 'account', label: 'Konto', icon: 'user', description: 'Passwort des Administrators ändern' },
 	{ id: 'tokens', label: 'API-Tokens', icon: 'key', description: 'Tokens für Skripte und Automatisierung' },
 	{
@@ -85,7 +91,9 @@ export const entityLabel: Record<string, string> = {
 	relation: 'Topologie-Kante',
 	file: 'Datei',
 	vault: 'Vault',
-	view: 'Ansicht'
+	view: 'Ansicht',
+	site: 'Standort',
+	federation: 'Verbund'
 };
 
 /** Link to the UI page of an audited entity (null if none). */
@@ -102,6 +110,10 @@ export function entityHref(type: string, id: string): string | null {
 			return `/rules`;
 		case 'credential':
 			return `/credentials`;
+		case 'site':
+			return `/sites`;
+		case 'federation':
+			return `/system?tab=federation`;
 		default:
 			return null;
 	}

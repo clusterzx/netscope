@@ -41,7 +41,7 @@
 <br>
 
 - **Inventar:** Geräte mit IPs, MACs, Hersteller, Hostname (aus Quellen mit Priorität), Typ,
-  Standort, Besitzer, Tags, Gruppen, Custom Fields, Notizen (Markdown), Eltern/Kinder
+  Aufstellort, Besitzer, Tags, Gruppen, Custom Fields, Notizen (Markdown), Eltern/Kinder
   (Host ↔ VM, Host ↔ Container, Switch ↔ Port), Merge/Split, vollständiges Audit-Log.
 - **Scanner:** ARP, ICMP (Latenz/Verlust als Zeitreihe), nmap TCP/UDP (Dienste, Versionen, OS,
   CPE), DNS, mDNS, NetBIOS, UPnP, OUI, HTTP (Titel, Server, Favicon-Hash, Web-App-Erkennung),
@@ -50,6 +50,8 @@
 - **Importer:** Proxmox VE, OpenWrt/GL.iNet (DHCP), Docker, NetAlertX, CSV.
 - **Entfernte Netze:** Subnetze hinter Routern oder über einen eigenen WireGuard-Tunnel von
   NetScope (z. B. ins Rechenzentrum) – Konfiguration hochladen, fertig.
+- **Mehrere Standorte:** In jedem Netz eine eigene NetScope-Instanz, die an eine Zentrale
+  liefert; dort alle Netze gemeinsam oder je Standort, mit Standort-Auswahl, Filter und Regeln.
 - **Auswertung:** Änderungserkennung mit Events, CVE-Abgleich gegen eine lokal gespiegelte
   NVD, Health-Checks mit Verfügbarkeit, Topologie-Graph, Berichte.
 - **Benachrichtigungen:** Regel-Engine (Bedingungen, Bündelung, Ruhezeiten, Drosselung,
@@ -154,6 +156,9 @@ andere wird in der Oberfläche gepflegt. Jeder Wert ist per Umgebungsvariable ü
 | `trusted_proxies` | `NETSCOPE_TRUSTED_PROXIES` | private Netze, localhost |
 | – | `NETSCOPE_ADMIN_PASSWORD` | Passwort des ersten Admins (nur beim allerersten Start) |
 | – | `NETSCOPE_CONFIG` | Pfad der Konfigurationsdatei |
+| `ui` | `NETSCOPE_UI` | `true`; `false` = nur API (Standort als reiner Sammler) |
+| – | `NETSCOPE_CENTRAL_URL`, `NETSCOPE_CENTRAL_TOKEN` | Standort: Zentrale und Token (legen die Anbindung fest, siehe [Mehrere Standorte](#mehrere-standorte-verbund)) |
+| – | `NETSCOPE_CENTRAL_FINGERPRINT` | Standort: SHA-256 des Zertifikats der Zentrale (optional, für selbst signierte Zertifikate) |
 
 ## Plugins
 
@@ -306,6 +311,60 @@ Voraussetzungen: Linux-Host mit WireGuard im Kernel (ab 5.6), Container mit Host
 und `NET_ADMIN` (wie in der mitgelieferten `docker-compose.yml`). Unter Docker Desktop
 (Windows/macOS) ist die Option ausgegraut.
 
+## Mehrere Standorte (Verbund)
+
+Ein Tunnel reicht für viele entfernte Netze, hat aber Grenzen: keine MAC-Adressen, kein ARP,
+mDNS oder SSDP, und jeder Host braucht Firewall-Freigaben. Für solche Netze läuft besser eine
+**eigene NetScope-Instanz vor Ort (Standort)**, die an eine **Zentrale** liefert. Die Rolle
+steht unter **System → Verbund**: *eigenständig* (Standard), *Standort* oder *Zentrale*.
+
+| | Standort | Zentrale |
+|---|---|---|
+| Scans, Plugins, Zugangsdaten | eigene; Zugangsdaten verlassen den Standort nie | eigene, nur für ihre eigenen Netze |
+| Oberfläche | vollständig, arbeitet auch ohne Zentrale | alle Netze gemeinsam oder je Standort |
+| Benachrichtigungen | eigene Regeln (optional) | Events aller Standorte laufen durch ihre Regeln |
+| Manuelle Angaben (Name, Tags, Notizen …) | gelten am Standort | gelten in der Zentrale; nichts wird zurückgeschrieben |
+
+**Einrichten:**
+
+1. In der Zentrale unter **System → Verbund** die Rolle *Zentrale* wählen (optional einen
+   Namen für diese Instanz, z. B. „Zuhause“).
+2. Unter **Standorte** einen Standort anlegen. Das Token wird genau einmal angezeigt.
+3. Am Standort unter **System → Verbund** die Rolle *Standort* wählen, die Adresse der
+   Zentrale und das Token eintragen, speichern – der Verbindungstest folgt automatisch.
+   Ohne Oberfläche geht es auch per Umgebung: `NETSCOPE_CENTRAL_URL`,
+   `NETSCOPE_CENTRAL_TOKEN` und `NETSCOPE_UI=false`.
+
+Der Standort baut die Verbindung selbst auf (HTTPS empfohlen); am Standort sind keine
+eingehenden Freigaben nötig. Er liefert, was er lernt: Beobachtungen der Plugins,
+Offline-Wechsel, IP-Wechsel, Löschen/Zusammenführen/Aufteilen von Geräten und seine Events.
+Beim ersten Kontakt (und nach einer Lücke) schickt er seinen kompletten Bestand. Ist die
+Zentrale nicht erreichbar, puffert er alles in seiner Datenbank und liefert es in der
+richtigen Reihenfolge nach – nichts doppelt. Die Zentrale meldet einen Standort, der sich
+fünf Minuten nicht meldet, mit `site.down` (und `site.up`, sobald er wieder liefert).
+
+In der Zentrale gilt:
+
+- **IP-Adressen gelten je Standort:** Dasselbe `192.168.1.0/24` darf es an mehreren
+  Standorten geben. MAC-Adressen und externe Referenzen (z. B. Proxmox-VMs) sind global –
+  dasselbe Gerät von zwei Standorten ist ein Gerät.
+- Die **Standort-Auswahl** oben schränkt Geräte, Topologie, Events, Schwachstellen,
+  Dashboard und Export auf einen Standort ein; in der Filtersprache `site:colo` bzw.
+  `site:local` für die Zentrale selbst. Regeln haben die Bedingung *Standorte*.
+- Die **Events eines Standorts** übernimmt die Zentrale mit Standort-Kennzeichen; für
+  Geräte eines Standorts erzeugt sie keine eigenen (sonst gäbe es jede Meldung doppelt).
+  Ihr CVE-Abgleich und die Topologie (je Standort abgeleitet) laufen trotzdem.
+- Die Zentrale **löst am Standort nichts aus**: Scans, Aktionen und Health-Checks für
+  Geräte eines Standorts gibt es dort; die Geräteseite verlinkt stattdessen auf den Standort
+  (dessen öffentliche URL oder die unter *Standorte* hinterlegte Adresse).
+- **Standorte** zeigt je Standort Verbindung, letzte Meldung, Puffer, Version, Subnetze und
+  Plugins mit Fehlern. Ein neues Token macht das alte sofort ungültig; *Entfernen* löscht die
+  gelieferten Geräte und Events aus der Zentrale (am Standort bleibt alles).
+
+Wird ein Netz bisher per Tunnel von der Zentrale gescannt, das Subnetz dort entfernen,
+sobald der Standort liefert – sonst erscheinen Geräte ohne MAC doppelt (einmal über den
+Tunnel, einmal vom Standort).
+
 ## Filter-Query-Sprache
 
 In der Geräteliste, in Gruppen, Scopes und Regeln. Terme werden mit UND verknüpft, `|`
@@ -323,7 +382,7 @@ port:22|80 ip:192.168.8.0/24 app:grafana cert<30d
 
 | Feld | Bedeutung |
 |---|---|
-| (Freitext) | Name, Hostname, IP, MAC, Hersteller, Modell, OS, Standort, Besitzer, Notizen, Tags |
+| (Freitext) | Name, Hostname, IP, MAC, Hersteller, Modell, OS, Aufstellort, Besitzer, Notizen, Tags |
 | `tag`, `group`, `type`, `vendor`, `model`, `os`, `name`, `hostname`, `location`, `owner`, `notes` | Stammdaten |
 | `ip`, `subnet`, `mac` | Adressen (CIDR und Platzhalter `*` erlaubt) |
 | `port` (`:`, `>`, `<` …; `port:161/udp`), `service`, `product`, `version` | offene Ports und Dienste |
@@ -335,13 +394,14 @@ port:22|80 ip:192.168.8.0/24 app:grafana cert<30d
 | `cert<30d`, `cert:expired`, `cert:selfsigned`, `cert:weak` | Zertifikate |
 | `app`, `title`, `container`, `package`, `health`, `source`, `parent`, `id` | weitere Merkmale |
 | `cf.<feld>` | Custom Fields (`cf.rack:A1`, `cf.baujahr>=2020`) |
+| `site` | NetScope-Standort in der Zentrale (`site:colo`, `site:local` = die Zentrale selbst) |
 
 </details>
 
 ## Regeln und Benachrichtigungen
 
 Events gehen nie direkt an Publisher, sondern durch Regeln (Bedingungen: Event-Typ, Tag,
-Gruppe, Subnetz, Schweregrad, Zeitfenster, Payload, „nur nicht bekannte Geräte“ → Aktion:
+Gruppe, Subnetz, Standort (Verbund), Schweregrad, Zeitfenster, Payload, „nur nicht bekannte Geräte“ → Aktion:
 Publisher, Priorität, sofort oder gesammelt über N Minuten, Drosselung, Ruhezeiten,
 Eskalation ohne Quittierung). Jede Regel lässt sich mit einem simulierten Event testen.
 Vorgefertigt (anpassbar):
@@ -433,6 +493,10 @@ Die Grafiken in diesem README (`docs/assets/*.svg`, hell und dunkel) erzeugt
   dem Host.
 - WireGuard-Tunnel führen keine Befehle aus der Konfiguration aus und leiten nur die
   zugeordneten Subnetze um; ihre Interfaces (`nswg<ID>`) räumt NetScope beim Beenden auf.
+- Standort-Tokens (`nss_…`) gelten nur für das Einliefern bei der Zentrale, nie für die
+  übrige API; die Zentrale speichert nur ihren Hash, der Standort das Token verschlüsselt.
+  Zugangsdaten eines Standorts verlassen ihn nie, und die Zentrale kann am Standort nichts
+  auslösen. Mit selbst signiertem Zertifikat der Zentrale dessen Fingerprint hinterlegen.
 
 ## Dokumentation
 
