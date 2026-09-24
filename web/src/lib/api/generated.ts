@@ -236,6 +236,10 @@ export interface ApiIgnoreRequest {
 	note?: string;
 }
 
+export interface ApiIpRequest {
+	ip: string;
+}
+
 export interface ApiLogLevelRequest {
 	level: string;
 }
@@ -1876,6 +1880,14 @@ export interface ApiPaths {
 	'/api/v1/devices/{id}/inventory': {
 		/** Strukturiertes Inventar je Quelle (SSH, SNMP, UPnP …) */
 		get: { query: never; body: never; response: Record<string, unknown> };
+	};
+	'/api/v1/devices/{id}/ips': {
+		/** IP-Adresse von Hand vergeben (z. B. für VMs, deren Hypervisor keine Adressen meldet) */
+		post: { query: never; body: ApiIpRequest; response: InventoryDeviceDetail };
+	};
+	'/api/v1/devices/{id}/ips/{ip}': {
+		/** Von Hand vergebene IP-Adresse entfernen */
+		delete: { query: never; body: never; response: InventoryDeviceDetail };
 	};
 	'/api/v1/devices/{id}/observations': {
 		/** Rohdaten pro Plugin */

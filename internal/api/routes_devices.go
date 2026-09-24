@@ -53,6 +53,10 @@ type splitRequest struct {
 	MACs []string `json:"macs"`
 }
 
+type ipRequest struct {
+	IP string `json:"ip"`
+}
+
 type scanRequest struct {
 	Plugins []string `json:"plugins"`
 }
@@ -99,6 +103,11 @@ func (s *Server) registerDevices() {
 		Resp: okResponse{}, handler: s.handleDeleteDevice})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/split", Tag: "Geräte", Summary: "MAC-Adressen in ein neues Gerät abspalten",
 		Scope: scopeWrite, Body: splitRequest{}, Resp: idResponse{}, handler: s.handleSplit})
+	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/ips", Tag: "Geräte",
+		Summary: "IP-Adresse von Hand vergeben (z. B. für VMs, deren Hypervisor keine Adressen meldet)", Scope: scopeWrite,
+		Body: ipRequest{}, Resp: inventory.DeviceDetail{}, handler: s.handleAddIP})
+	s.add(&route{Method: "DELETE", Path: "/api/v1/devices/{id}/ips/{ip}", Tag: "Geräte", Summary: "Von Hand vergebene IP-Adresse entfernen",
+		Scope: scopeWrite, Resp: inventory.DeviceDetail{}, handler: s.handleRemoveIP})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/scan", Tag: "Geräte", Summary: "Scanner jetzt für dieses Gerät ausführen",
 		Scope: scopeWrite, Body: scanRequest{}, Resp: scanResponse{}, Status: http.StatusAccepted, handler: s.handleScanDevice})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/actions/{plugin}/{action}", Tag: "Geräte", Summary: "Geräteaktion eines Plugins (z. B. WOL)",
@@ -264,6 +273,42 @@ func (s *Server) handleMerge(w http.ResponseWriter, r *http.Request) {
 	s.record(r, "device.merge", "device", strconv.FormatInt(req.Target, 10),
 		fmt.Sprintf("%s zusammengeführt in %s", strings.Join(names, ", "), target), req, nil)
 	writeJSON(w, http.StatusOK, okResponse{OK: true})
+}
+
+func (s *Server) handleAddIP(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	var req ipRequest
+	if err := decode(r, &req); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if err := s.Inventory.AddManualIP(r.Context(), id, strings.TrimSpace(req.IP)); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.record(r, "device.ip_add", "device", strconv.FormatInt(id, 10), "IP "+req.IP+" von Hand vergeben: "+s.Inventory.Name(r.Context(), id), nil, req)
+	d, err := s.Inventory.Get(r.Context(), id)
+	s.respond(w, r, d, err)
+}
+
+func (s *Server) handleRemoveIP(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	ip := r.PathValue("ip")
+	if err := s.Inventory.RemoveManualIP(r.Context(), id, ip); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.record(r, "device.ip_remove", "device", strconv.FormatInt(id, 10), "Von Hand vergebene IP "+ip+" entfernt: "+s.Inventory.Name(r.Context(), id), ipRequest{IP: ip}, nil)
+	d, err := s.Inventory.Get(r.Context(), id)
+	s.respond(w, r, d, err)
 }
 
 func (s *Server) handleSplit(w http.ResponseWriter, r *http.Request) {

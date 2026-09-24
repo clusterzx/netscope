@@ -3,16 +3,19 @@
 	MACs, notes, custom fields, presence per plugin, parent/children and external refs.
 -->
 <script lang="ts">
-	import { api } from '$lib/api';
+	import { api, errorMessage, fieldErrors } from '$lib/api';
 	import type { DeviceDetail, Relation } from '$lib/api/types';
 	import { formatCustom } from '$lib/components/devices/columns';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Card from '$lib/components/ui/Card.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import JsonView from '$lib/components/ui/JsonView.svelte';
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import StatusDot from '$lib/components/ui/StatusDot.svelte';
 	import { customFields } from '$lib/stores/catalog.svelte';
+	import { confirm } from '$lib/stores/confirm.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDateTime, formatNumber } from '$lib/utils/format';
 	import { deviceTypeName, factKindLabel, relationKindLabel } from '$lib/utils/labels';
 	import CredentialsCard from './CredentialsCard.svelte';
@@ -63,6 +66,53 @@
 	$effect(() => () => rel.abort());
 	const parents = $derived((rel.data ?? []).filter((r) => r.childId === d.id));
 	const children = $derived((rel.data ?? []).filter((r) => r.parentId === d.id));
+
+	// ---------------------------------------------------------------- manual addresses
+	/** addresses of a site device are kept at the site */
+	const canEditIPs = $derived(!d.siteRef);
+	let ipAdding = $state(false);
+	let newIp = $state('');
+	let ipError = $state<string | null>(null);
+	let ipBusy = $state(false);
+
+	async function addIp() {
+		const v = newIp.trim();
+		if (!v) {
+			ipError = 'IP-Adresse eingeben';
+			return;
+		}
+		ipBusy = true;
+		ipError = null;
+		try {
+			const next = await api.post('/api/v1/devices/{id}/ips', { path: { id: d.id }, body: { ip: v } });
+			onchanged(next);
+			newIp = '';
+			ipAdding = false;
+			toast.success(`${v} vergeben`);
+		} catch (e) {
+			ipError = fieldErrors(e).ip ?? errorMessage(e);
+		} finally {
+			ipBusy = false;
+		}
+	}
+
+	async function removeIp(ip: string) {
+		const ok = await confirm({
+			title: `${ip} entfernen?`,
+			message:
+				'Die von Hand vergebene Adresse wird entfernt; Scanner prüfen sie danach nicht mehr für dieses Gerät.',
+			confirmLabel: 'Entfernen',
+			danger: true
+		});
+		if (!ok) return;
+		try {
+			const next = await api.delete('/api/v1/devices/{id}/ips/{ip}', { path: { id: d.id, ip } });
+			onchanged(next);
+			toast.success(`${ip} entfernt`);
+		} catch (e) {
+			toast.error(e);
+		}
+	}
 
 	function factValue(kind: string, value: string): string {
 		return kind === 'type' ? deviceTypeName(value) : value;
@@ -151,6 +201,48 @@
 		</Card>
 
 		<Card title="IP-Adressen" icon="network" padding="none" description="Aktuelle und frühere Zuordnungen">
+			{#snippet actions()}
+				{#if canEditIPs && !ipAdding}
+					<Button size="sm" variant="ghost" icon="plus" onclick={() => (ipAdding = true)}>IP vergeben</Button>
+				{/if}
+			{/snippet}
+			{#if ipAdding}
+				<form
+					class="flex flex-col gap-2 border-b border-border px-4 py-3"
+					onsubmit={(e) => {
+						e.preventDefault();
+						addIp();
+					}}
+				>
+					<div class="flex flex-wrap items-start gap-2">
+						<Input
+							label="IP-Adresse"
+							bind:value={newIp}
+							placeholder="z. B. 192.168.1.20"
+							error={ipError}
+							mono
+							class="w-56"
+							autofocus
+						/>
+						<div class="flex gap-2 pt-6">
+							<Button type="submit" variant="primary" icon="plus" loading={ipBusy}>Vergeben</Button>
+							<Button
+								onclick={() => {
+									ipAdding = false;
+									ipError = null;
+									newIp = '';
+								}}
+								disabled={ipBusy}>Abbrechen</Button
+							>
+						</div>
+					</div>
+					<p class="text-xs text-fg-subtle">
+						Für Geräte, deren Adresse kein Scanner findet – z. B. VMs ohne Gast-Agent. Ping, Ports und Dienste
+						werden danach auch für diese Adresse geprüft. Ist sie bisher einem Gerät zugeordnet, das nur über
+						diese IP bekannt ist, wird es mit diesem zusammengeführt.
+					</p>
+				</form>
+			{/if}
 			{#if d.ipHistory?.length}
 				<div class="relative overflow-x-auto">
 					<table class="w-full border-separate border-spacing-0 text-sm">
@@ -186,6 +278,16 @@
 												>
 												aktuell · gesehen <RelativeTime value={ip.lastSeen} />
 											</span>
+											{#if ip.source === 'manual' && canEditIPs}
+												<Button
+													size="xs"
+													variant="ghost"
+													icon="trash"
+													label="{ip.ip} entfernen"
+													class="ml-1"
+													onclick={() => removeIp(ip.ip)}
+												/>
+											{/if}
 										{/if}
 									</td>
 								</tr>
@@ -193,7 +295,7 @@
 						</tbody>
 					</table>
 				</div>
-			{:else}
+			{:else if !ipAdding}
 				<p class="px-4 py-3 text-sm text-fg-subtle">Keine IP-Adresse bekannt.</p>
 			{/if}
 		</Card>
