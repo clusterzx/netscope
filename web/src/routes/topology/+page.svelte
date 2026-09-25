@@ -10,7 +10,7 @@
 	import NodeList from '$lib/components/topology/NodeList.svelte';
 	import SelectionPanel from '$lib/components/topology/SelectionPanel.svelte';
 	import TopologyCanvas from '$lib/components/topology/TopologyCanvas.svelte';
-	import type { Pins } from '$lib/components/topology/graph';
+	import type { LayoutMode, Pins } from '$lib/components/topology/graph';
 	import {
 		Alert,
 		Button,
@@ -158,6 +158,15 @@
 		});
 	});
 	const matches = $derived(search.trim() ? new Set(listNodes.map((n) => n.id)) : null);
+
+	// ---------------------------------------------------------------- layout (persisted per browser)
+	let layout = $state<LayoutMode>(
+		loadPref<LayoutMode>('topology.layout', 'force') === 'radial' ? 'radial' : 'force'
+	);
+	function setLayout(v: LayoutMode) {
+		layout = v;
+		savePref('topology.layout', v);
+	}
 
 	// ---------------------------------------------------------------- pins (persisted per browser)
 	const initialPins = loadPref<Pins>('topology.pins', {});
@@ -442,6 +451,7 @@
 				{nodes}
 				{edges}
 				{pins}
+				{layout}
 				{selected}
 				{selectedEdge}
 				{matches}
@@ -487,7 +497,26 @@
 					label="Layout neu berechnen"
 					onclick={() => view?.relayout()}
 				/>
-				{#if pinned.size}
+				<span class="mx-1 my-0.5 h-px bg-border" aria-hidden="true"></span>
+				<Button
+					variant="ghost"
+					size="sm"
+					icon="topology"
+					label="Anordnung: frei (Kräfte, Knoten lassen sich fixieren)"
+					active={layout === 'force'}
+					aria-pressed={layout === 'force'}
+					onclick={() => setLayout('force')}
+				/>
+				<Button
+					variant="ghost"
+					size="sm"
+					icon="radar"
+					label="Anordnung: Kreise (Kinder rund um ihr Gerät, Container rund um ihren Host)"
+					active={layout === 'radial'}
+					aria-pressed={layout === 'radial'}
+					onclick={() => setLayout('radial')}
+				/>
+				{#if pinned.size && layout === 'force'}
 					<Button
 						variant="ghost"
 						size="sm"

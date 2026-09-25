@@ -20,6 +20,10 @@ import {
 } from 'd3-force';
 import type { GraphEdge, GraphNode } from '$lib/api';
 import { icons, type IconName } from '$lib/components/ui/icons';
+import { radialLayout } from './radial';
+
+/** force: free d3-force layout (nodes can be pinned); radial: children on rings around their parent */
+export type LayoutMode = 'force' | 'radial';
 
 // ---------------------------------------------------------------- visual encoding
 
@@ -249,6 +253,16 @@ export class TopologyEngine {
 	#labelOrder: TNode[] = [];
 	#labels = new Map<string, { src: string; text: string; w: number }>();
 	#occ = new Uint8Array(0);
+	#layout: LayoutMode = 'force';
+	/** children in the radial layout tree (dragging moves them along) */
+	#tree = new Map<string, TNode[]>();
+	/** animated move of all nodes to new positions (radial layout) */
+	#tween: {
+		from: Map<TNode, [number, number]>;
+		to: Map<TNode, [number, number]>;
+		start: number;
+		dur: number;
+	} | null = null;
 	#reduceMotion = false;
 	#destroyed = false;
 
@@ -393,7 +407,9 @@ export class TopologyEngine {
 			this.#signature = sig;
 			this.#sim.nodes(list);
 			this.#linkForce.links(links);
-			if (!hadLayout || added > list.length / 2) {
+			if (this.#layout === 'radial') {
+				this.#applyRadial(hadLayout && added <= list.length / 2);
+			} else if (!hadLayout || added > list.length / 2) {
 				// fresh layout: settle most of it synchronously, then animate the rest
 				this.#sim.alpha(1);
 				const start = performance.now();
@@ -403,7 +419,7 @@ export class TopologyEngine {
 			} else {
 				this.#sim.alpha(Math.max(this.#sim.alpha(), 0.3));
 			}
-			this.#simRunning = true;
+			this.#simRunning = this.#layout === 'force';
 		}
 		if (this.#hover?.node && !next.has(this.#hover.node.id)) this.#setHover(null, 0, 0);
 		this.#requestDraw();
@@ -462,7 +478,51 @@ export class TopologyEngine {
 	/** Re-runs the layout (pinned nodes stay) and fits the view afterwards. */
 	relayout() {
 		this.#autoFit = true;
-		this.#kick(1);
+		if (this.#layout === 'radial') this.#applyRadial(true);
+		else this.#kick(1);
+	}
+
+	get layout(): LayoutMode {
+		return this.#layout;
+	}
+
+	/** Switches between the free force layout and the rings around each parent. */
+	setLayout(mode: LayoutMode) {
+		if (mode === this.#layout) return;
+		this.#layout = mode;
+		this.#autoFit = true;
+		if (mode === 'radial') {
+			this.#simRunning = false;
+			if (this.nodes.length) this.#applyRadial(true);
+		} else {
+			this.#tween = null;
+			this.#tree = new Map();
+			this.#kick(0.6);
+		}
+		this.#requestDraw();
+	}
+
+	/** Computes the radial layout and moves the nodes there (animated unless reduced motion). */
+	#applyRadial(animate: boolean) {
+		const { pos, kids } = radialLayout(this.nodes, this.links);
+		this.#tree = kids;
+		const from = new Map<TNode, [number, number]>();
+		const to = new Map<TNode, [number, number]>();
+		for (const n of this.nodes) {
+			const p = pos.get(n.id);
+			if (!p) continue;
+			if (!animate || this.#reduceMotion || n.x === undefined || n.y === undefined) {
+				n.x = p[0];
+				n.y = p[1];
+			} else {
+				from.set(n, [n.x, n.y]);
+				to.set(n, p);
+			}
+			n.vx = n.vy = 0;
+		}
+		this.#tween = to.size ? { from, to, start: performance.now(), dur: 650 } : null;
+		if (!this.#tween && this.#autoFit) this.fit(false);
+		this.#requestDraw();
 	}
 
 	// ------------------------------------------------------------ view
@@ -571,6 +631,11 @@ export class TopologyEngine {
 	// ------------------------------------------------------------ loop
 
 	#kick(alpha?: number) {
+		if (this.#layout === 'radial') {
+			// positions come from the rings, not from the simulation
+			this.#requestDraw();
+			return;
+		}
 		if (alpha !== undefined) this.#sim.alpha(Math.max(this.#sim.alpha(), alpha));
 		this.#simRunning = true;
 		this.#requestDraw();
@@ -583,6 +648,20 @@ export class TopologyEngine {
 	#loop = (now: number) => {
 		this.#frame = 0;
 		let more = false;
+		if (this.#tween) {
+			const tw = this.#tween;
+			const p = clamp((now - tw.start) / tw.dur, 0, 1);
+			const e = ease(p);
+			for (const [n, [fx, fy]] of tw.from) {
+				const [tx, ty] = tw.to.get(n)!;
+				n.x = fx + (tx - fx) * e;
+				n.y = fy + (ty - fy) * e;
+			}
+			if (p >= 1) {
+				this.#tween = null;
+				if (this.#autoFit) this.fit(true);
+			} else more = true;
+		}
 		if (this.#simRunning) {
 			this.#sim.tick();
 			if (this.#sim.alpha() < this.#sim.alphaMin()) {
@@ -789,7 +868,7 @@ export class TopologyEngine {
 				base();
 			}
 			// pinned marker
-			if (k * r >= 7 && n.fx !== null && n.fx !== undefined) {
+			if (k * r >= 7 && this.#layout === 'force' && n.fx !== null && n.fx !== undefined) {
 				const pr = 2.6 * px;
 				ctx.fillStyle = pal['--fg-muted'];
 				ctx.strokeStyle = pal['--surface'];
@@ -999,13 +1078,29 @@ export class TopologyEngine {
 				if (dx * dx + dy * dy < 16) return;
 				g.moved = true;
 				this.#setHover(null, p.x, p.y);
-				if (g.node) {
+				if (g.node && this.#layout === 'radial') {
+					this.#tween = null;
+					this.#autoFit = false;
+				} else if (g.node) {
 					g.node.fx = g.node.x;
 					g.node.fy = g.node.y;
 					this.#sim.alphaTarget(0.25);
 				} else this.#autoFit = false;
 			}
-			if (g.node) {
+			if (g.node && this.#layout === 'radial') {
+				// the node takes its whole subtree along
+				const { k, x, y } = this.#t;
+				const dx = (p.x - x) / k - g.node.x!;
+				const dy = (p.y - y) / k - g.node.y!;
+				const stack = [g.node];
+				while (stack.length) {
+					const n = stack.pop()!;
+					n.x! += dx;
+					n.y! += dy;
+					stack.push(...(this.#tree.get(n.id) ?? []));
+				}
+				this.#requestDraw();
+			} else if (g.node) {
 				const { k, x, y } = this.#t;
 				g.node.fx = (p.x - x) / k;
 				g.node.fy = (p.y - y) / k;
@@ -1041,7 +1136,7 @@ export class TopologyEngine {
 		if (!g || g.id !== e.pointerId) return;
 		this.#gesture = null;
 		this.#suppressClick = g.moved;
-		if (g.moved && g.node) {
+		if (g.moved && g.node && this.#layout === 'force') {
 			this.#sim.alphaTarget(0);
 			this.#cb.onPinsChange(this.pins());
 		}

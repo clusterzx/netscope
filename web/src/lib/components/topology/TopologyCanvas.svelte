@@ -6,18 +6,27 @@
     onnodeclick={(n, e) => …} onedgeclick={(e) => …} onemptyclick={() => …}
     onnodedblclick={(n) => …} onpinschange={(pins) => …} />
   view.zoomIn() / zoomOut() / fit() / center(id) / unpin(id) / unpinAll() / relayout()
+  layout: 'force' (free, pinnable) | 'radial' (children on rings around their parent)
 -->
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import type { GraphEdge, GraphNode } from '$lib/api';
 	import { deviceTypeName, relationKindLabel, stateLabel, label as lbl } from '$lib/utils/labels';
-	import { TopologyEngine, edgeLabel, readPalette, type HoverTarget, type Pins } from './graph';
+	import {
+		TopologyEngine,
+		edgeLabel,
+		readPalette,
+		type HoverTarget,
+		type LayoutMode,
+		type Pins
+	} from './graph';
 
 	interface Props {
 		nodes: GraphNode[];
 		edges: GraphEdge[];
 		/** initial pinned positions */
 		pins: Pins;
+		layout?: LayoutMode;
 		selected?: string | null;
 		selectedEdge?: string | null;
 		matches?: Set<string> | null;
@@ -37,6 +46,7 @@
 		nodes,
 		edges,
 		pins,
+		layout = 'force',
 		selected = null,
 		selectedEdge = null,
 		matches = null,
@@ -71,6 +81,8 @@
 			onDoubleClickNode: (n) => onnodedblclick?.(n.data),
 			onPinsChange: (p) => onpinschange?.(p)
 		});
+		// before the first data: the initial layout is computed directly in the chosen mode
+		eng.setLayout(untrack(() => layout));
 		engine = eng;
 
 		const ro = new ResizeObserver((entries) => {
@@ -117,6 +129,10 @@
 
 	$effect(() => {
 		engine?.setState({ selected, selectedEdge, matches, connectMode, connectFrom });
+	});
+
+	$effect(() => {
+		engine?.setLayout(layout);
 	});
 
 	export function zoomIn() {
