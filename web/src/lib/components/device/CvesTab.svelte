@@ -110,7 +110,7 @@
 	const ignoredCount = $derived(all.filter((c) => c.ignored).length);
 
 	// ---------------------------------------------------------------- expand
-	let open = $state<Record<string, boolean>>({});
+	let open = $state<Record<number, boolean>>({});
 
 	// ---------------------------------------------------------------- ignore
 	let ignoreOpen = $state(false);
@@ -184,10 +184,10 @@
 	<Button
 		size="xs"
 		variant="ghost"
-		icon={open[c.cve] ? 'chevron-down' : 'chevron-right'}
-		label={open[c.cve] ? 'Details ausblenden' : 'Details anzeigen'}
-		aria-expanded={!!open[c.cve]}
-		onclick={() => (open[c.cve] = !open[c.cve])}
+		icon={open[c.id] ? 'chevron-down' : 'chevron-right'}
+		label={open[c.id] ? 'Details ausblenden' : 'Details anzeigen'}
+		aria-expanded={!!open[c.id]}
+		onclick={() => (open[c.id] = !open[c.id])}
 	/>
 {/snippet}
 {#snippet cveCell(c: Item)}
@@ -286,7 +286,7 @@
 		<Table
 			{columns}
 			rows={pageRows}
-			key={(c) => c.cve}
+			key={(c) => c.id}
 			{sort}
 			onsort={(s) => (sort = s)}
 			loading={data.loading}
@@ -295,7 +295,7 @@
 			rowClass={(c) => (c.ignored ? 'opacity-60' : '')}
 		>
 			{#snippet expanded(c)}
-				{#if open[c.cve]}
+				{#if open[c.id]}
 					<tr class="bg-surface-2">
 						<td colspan={columns.length} class="border-b border-border px-4 py-3">
 							<div class="flex max-w-4xl flex-col gap-2 text-sm">
