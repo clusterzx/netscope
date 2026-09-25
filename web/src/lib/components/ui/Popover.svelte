@@ -53,7 +53,12 @@
 		left = Math.max(8, Math.min(left, vw - pw - 8));
 		top = Math.max(8, top);
 		const maxH = Math.max(160, vh - top - 12);
-		style = `top:${top}px;left:${left}px;max-height:${maxH}px;${matchWidth ? `min-width:${r.width}px;` : ''}`;
+		// an ancestor with transform, filter or backdrop-filter (e.g. the blurred top bar)
+		// becomes the containing block of the fixed panel: subtract its origin
+		const cur = panel.getBoundingClientRect();
+		const ox = cur.left - (parseFloat(panel.style.left) || 0);
+		const oy = cur.top - (parseFloat(panel.style.top) || 0);
+		style = `top:${top - oy}px;left:${left - ox}px;max-height:${maxH}px;${matchWidth ? `min-width:${r.width}px;` : ''}`;
 	}
 
 	function close() {
