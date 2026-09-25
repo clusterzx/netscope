@@ -366,7 +366,7 @@
 		{/if}
 	{/snippet}
 	{#snippet actions()}
-		{#if auth.canWrite}
+		{#if auth.can('devices.edit')}
 			<Button
 				icon="link"
 				active={!!connect}
@@ -613,7 +613,7 @@
 					{edges}
 					{nodesById}
 					pinned={!!selectedNode && pinned.has(selectedNode.id)}
-					canWrite={auth.canWrite}
+					canWrite={auth.can('devices.edit')}
 					class="absolute inset-x-2 bottom-2 z-20 max-h-[55%] sm:inset-x-auto sm:top-2 sm:right-2 sm:bottom-auto sm:max-h-[calc(100%-1rem)] sm:w-80"
 					onclose={() => select(null)}
 					onselectnode={(id) => select(id, true)}

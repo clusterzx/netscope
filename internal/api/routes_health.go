@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"netscope/internal/auth"
 	"netscope/internal/inventory"
 	"netscope/internal/plugins/healthcheck"
 	"netscope/internal/timeseries"
@@ -40,15 +41,15 @@ func (s *Server) registerHealth() {
 	s.add(&route{Method: "GET", Path: "/api/v1/health-checks", Tag: "Health", Summary: "Health-Checks", Scope: scopeRead,
 		Params: []param{{Name: "device", Type: "integer"}}, Resp: []healthcheck.Check{}, handler: s.handleChecks})
 	s.add(&route{Method: "POST", Path: "/api/v1/health-checks", Tag: "Health", Summary: "Health-Check anlegen", Scope: scopeWrite,
-		Body: healthcheck.Check{}, Resp: healthcheck.Check{}, Status: http.StatusCreated, handler: s.handleSaveCheck})
+		Body: healthcheck.Check{}, Resp: healthcheck.Check{}, Status: http.StatusCreated, Perm: auth.PermHealthManage, handler: s.handleSaveCheck})
 	s.add(&route{Method: "GET", Path: "/api/v1/health-checks/{id}", Tag: "Health", Summary: "Ein Health-Check", Scope: scopeRead,
 		Resp: healthcheck.Check{}, handler: s.handleCheck})
 	s.add(&route{Method: "PUT", Path: "/api/v1/health-checks/{id}", Tag: "Health", Summary: "Health-Check ändern", Scope: scopeWrite,
-		Body: healthcheck.Check{}, Resp: healthcheck.Check{}, handler: s.handleSaveCheck})
+		Body: healthcheck.Check{}, Resp: healthcheck.Check{}, Perm: auth.PermHealthManage, handler: s.handleSaveCheck})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/health-checks/{id}", Tag: "Health", Summary: "Health-Check löschen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteCheck})
+		Resp: okResponse{}, Perm: auth.PermHealthManage, handler: s.handleDeleteCheck})
 	s.add(&route{Method: "POST", Path: "/api/v1/health-checks/{id}/run", Tag: "Health", Summary: "Check sofort ausführen", Scope: scopeWrite,
-		Resp: checkRunResult{}, handler: s.handleRunCheck})
+		Resp: checkRunResult{}, Perm: auth.PermHealthManage, handler: s.handleRunCheck})
 	s.add(&route{Method: "GET", Path: "/api/v1/health-checks/{id}/outages", Tag: "Health", Summary: "Ausfallhistorie eines Checks", Scope: scopeRead,
 		Params: []param{{Name: "limit", Type: "integer"}}, Resp: []healthcheck.Outage{}, handler: s.handleCheckOutages})
 	s.add(&route{Method: "GET", Path: "/api/v1/health-checks/{id}/latency", Tag: "Health", Summary: "Latenz-Zeitreihe eines Checks", Scope: scopeRead,
@@ -63,9 +64,9 @@ func (s *Server) registerTopology() {
 	s.add(&route{Method: "GET", Path: "/api/v1/topology/edges", Tag: "Topologie", Summary: "Manuelle Kanten", Scope: scopeRead,
 		Resp: []inventory.Relation{}, handler: s.handleManualEdges})
 	s.add(&route{Method: "POST", Path: "/api/v1/topology/edges", Tag: "Topologie", Summary: "Manuelle (geschützte) Kante anlegen", Scope: scopeWrite,
-		Body: graphEdgeRequest{}, Resp: idResponse{}, Status: http.StatusCreated, handler: s.handleAddEdge})
+		Body: graphEdgeRequest{}, Resp: idResponse{}, Status: http.StatusCreated, Perm: auth.PermDevicesEdit, handler: s.handleAddEdge})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/topology/edges/{id}", Tag: "Topologie", Summary: "Kante löschen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteEdge})
+		Resp: okResponse{}, Perm: auth.PermDevicesEdit, handler: s.handleDeleteEdge})
 }
 
 func (s *Server) handleHealthBoard(w http.ResponseWriter, r *http.Request) {

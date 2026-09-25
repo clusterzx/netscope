@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"netscope/internal/auth"
 	"netscope/internal/netutil"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
@@ -54,20 +55,20 @@ func (s *Server) registerRules() {
 	s.add(&route{Method: "GET", Path: "/api/v1/rules", Tag: "Regeln", Summary: "Benachrichtigungsregeln", Scope: scopeRead,
 		Resp: []rules.Rule{}, handler: s.handleRules})
 	s.add(&route{Method: "POST", Path: "/api/v1/rules", Tag: "Regeln", Summary: "Regel anlegen", Scope: scopeWrite,
-		Body: rules.Rule{}, Resp: rules.Rule{}, Status: http.StatusCreated, handler: s.handleSaveRule})
+		Body: rules.Rule{}, Resp: rules.Rule{}, Status: http.StatusCreated, Perm: auth.PermRulesManage, handler: s.handleSaveRule})
 	s.add(&route{Method: "PUT", Path: "/api/v1/rules/order", Tag: "Regeln", Summary: "Auswertungsreihenfolge der Regeln setzen (atomar)",
-		Scope: scopeWrite, Body: ruleOrderRequest{}, Resp: []rules.Rule{}, handler: s.handleRuleOrder})
+		Scope: scopeWrite, Body: ruleOrderRequest{}, Resp: []rules.Rule{}, Perm: auth.PermRulesManage, handler: s.handleRuleOrder})
 	s.add(&route{Method: "GET", Path: "/api/v1/rules/{id}", Tag: "Regeln", Summary: "Eine Regel", Scope: scopeRead,
 		Resp: rules.Rule{}, handler: s.handleRule})
 	s.add(&route{Method: "PUT", Path: "/api/v1/rules/{id}", Tag: "Regeln", Summary: "Regel ändern", Scope: scopeWrite,
-		Body: rules.Rule{}, Resp: rules.Rule{}, handler: s.handleSaveRule})
+		Body: rules.Rule{}, Resp: rules.Rule{}, Perm: auth.PermRulesManage, handler: s.handleSaveRule})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/rules/{id}", Tag: "Regeln", Summary: "Regel löschen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteRule})
+		Resp: okResponse{}, Perm: auth.PermRulesManage, handler: s.handleDeleteRule})
 	s.add(&route{Method: "POST", Path: "/api/v1/rules/test", Tag: "Regeln",
 		Summary: "Regel mit simuliertem Event testen (gespeicherte Regel per ID-Route oder ungespeicherte im Body)", Scope: scopeWrite,
-		Body: ruleTestRequest{}, Resp: rules.SimResult{}, handler: s.handleTestRule})
+		Body: ruleTestRequest{}, Resp: rules.SimResult{}, Perm: auth.PermRulesManage, handler: s.handleTestRule})
 	s.add(&route{Method: "POST", Path: "/api/v1/rules/{id}/test", Tag: "Regeln", Summary: "Gespeicherte Regel mit simuliertem Event testen",
-		Scope: scopeWrite, Body: rules.SimInput{}, Resp: rules.SimResult{}, handler: s.handleTestSavedRule})
+		Scope: scopeWrite, Body: rules.SimInput{}, Resp: rules.SimResult{}, Perm: auth.PermRulesManage, handler: s.handleTestSavedRule})
 	s.add(&route{Method: "GET", Path: "/api/v1/notifications", Tag: "Regeln", Summary: "Benachrichtigungsverlauf", Scope: scopeRead,
 		Params: []param{{Name: "status"}, {Name: "publisher"}, {Name: "event", Type: "integer"}, {Name: "rule", Type: "integer"}, {Name: "limit", Type: "integer"},
 			{Name: "offset", Type: "integer"}}, Resp: notificationList{}, handler: s.handleNotifications})
@@ -77,18 +78,18 @@ func (s *Server) registerRules() {
 
 func (s *Server) registerCredentials() {
 	s.add(&route{Method: "GET", Path: "/api/v1/credentials", Tag: "Credentials", Summary: "Vault-Einträge (ohne Secrets)", Scope: scopeRead,
-		Resp: []credentialView{}, handler: s.handleCredentials})
+		Resp: []credentialView{}, Perm: auth.PermCredentialsView, handler: s.handleCredentials})
 	s.add(&route{Method: "GET", Path: "/api/v1/credentials/types", Tag: "Credentials", Summary: "Credential-Typen mit Formular-Schema",
 		Scope: scopeRead, Resp: []plugin.CredentialType{}, handler: s.handleCredentialTypes})
 	s.add(&route{Method: "POST", Path: "/api/v1/credentials", Tag: "Credentials", Summary: "Credential anlegen (verschlüsselt gespeichert)",
-		Scope: scopeWrite, Body: vault.CredentialInput{}, Resp: credentialView{}, Status: http.StatusCreated, handler: s.handleSaveCredential})
+		Scope: scopeWrite, Body: vault.CredentialInput{}, Resp: credentialView{}, Status: http.StatusCreated, Perm: auth.PermCredentialsEdit, handler: s.handleSaveCredential})
 	s.add(&route{Method: "GET", Path: "/api/v1/credentials/{id}", Tag: "Credentials", Summary: "Ein Credential (ohne Secrets)", Scope: scopeRead,
-		Resp: credentialView{}, handler: s.handleCredential})
+		Resp: credentialView{}, Perm: auth.PermCredentialsView, handler: s.handleCredential})
 	s.add(&route{Method: "PUT", Path: "/api/v1/credentials/{id}", Tag: "Credentials",
 		Summary: "Credential ändern (Secret-Felder mit ******** bleiben unverändert)", Scope: scopeWrite,
-		Body: vault.CredentialInput{}, Resp: credentialView{}, handler: s.handleSaveCredential})
+		Body: vault.CredentialInput{}, Resp: credentialView{}, Perm: auth.PermCredentialsEdit, handler: s.handleSaveCredential})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/credentials/{id}", Tag: "Credentials", Summary: "Credential löschen (nur wenn unbenutzt)",
-		Scope: scopeWrite, Resp: okResponse{}, handler: s.handleDeleteCredential})
+		Scope: scopeWrite, Resp: okResponse{}, Perm: auth.PermCredentialsEdit, handler: s.handleDeleteCredential})
 }
 
 func (s *Server) handleRules(w http.ResponseWriter, r *http.Request) {

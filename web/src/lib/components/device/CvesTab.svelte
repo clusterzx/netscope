@@ -19,6 +19,7 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDate, formatDateTime, formatNumber } from '$lib/utils/format';
 	import { severityFromCvss, severityRank } from '$lib/utils/labels';
@@ -145,7 +146,8 @@
 		}
 	}
 
-	const columns: Column<Item>[] = [
+	const canManage = $derived(auth.can('vulns.manage'));
+	const allColumns: Column<Item>[] = [
 		{ key: 'expand', label: '', width: '2.25rem', cell: expandCell },
 		{ key: 'cve', label: 'CVE', sortable: true, cell: cveCell },
 		{ key: 'cvss', label: 'CVSS', sortable: true, sortDesc: true, cell: cvssCell },
@@ -162,6 +164,7 @@
 		},
 		{ key: 'actions', label: 'Aktion', align: 'right', cell: actionCell }
 	];
+	const columns = $derived(canManage ? allColumns : allColumns.filter((c) => c.key !== 'actions'));
 
 	const sevOptions = [
 		{ value: '', label: 'Alle Schweregrade' },

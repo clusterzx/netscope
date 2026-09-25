@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"netscope/internal/auth"
 	"netscope/internal/inventory"
 )
 
@@ -15,40 +16,40 @@ func (s *Server) registerMeta() {
 	s.add(&route{Method: "GET", Path: "/api/v1/subnets", Tag: "Subnetze", Summary: "Subnetze (mit Tunnel-Zustand)", Scope: scopeRead,
 		Resp: []subnetView{}, handler: s.handleSubnets})
 	s.add(&route{Method: "POST", Path: "/api/v1/subnets", Tag: "Subnetze", Summary: "Subnetz anlegen", Scope: scopeWrite,
-		Body: inventory.Subnet{}, Resp: subnetView{}, Status: http.StatusCreated, handler: s.handleSaveSubnet})
+		Body: inventory.Subnet{}, Resp: subnetView{}, Status: http.StatusCreated, Perm: auth.PermNetworkManage, handler: s.handleSaveSubnet})
 	s.add(&route{Method: "PUT", Path: "/api/v1/subnets/{id}", Tag: "Subnetze", Summary: "Subnetz ändern", Scope: scopeWrite,
-		Body: inventory.Subnet{}, Resp: subnetView{}, handler: s.handleSaveSubnet})
+		Body: inventory.Subnet{}, Resp: subnetView{}, Perm: auth.PermNetworkManage, handler: s.handleSaveSubnet})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/subnets/{id}", Tag: "Subnetze", Summary: "Subnetz löschen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteSubnet})
+		Resp: okResponse{}, Perm: auth.PermNetworkManage, handler: s.handleDeleteSubnet})
 
 	s.add(&route{Method: "GET", Path: "/api/v1/groups", Tag: "Gruppen", Summary: "Gerätegruppen", Scope: scopeRead,
 		Resp: []inventory.Group{}, handler: s.handleGroups})
 	s.add(&route{Method: "POST", Path: "/api/v1/groups", Tag: "Gruppen", Summary: "Gruppe anlegen (manuell oder regelbasiert per Filter)",
-		Scope: scopeWrite, Body: inventory.Group{}, Resp: inventory.Group{}, Status: http.StatusCreated, handler: s.handleSaveGroup})
+		Scope: scopeWrite, Body: inventory.Group{}, Resp: inventory.Group{}, Status: http.StatusCreated, Perm: auth.PermInventoryConfig, handler: s.handleSaveGroup})
 	s.add(&route{Method: "PUT", Path: "/api/v1/groups/{id}", Tag: "Gruppen", Summary: "Gruppe ändern", Scope: scopeWrite,
-		Body: inventory.Group{}, Resp: inventory.Group{}, handler: s.handleSaveGroup})
+		Body: inventory.Group{}, Resp: inventory.Group{}, Perm: auth.PermInventoryConfig, handler: s.handleSaveGroup})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/groups/{id}", Tag: "Gruppen", Summary: "Gruppe löschen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteGroup})
+		Resp: okResponse{}, Perm: auth.PermInventoryConfig, handler: s.handleDeleteGroup})
 	s.add(&route{Method: "GET", Path: "/api/v1/groups/{id}/members", Tag: "Gruppen", Summary: "Mitglieder einer Gruppe", Scope: scopeRead,
 		Resp: groupMembers{}, handler: s.handleGroupMembers})
 
 	s.add(&route{Method: "GET", Path: "/api/v1/custom-fields", Tag: "Custom Fields", Summary: "Custom-Field-Definitionen", Scope: scopeRead,
 		Resp: []inventory.CustomField{}, handler: s.handleCustomFields})
 	s.add(&route{Method: "POST", Path: "/api/v1/custom-fields", Tag: "Custom Fields", Summary: "Custom Field anlegen", Scope: scopeWrite,
-		Body: inventory.CustomField{}, Resp: inventory.CustomField{}, Status: http.StatusCreated, handler: s.handleSaveCustomField})
+		Body: inventory.CustomField{}, Resp: inventory.CustomField{}, Status: http.StatusCreated, Perm: auth.PermInventoryConfig, handler: s.handleSaveCustomField})
 	s.add(&route{Method: "PUT", Path: "/api/v1/custom-fields/{id}", Tag: "Custom Fields", Summary: "Custom Field ändern", Scope: scopeWrite,
-		Body: inventory.CustomField{}, Resp: inventory.CustomField{}, handler: s.handleSaveCustomField})
+		Body: inventory.CustomField{}, Resp: inventory.CustomField{}, Perm: auth.PermInventoryConfig, handler: s.handleSaveCustomField})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/custom-fields/{id}", Tag: "Custom Fields", Summary: "Custom Field löschen (inkl. Werte)",
-		Scope: scopeWrite, Resp: okResponse{}, handler: s.handleDeleteCustomField})
+		Scope: scopeWrite, Resp: okResponse{}, Perm: auth.PermInventoryConfig, handler: s.handleDeleteCustomField})
 
 	s.add(&route{Method: "GET", Path: "/api/v1/views", Tag: "Ansichten", Summary: "Gespeicherte Geräteansichten", Scope: scopeRead,
 		Resp: []inventory.SavedView{}, handler: s.handleViews})
 	s.add(&route{Method: "POST", Path: "/api/v1/views", Tag: "Ansichten", Summary: "Ansicht speichern", Scope: scopeWrite,
-		Body: inventory.SavedView{}, Resp: inventory.SavedView{}, Status: http.StatusCreated, handler: s.handleSaveView})
+		Body: inventory.SavedView{}, Resp: inventory.SavedView{}, Status: http.StatusCreated, Perm: auth.PermInventoryConfig, handler: s.handleSaveView})
 	s.add(&route{Method: "PUT", Path: "/api/v1/views/{id}", Tag: "Ansichten", Summary: "Ansicht ändern", Scope: scopeWrite,
-		Body: inventory.SavedView{}, Resp: inventory.SavedView{}, handler: s.handleSaveView})
+		Body: inventory.SavedView{}, Resp: inventory.SavedView{}, Perm: auth.PermInventoryConfig, handler: s.handleSaveView})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/views/{id}", Tag: "Ansichten", Summary: "Ansicht löschen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteView})
+		Resp: okResponse{}, Perm: auth.PermInventoryConfig, handler: s.handleDeleteView})
 }
 
 // optionalID returns the path id for PUT (0 for POST).

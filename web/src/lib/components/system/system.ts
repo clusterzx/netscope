@@ -1,6 +1,7 @@
 // Helpers for the system pages: tab catalogue, labels, validation and a JSON diff.
 import { errorMessage, fieldErrors } from '$lib/api';
 import type { IconName } from '$lib/components/ui';
+import type { Permission } from '$lib/stores/auth.svelte';
 import type { Tone } from '$lib/utils/labels';
 
 export interface SystemTab {
@@ -8,6 +9,8 @@ export interface SystemTab {
 	label: string;
 	icon: IconName;
 	description: string;
+	/** needed to see the tab (the others are readable by everyone) */
+	perm?: Permission;
 }
 
 export const SYSTEM_TABS: SystemTab[] = [
@@ -29,7 +32,21 @@ export const SYSTEM_TABS: SystemTab[] = [
 		icon: 'globe',
 		description: 'Mehrere NetScope-Instanzen bündeln: Standorte liefern an eine Zentrale'
 	},
-	{ id: 'account', label: 'Konto', icon: 'user', description: 'Passwort des Administrators ändern' },
+	{ id: 'account', label: 'Konto', icon: 'user', description: 'Eigenes Passwort und Zwei-Faktor-Anmeldung' },
+	{
+		id: 'users',
+		label: 'Benutzer',
+		icon: 'user',
+		description: 'Konten anlegen, Rollen zuweisen, Passwörter und 2FA zurücksetzen',
+		perm: 'users.manage'
+	},
+	{
+		id: 'roles',
+		label: 'Rollen',
+		icon: 'shield',
+		description: 'Welche Rechte eine Rolle hat und ob sie 2FA verlangt',
+		perm: 'users.manage'
+	},
 	{ id: 'tokens', label: 'API-Tokens', icon: 'key', description: 'Tokens für Skripte und Automatisierung' },
 	{
 		id: 'subnets',
@@ -39,10 +56,34 @@ export const SYSTEM_TABS: SystemTab[] = [
 	},
 	{ id: 'groups', label: 'Gruppen', icon: 'layers', description: 'Manuelle und regelbasierte Gerätegruppen' },
 	{ id: 'fields', label: 'Custom Fields', icon: 'tag', description: 'Eigene Geräteattribute' },
-	{ id: 'backups', label: 'Backups', icon: 'disk', description: 'Datenbank sichern und wiederherstellen' },
-	{ id: 'vault', label: 'Vault', icon: 'lock', description: 'Master-Key der verschlüsselten Credentials' },
-	{ id: 'logs', label: 'Log-Viewer', icon: 'terminal', description: 'Anwendungsprotokoll mit Live-Ansicht' },
-	{ id: 'audit', label: 'Audit-Log', icon: 'history', description: 'Protokoll aller manuellen Änderungen' }
+	{
+		id: 'backups',
+		label: 'Backups',
+		icon: 'disk',
+		description: 'Datenbank sichern und wiederherstellen',
+		perm: 'backups.manage'
+	},
+	{
+		id: 'vault',
+		label: 'Vault',
+		icon: 'lock',
+		description: 'Master-Key der verschlüsselten Credentials',
+		perm: 'system.manage'
+	},
+	{
+		id: 'logs',
+		label: 'Log-Viewer',
+		icon: 'terminal',
+		description: 'Anwendungsprotokoll mit Live-Ansicht',
+		perm: 'audit.view'
+	},
+	{
+		id: 'audit',
+		label: 'Audit-Log',
+		icon: 'history',
+		description: 'Protokoll aller manuellen Änderungen',
+		perm: 'audit.view'
+	}
 ];
 
 // ---------------------------------------------------------------- log levels

@@ -6,6 +6,7 @@
 	import { api } from '$lib/api';
 	import type { PluginView } from '$lib/api';
 	import { Badge, Button, Card, ErrorState, RelativeTime, Skeleton } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { runStatusLabel, runStatusTone } from '$lib/utils/labels';
@@ -26,11 +27,16 @@
 	const pubs = $derived(Array.isArray(settings.publishers) ? (settings.publishers as string[]) : []);
 </script>
 
+{#snippet configure()}
+	<Button size="sm" href="/plugins/report" icon="system">Bericht konfigurieren</Button>
+{/snippet}
+
 <Card
 	title="Geplanter Bericht"
 	description="Änderungsbericht automatisch per Publisher"
 	icon="calendar"
 	class={klass}
+	footer={auth.can('plugins.manage') ? configure : undefined}
 >
 	{#if plugin.error && !p}
 		<ErrorState compact error={plugin.error} onretry={() => plugin.reload()} />
@@ -75,7 +81,4 @@
 			{/if}
 		</div>
 	{/if}
-	{#snippet footer()}
-		<Button size="sm" href="/plugins/report" icon="system">Bericht konfigurieren</Button>
-	{/snippet}
 </Card>

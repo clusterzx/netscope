@@ -31,6 +31,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -297,7 +298,9 @@
 					<EmptyState
 						icon="cloud"
 						title="Noch keine CVE-Daten"
-						description="Die lokale NVD-Kopie ist leer – zuerst oben die NVD synchronisieren."
+						description={auth.can('plugins.manage')
+							? 'Die lokale NVD-Kopie ist leer – zuerst oben die NVD synchronisieren.'
+							: 'Die lokale NVD-Kopie ist leer.'}
 					/>
 				{:else}
 					<EmptyState

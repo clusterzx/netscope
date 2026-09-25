@@ -20,6 +20,7 @@
 	import RunProgress from '$lib/components/plugins/RunProgress.svelte';
 	import RunStatusBadge from '$lib/components/plugins/RunStatusBadge.svelte';
 	import { KIND_ORDER, canRun, isPublisher, kindDescription } from '$lib/components/plugins/plugin';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
@@ -108,6 +109,8 @@
 	});
 
 	// ---------------------------------------------------------------- actions
+	const canManage = $derived(auth.can('plugins.manage'));
+	const canScan = $derived(auth.can('devices.scan'));
 	let busy = $state<Record<string, boolean>>({});
 
 	async function setEnabled(p: PluginView, v: boolean) {
@@ -251,14 +254,16 @@
 									lg:grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_auto] lg:items-center"
 							>
 								<div class="pt-0.5 lg:pt-0">
-									<Toggle
-										checked={enabled}
-										onchange={(v) => setEnabled(p, v)}
-										disabled={busy[p.info.id]}
-										label="{p.info.name} aktiv"
-										hideLabel
-										size="sm"
-									/>
+									{#if canManage}
+										<Toggle
+											checked={enabled}
+											onchange={(v) => setEnabled(p, v)}
+											disabled={busy[p.info.id]}
+											label="{p.info.name} aktiv"
+											hideLabel
+											size="sm"
+										/>
+									{/if}
 								</div>
 
 								<!-- name, description, warnings -->
@@ -353,7 +358,7 @@
 
 								<!-- actions -->
 								<div class="col-start-2 flex items-center gap-1 lg:col-start-auto lg:justify-end">
-									{#if canRun(p)}
+									{#if canRun(p) && canScan}
 										<Button
 											size="sm"
 											icon="play"
@@ -369,7 +374,7 @@
 										size="sm"
 										variant="ghost"
 										icon="system"
-										label="{p.info.name} konfigurieren"
+										label={canManage ? `${p.info.name} konfigurieren` : `${p.info.name} öffnen`}
 										href={href(p)}
 									/>
 								</div>

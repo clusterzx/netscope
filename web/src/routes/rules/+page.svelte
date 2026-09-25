@@ -19,6 +19,7 @@
 	import NotificationHistory from '$lib/components/rules/NotificationHistory.svelte';
 	import { loadPublishers, publishers } from '$lib/components/rules/publishers.svelte';
 	import { actionSummary, conditionSummary } from '$lib/components/rules/rule';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { eventTypes, groups } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
@@ -50,6 +51,7 @@
 	const siteName = (id: number) =>
 		id === 0 ? federation.localName : (federation.site(id)?.name ?? `#${id}`);
 	const anyPublisher = $derived(pubs.some((p) => p.enabled));
+	const canManage = $derived(auth.can('rules.manage'));
 
 	// ---------------------------------------------------------------- enable
 	let busy = $state<Record<number, boolean>>({});
@@ -148,7 +150,7 @@
 
 <PageHeader title="Regeln" description="Welche Events wann über welchen Publisher gemeldet werden">
 	{#snippet actions()}
-		{#if tab === 'rules'}
+		{#if tab === 'rules' && canManage}
 			<Button variant="primary" icon="plus" href="/rules/new">Neue Regel</Button>
 		{/if}
 	{/snippet}
@@ -180,7 +182,9 @@
 				Regeln werden ausgewertet, aber Benachrichtigungen erst verschickt, wenn ein Publisher eingerichtet
 				und aktiviert ist.
 				{#snippet actions()}
-					<Button size="xs" href="/plugins#kind-publisher">Publisher einrichten</Button>
+					{#if auth.can('plugins.manage')}
+						<Button size="xs" href="/plugins#kind-publisher">Publisher einrichten</Button>
+					{/if}
 				{/snippet}
 			</Alert>
 		{/if}
@@ -190,19 +194,20 @@
 		{:else if !data.data}
 			<div class="rounded-lg border border-border bg-surface p-4"><Skeleton rows={4} /></div>
 		{:else if rules.length === 0}
+			{#snippet create()}
+				<Button variant="primary" icon="plus" href="/rules/new">Neue Regel</Button>
+			{/snippet}
 			<EmptyState
 				icon="rules"
 				title="Keine Regeln"
 				description="Ohne Regeln werden Events zwar erfasst, aber niemand benachrichtigt."
-			>
-				{#snippet actions()}
-					<Button variant="primary" icon="plus" href="/rules/new">Neue Regel</Button>
-				{/snippet}
-			</EmptyState>
+				actions={canManage ? create : undefined}
+			/>
 		{:else}
 			<p class="text-sm text-fg-muted">
 				Regeln werden von oben nach unten ausgewertet; eine Regel mit „Stopp“ beendet die Auswertung, wenn sie
-				greift. Reihenfolge per Ziehen oder mit den Pfeil-Schaltflächen ändern.
+				greift.{#if canManage}
+					Reihenfolge per Ziehen oder mit den Pfeil-Schaltflächen ändern.{/if}
 			</p>
 			<ol class="flex flex-col gap-2" aria-label="Regeln in Auswertungsreihenfolge" aria-busy={reordering}>
 				{#each rules as r, i (r.id)}
@@ -228,42 +233,46 @@
 						<div
 							class="flex w-10 shrink-0 flex-col items-center justify-center gap-0.5 border-r border-border py-2"
 						>
-							<span
-								draggable="true"
-								role="presentation"
-								title="Ziehen zum Verschieben"
-								class="hidden cursor-grab text-fg-subtle hover:text-fg active:cursor-grabbing sm:block"
-								ondragstart={(e) => {
-									dragId = r.id;
-									e.dataTransfer?.setData('text/plain', String(r.id));
-									if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-								}}
-								ondragend={() => {
-									dragId = null;
-									overId = null;
-								}}
-							>
-								<Icon name="grip" size={16} />
-							</span>
-							<Button
-								id="rule-{r.id}-up"
-								size="xs"
-								variant="ghost"
-								icon="chevron-up"
-								label="„{r.name}“ nach oben"
-								disabled={i === 0 || reordering}
-								onclick={() => move(i, -1)}
-							/>
+							{#if canManage}
+								<span
+									draggable="true"
+									role="presentation"
+									title="Ziehen zum Verschieben"
+									class="hidden cursor-grab text-fg-subtle hover:text-fg active:cursor-grabbing sm:block"
+									ondragstart={(e) => {
+										dragId = r.id;
+										e.dataTransfer?.setData('text/plain', String(r.id));
+										if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+									}}
+									ondragend={() => {
+										dragId = null;
+										overId = null;
+									}}
+								>
+									<Icon name="grip" size={16} />
+								</span>
+								<Button
+									id="rule-{r.id}-up"
+									size="xs"
+									variant="ghost"
+									icon="chevron-up"
+									label="„{r.name}“ nach oben"
+									disabled={i === 0 || reordering}
+									onclick={() => move(i, -1)}
+								/>
+							{/if}
 							<span class="text-xs font-semibold text-fg-subtle tabular" aria-hidden="true">{i + 1}</span>
-							<Button
-								id="rule-{r.id}-down"
-								size="xs"
-								variant="ghost"
-								icon="chevron-down"
-								label="„{r.name}“ nach unten"
-								disabled={i === rules.length - 1 || reordering}
-								onclick={() => move(i, 1)}
-							/>
+							{#if canManage}
+								<Button
+									id="rule-{r.id}-down"
+									size="xs"
+									variant="ghost"
+									icon="chevron-down"
+									label="„{r.name}“ nach unten"
+									disabled={i === rules.length - 1 || reordering}
+									onclick={() => move(i, 1)}
+								/>
+							{/if}
 						</div>
 
 						<div class="flex min-w-0 flex-1 flex-col gap-1.5 py-3 pr-1">
@@ -301,27 +310,38 @@
 						<div
 							class="flex shrink-0 flex-col items-end justify-between gap-2 py-3 pr-3 sm:flex-row sm:items-center"
 						>
-							<Toggle
-								checked={r.enabled}
-								onchange={(v) => setEnabled(r, v)}
-								disabled={busy[r.id]}
-								label="„{r.name}“ aktiv"
-								hideLabel
-								size="sm"
-							/>
+							{#if canManage}
+								<Toggle
+									checked={r.enabled}
+									onchange={(v) => setEnabled(r, v)}
+									disabled={busy[r.id]}
+									label="„{r.name}“ aktiv"
+									hideLabel
+									size="sm"
+								/>
+							{/if}
 							<Menu
 								label="Aktionen für „{r.name}“"
-								items={[
-									{ label: 'Bearbeiten', icon: 'edit', href: `/rules/${r.id}` },
-									{ label: 'Duplizieren', icon: 'copy', href: `/rules/new?from=${r.id}` },
-									{
-										label: 'Benachrichtigungen',
-										icon: 'bell',
-										href: `/rules?tab=notifications&rule=${r.id}`
-									},
-									{ separator: true },
-									{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(r) }
-								]}
+								items={canManage
+									? [
+											{ label: 'Bearbeiten', icon: 'edit', href: `/rules/${r.id}` },
+											{ label: 'Duplizieren', icon: 'copy', href: `/rules/new?from=${r.id}` },
+											{
+												label: 'Benachrichtigungen',
+												icon: 'bell',
+												href: `/rules?tab=notifications&rule=${r.id}`
+											},
+											{ separator: true },
+											{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(r) }
+										]
+									: [
+											{ label: 'Anzeigen', icon: 'eye', href: `/rules/${r.id}` },
+											{
+												label: 'Benachrichtigungen',
+												icon: 'bell',
+												href: `/rules?tab=notifications&rule=${r.id}`
+											}
+										]}
 							/>
 						</div>
 					</li>

@@ -106,7 +106,7 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	if err != nil {
 		return fail(err)
 	}
-	authSvc := auth.New(d)
+	authSvc := auth.New(d, v)
 	created, generated, err := authSvc.EnsureAdmin(ctx, cfg.AdminPassword)
 	if err != nil {
 		return fail(err)

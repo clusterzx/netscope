@@ -26,6 +26,7 @@
 		RelativeTime,
 		Skeleton
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
 	import { formatDate, formatDateTime, formatNumber, plural } from '$lib/utils/format';
@@ -60,6 +61,7 @@
 	let showAllCpe = $state(false);
 	const cpeShown = $derived(showAllCpe ? (info?.cpeMatches ?? []) : (info?.cpeMatches ?? []).slice(0, 12));
 
+	const canManage = $derived(auth.can('vulns.manage'));
 	let ignoreOpen = $state(false);
 	let ignoreTarget = $state<IgnoreTarget | null>(null);
 	function openIgnore(d: CveDeviceCVE) {
@@ -208,15 +210,17 @@
 											{/if}
 										</dl>
 									</div>
-									<Button
-										size="sm"
-										variant={d.ignored ? 'secondary' : 'ghost'}
-										icon={d.ignored ? 'eye' : 'eye-off'}
-										class="self-start"
-										onclick={() => openIgnore(d)}
-									>
-										{d.ignored ? 'Wieder relevant' : 'Als irrelevant markieren'}
-									</Button>
+									{#if canManage}
+										<Button
+											size="sm"
+											variant={d.ignored ? 'secondary' : 'ghost'}
+											icon={d.ignored ? 'eye' : 'eye-off'}
+											class="self-start"
+											onclick={() => openIgnore(d)}
+										>
+											{d.ignored ? 'Wieder relevant' : 'Als irrelevant markieren'}
+										</Button>
+									{/if}
 								</li>
 							{/each}
 						</ul>

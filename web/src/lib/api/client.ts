@@ -7,7 +7,8 @@
 //
 // Paths, query parameters, bodies and responses are checked against ApiPaths (generated from
 // /api/openapi.json). Endpoints that are not (yet) in the spec go through api.raw.*.
-// Mutating requests carry the CSRF header; a 401 redirects to /login?next=<current path>
+// Mutating requests carry the CSRF header; a 401 redirects to /login?next=<current path>, a
+// 403 of a session that has to finish its setup (password, second factor) to /setup
 // (unless `auth: false`). Failures throw ApiError (status, code, message, fields).
 import { goto } from '$app/navigation';
 import type { ApiPaths, ApiUploadResponse } from './generated';
@@ -127,6 +128,12 @@ function redirectToLogin() {
 	);
 }
 
+function redirectToSetup() {
+	if (redirecting || typeof window === 'undefined' || window.location.pathname === '/setup') return;
+	redirecting = true;
+	goto('/setup', { replaceState: true }).finally(() => (redirecting = false));
+}
+
 async function parseError(res: globalThis.Response): Promise<ApiError> {
 	let code = 'http_' + res.status;
 	let message = res.statusText || `HTTP ${res.status}`;
@@ -181,6 +188,9 @@ export async function request<T>(
 	if (!res.ok) {
 		const err = await parseError(res);
 		if (res.status === 401 && opts.auth !== false) redirectToLogin();
+		// the session first has to change its start password or set up a second factor
+		if (res.status === 403 && (err.code === 'password_change_required' || err.code === 'mfa_setup_required'))
+			redirectToSetup();
 		throw err;
 	}
 	if (res.status === 204) return undefined as T;

@@ -8,6 +8,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import Popover from '$lib/components/ui/Popover.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 
@@ -162,32 +163,34 @@
 			<p class="px-3 py-1.5 text-sm text-fg-subtle">Noch keine Ansichten gespeichert.</p>
 		{/each}
 	</div>
-	<div class="border-t border-border py-1">
-		<button
-			type="button"
-			class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2"
-			onclick={openSave}
-		>
-			<Icon name="plus" size={14} class="text-fg-subtle" /> Als neue Ansicht speichern …
-		</button>
-		{#if active}
+	{#if auth.can('inventory.config')}
+		<div class="border-t border-border py-1">
 			<button
 				type="button"
-				class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2 disabled:opacity-50"
-				disabled={!dirty}
-				onclick={overwrite}
+				class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2"
+				onclick={openSave}
 			>
-				<Icon name="save" size={14} class="text-fg-subtle" /> „{active.name}“ aktualisieren
+				<Icon name="plus" size={14} class="text-fg-subtle" /> Als neue Ansicht speichern …
 			</button>
-			<button
-				type="button"
-				class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-danger hover:bg-surface-2"
-				onclick={remove}
-			>
-				<Icon name="trash" size={14} /> „{active.name}“ löschen
-			</button>
-		{/if}
-	</div>
+			{#if active}
+				<button
+					type="button"
+					class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2 disabled:opacity-50"
+					disabled={!dirty}
+					onclick={overwrite}
+				>
+					<Icon name="save" size={14} class="text-fg-subtle" /> „{active.name}“ aktualisieren
+				</button>
+				<button
+					type="button"
+					class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-danger hover:bg-surface-2"
+					onclick={remove}
+				>
+					<Icon name="trash" size={14} /> „{active.name}“ löschen
+				</button>
+			{/if}
+		</div>
+	{/if}
 </Popover>
 
 <Modal bind:open={saveOpen} title="Ansicht speichern" size="sm" as="form" onsubmit={saveNew} {busy}>

@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"strings"
 
+	"netscope/internal/auth"
 	"netscope/internal/inventory"
 	"netscope/internal/netutil"
 	"netscope/internal/plugin"
@@ -40,10 +41,10 @@ func (s *Server) registerTunnels() {
 		Resp: tunnelOverview{}, handler: s.handleTunnels})
 	s.add(&route{Method: "POST", Path: "/api/v1/tunnels/inspect", Tag: "Subnetze",
 		Summary: "WireGuard-Konfiguration prüfen (liefert nur öffentliche Angaben und Hinweise)", Scope: scopeWrite,
-		Body: tunnelInput{}, Resp: wgconf.Summary{}, handler: s.handleInspectTunnel})
+		Body: tunnelInput{}, Resp: wgconf.Summary{}, Perm: auth.PermNetworkManage, handler: s.handleInspectTunnel})
 	s.add(&route{Method: "POST", Path: "/api/v1/tunnels/test", Tag: "Subnetze",
 		Summary: "Verbindungstest: Handshake mit dem WireGuard-Server (bis 10 s)", Scope: scopeWrite,
-		Body: tunnelInput{}, Resp: tunnel.TestResult{}, handler: s.handleTestTunnel})
+		Body: tunnelInput{}, Resp: tunnel.TestResult{}, Perm: auth.PermNetworkManage, handler: s.handleTestTunnel})
 }
 
 func (s *Server) handleTunnels(w http.ResponseWriter, r *http.Request) {

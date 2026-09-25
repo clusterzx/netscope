@@ -53,6 +53,8 @@
   NetScope (z. B. ins Rechenzentrum) – Konfiguration hochladen, fertig.
 - **Mehrere Standorte:** In jedem Netz eine eigene NetScope-Instanz, die an eine Zentrale
   liefert; dort alle Netze gemeinsam oder je Standort, mit Standort-Auswahl, Filter und Regeln.
+- **Benutzer:** frei definierbare Rollen mit Rechten je Bereich, Zwei-Faktor-Anmeldung per
+  Authenticator-App oder Passkey (pro Rolle erzwingbar), Wiederherstellungscodes.
 - **Auswertung:** Änderungserkennung mit Events, CVE-Abgleich gegen eine lokal gespiegelte
   NVD, Health-Checks mit Verfügbarkeit, Topologie-Graph, Berichte.
 - **Benachrichtigungen:** Regel-Engine (Bedingungen, Bündelung, Ruhezeiten, Drosselung,
@@ -432,10 +434,54 @@ BSD) und der Linux-Kernel aus einem Fingerabdruck würden jede CVE der Hauptvers
 bleiben deshalb außen vor (Einstellung „Auch unsichere OS-Vermutungen abgleichen“ im Plugin).
 Die ersten Treffer einer neuen Datenquelle gelten als Erstinventar und lösen keine Events aus.
 
+## Benutzer, Rollen und Zwei-Faktor-Anmeldung
+
+Unter **System → Benutzer** legt ein Administrator weitere Konten an. Das Start-Passwort
+(vorgegeben oder erzeugt, einmal angezeigt) muss beim ersten Login geändert werden. Konten
+lassen sich deaktivieren – Sitzungen und API-Tokens enden dann sofort –, bekommen ein neues
+Start-Passwort oder ihren zweiten Faktor zurückgesetzt (verlorenes Handy).
+
+**Rollen** (System → Rollen) sind frei definierbare Rechte. Lesen dürfen alle Benutzer:
+Inventar, Topologie, Events, Health, Schwachstellen, Regeln, Plugins und Berichte. Die Rolle
+legt fest, was jemand ändern darf:
+
+| Bereich | Rechte |
+|---|---|
+| Inventar | Geräte bearbeiten · Geräte löschen und zusammenführen · Scans starten · Geräteaktionen (z. B. Wake-on-LAN) · Gruppen, Felder und Ansichten |
+| Überwachung | Events quittieren · Health-Checks verwalten · Schwachstellen bewerten · Regeln verwalten · Berichte versenden |
+| Konfiguration | Plugins konfigurieren* · Credentials einsehen · Credentials verwalten* · Subnetze und Tunnel* · Verbund und Standorte* |
+| System | Systemeinstellungen* · Backups* · Audit-Log und Server-Protokoll · eigene API-Tokens · Benutzer und Rollen* |
+
+Die mit * markierten Rechte sind kritisch: Plugins nutzen die Credentials aus dem Vault, ein
+Backup enthält alle Daten, und wer Benutzer verwalten darf, kann sich jedes Recht geben.
+Vorgegeben sind *Administrator* (immer alle Rechte, auch künftige), *Bearbeiter* und
+*Betrachter*; die beiden letzten lassen sich anpassen. Mindestens ein aktiver Administrator
+bleibt immer bestehen. Änderungen an einer Rolle gelten sofort, auch für laufende Sitzungen.
+
+**Zwei-Faktor-Anmeldung** richtet jeder unter **System → Konto** ein:
+
+- *Authenticator-App (TOTP)*: QR-Code scannen, ersten Code bestätigen. Jeder Code gilt nur
+  einmal.
+- *Passkey*: Fingerabdruck, Gesicht, Geräte-PIN oder Sicherheitsschlüssel. Browser erlauben
+  Passkeys nur über HTTPS mit einem Hostnamen (z. B. [hinter Traefik](#hinter-traefik)) oder
+  auf localhost, nicht über `http://<IP>:8080`. Ein Passkey gilt nur für den Hostnamen, unter
+  dem er eingerichtet wurde.
+- *Wiederherstellungscodes*: zehn Einmal-Codes, die mit dem ersten Faktor einmal angezeigt
+  werden.
+
+Eine Rolle kann die Zwei-Faktor-Anmeldung verlangen: Betroffene richten sie beim nächsten
+Login ein, bevor sie NetScope nutzen können. Wer sich ausgesperrt hat, dem setzt ein
+Administrator den zweiten Faktor zurück – oder im Container:
+`docker exec netscope netscope 2fa-reset --user NAME` (Passwort:
+`docker exec -it netscope netscope passwd --user NAME`).
+
 ## API
 
-- Dokumentation: `/api/docs`, Spezifikation: `/api/openapi.json`
-- API-Tokens unter **System → API-Tokens** (Scope `read` oder `write`) oder per CLI:
+- Dokumentation: `/api/docs`, Spezifikation: `/api/openapi.json`; bei jedem Endpunkt steht
+  das nötige Recht.
+- API-Tokens gehören einem Benutzer und haben höchstens die Rechte seiner Rolle (Scope `read`
+  nur deren lesenden Teil); einen zweiten Faktor brauchen sie nicht. Anlegen unter
+  **System → API-Tokens** oder per CLI (für den ersten Administrator):
   `docker exec netscope netscope token create --name skript --scope read`
 - Beispiel: `curl -H "Authorization: Bearer ns_…" http://netscope:8080/api/v1/devices?q=port:22`
 - Live-Updates: Server-Sent Events unter `/api/v1/stream?topics=event,device,run` (Topics und
@@ -459,7 +505,8 @@ starten die Dienste im Prozess neu; die vorherige Datenbank bleibt als
 Master-Key öffnen – passt der Schlüssel nicht, rollt NetScope automatisch auf die bisherige
 Datenbank zurück und protokolliert den Grund.
 
-CLI im Container: `netscope passwd` (Passwort zurücksetzen), `netscope token create`,
+CLI im Container: `netscope passwd [--user NAME]` (Passwort zurücksetzen),
+`netscope 2fa-reset [--user NAME]` (zweiten Faktor entfernen), `netscope token create`,
 `netscope healthcheck`, `netscope openapi`, `netscope version`.
 
 ## Entwicklung
@@ -485,9 +532,14 @@ Die Grafiken in diesem README (`docs/assets/*.svg`, hell und dunkel) erzeugt
 ## Sicherheit
 
 - Login mit bcrypt-Passwort und Session-Cookie (HttpOnly, SameSite=Lax, Secure hinter
-  HTTPS), Schutz gegen CSRF und Rate-Limit bei Fehlversuchen.
+  HTTPS), Schutz gegen CSRF und Rate-Limit bei Fehlversuchen (je Adresse; für den zweiten
+  Faktor zusätzlich je Benutzer, das richtige Passwort setzt es nicht zurück).
+- Rechte prüft der Server bei jedem Aufruf; ein Test stellt sicher, dass kein ändernder
+  Endpunkt ohne Recht bleibt. Deaktivierte Konten verlieren sofort Sitzungen und Tokens.
+- TOTP-Geheimnisse liegen verschlüsselt im Vault, Wiederherstellungscodes nur gehasht;
+  Passkeys speichern nur öffentliche Schlüssel.
 - API-Tokens werden nur gehasht gespeichert und genau einmal angezeigt.
-- Secrets (Credentials, geheime Plugin-Einstellungen) liegen AES-256-GCM-verschlüsselt in
+- Secrets (Credentials, geheime Plugin-Einstellungen, TOTP) liegen AES-256-GCM-verschlüsselt in
   der Datenbank; Key-Rotation unter **System**.
 - Der Container braucht `NET_RAW`/`NET_ADMIN` für ARP, ICMP, OS-Erkennung und die eigenen
   WireGuard-Tunnel; das Einbinden des Docker-Sockets ist optional und gibt Root-Rechte auf

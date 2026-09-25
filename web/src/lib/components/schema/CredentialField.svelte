@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import MultiSelect from '$lib/components/ui/MultiSelect.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { credentials } from '$lib/stores/catalog.svelte';
 
 	interface Props {
@@ -32,8 +33,9 @@
 		id
 	}: Props = $props();
 
+	const canView = $derived(auth.can('credentials.view'));
 	onMount(() => {
-		credentials.load().catch(() => {});
+		if (canView) credentials.load().catch(() => {});
 	});
 
 	const options = $derived(
@@ -45,9 +47,11 @@
 	const fullHint = $derived(
 		[
 			hint,
-			credentials.value && options.length === 0
-				? 'Noch kein passendes Credential – unter „Credentials“ anlegen.'
-				: typeHint
+			!canView
+				? 'Auswahl nicht einsehbar – dafür fehlt die Berechtigung „Credentials einsehen“.'
+				: credentials.value && options.length === 0
+					? 'Noch kein passendes Credential – unter „Credentials“ anlegen.'
+					: typeHint
 		]
 			.filter(Boolean)
 			.join(' · ')

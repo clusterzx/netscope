@@ -21,6 +21,7 @@
 		Toggle
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { credentials as credentialCatalog, subnets as subnetCatalog } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { live } from '$lib/stores/live.svelte';
@@ -30,6 +31,8 @@
 	import { apiErrors, cidrError, ipInCidr, isIP } from './system';
 	import TunnelSection from './TunnelSection.svelte';
 	import TunnelState from './TunnelState.svelte';
+
+	const canManage = $derived(auth.can('network.manage'));
 
 	const list = new AsyncData<Subnet[]>();
 	$effect(() => {
@@ -120,7 +123,7 @@
 
 	function openForm(s: Subnet | null) {
 		editing = s;
-		credentialCatalog.load().catch(() => {});
+		if (auth.can('credentials.view')) credentialCatalog.load().catch(() => {});
 		form = s
 			? {
 					...empty(),
@@ -136,7 +139,7 @@
 					tunnelCredentialId: s.tunnelCredentialId ?? null
 				}
 			: empty();
-		if (!s && wgCreds.length) form.tunnelMode = 'existing';
+		if ((!s && wgCreds.length) || !auth.can('credentials.manage')) form.tunnelMode = 'existing';
 		errors = {};
 		general = null;
 		open = true;
@@ -284,7 +287,9 @@
 	padding="none"
 >
 	{#snippet actions()}
-		<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Subnetz anlegen</Button>
+		{#if canManage}
+			<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Subnetz anlegen</Button>
+		{/if}
 	{/snippet}
 	{#if list.error && !list.data}
 		<ErrorState error={list.error} onretry={() => list.reload()} />
@@ -333,21 +338,30 @@
 						checked={s.enabled}
 						label="{s.cidr} aktiv"
 						hideLabel
+						disabled={!canManage}
 						onchange={(v) => toggleEnabled(s, v)}
 					/>
 				{:else if col.key === 'actions'}
 					<Menu
 						label="Aktionen für {s.cidr}"
-						items={[
-							{ label: 'Bearbeiten', icon: 'edit', onclick: () => openForm(s) },
-							{
-								label: 'Geräte anzeigen',
-								icon: 'devices',
-								href: `/devices?q=${encodeURIComponent('subnet:' + s.cidr)}`
-							},
-							{ separator: true },
-							{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(s) }
-						]}
+						items={canManage
+							? [
+									{ label: 'Bearbeiten', icon: 'edit', onclick: () => openForm(s) },
+									{
+										label: 'Geräte anzeigen',
+										icon: 'devices',
+										href: `/devices?q=${encodeURIComponent('subnet:' + s.cidr)}`
+									},
+									{ separator: true },
+									{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(s) }
+								]
+							: [
+									{
+										label: 'Geräte anzeigen',
+										icon: 'devices',
+										href: `/devices?q=${encodeURIComponent('subnet:' + s.cidr)}`
+									}
+								]}
 					/>
 				{/if}
 			{/snippet}
@@ -360,6 +374,11 @@
 				/>
 			{/snippet}
 		</Table>
+		{#if !canManage}
+			<p class="border-t border-border px-4 py-2 text-xs text-fg-subtle">
+				Nur lesen – dafür fehlt die Berechtigung „Subnetze und Tunnel verwalten“.
+			</p>
+		{/if}
 	{/if}
 </Card>
 

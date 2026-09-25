@@ -329,6 +329,22 @@ func (v *Vault) Rotate(ctx context.Context, newKey Key) error {
 				return err
 			}
 		}
+		// TOTP secrets of the users (active and in setup)
+		for _, col := range []string{"totp_secret", "totp_pending"} {
+			users, err := load("SELECT id, " + col + " FROM users WHERE " + col + " IS NOT NULL")
+			if err != nil {
+				return err
+			}
+			for _, r := range users {
+				nb, err := reencrypt(r.blob)
+				if err != nil {
+					return fmt.Errorf("user %v: %w", r.id, err)
+				}
+				if _, err := tx.ExecContext(ctx, "UPDATE users SET "+col+" = ? WHERE id = ?", nb, r.id); err != nil {
+					return err
+				}
+			}
+		}
 		// settings "<name>.secret" hold a JSON string with a base64 blob (e.g. the token a
 		// site uses at its central instance)
 		sets, err := load("SELECT key, value FROM settings WHERE key LIKE '%.secret'")

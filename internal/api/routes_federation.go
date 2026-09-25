@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"netscope/internal/auth"
 	"netscope/internal/federation"
 	"netscope/internal/federation/wire"
 )
@@ -57,27 +58,27 @@ func (s *Server) registerFederation() {
 		Scope: scopeRead, Resp: federationView{}, handler: s.handleFederation})
 	s.add(&route{Method: "PUT", Path: "/api/v1/federation", Tag: "Verbund",
 		Summary: "Rolle festlegen (eigenständig, Standort, Zentrale) und die Zentrale eines Standorts eintragen", Scope: scopeWrite,
-		Body: federation.SettingsInput{}, Resp: federationView{}, handler: s.handleUpdateFederation})
+		Body: federation.SettingsInput{}, Resp: federationView{}, Perm: auth.PermSitesManage, handler: s.handleUpdateFederation})
 	s.add(&route{Method: "POST", Path: "/api/v1/federation/test", Tag: "Verbund", Summary: "Standort: Verbindung zur Zentrale prüfen",
-		Scope: scopeWrite, Resp: federation.TestResult{}, handler: s.handleTestFederation})
+		Scope: scopeWrite, Resp: federation.TestResult{}, Perm: auth.PermSitesManage, handler: s.handleTestFederation})
 	s.add(&route{Method: "POST", Path: "/api/v1/federation/resync", Tag: "Verbund",
 		Summary: "Standort: vollständigen Abgleich mit der Zentrale anstoßen", Scope: scopeWrite, Status: http.StatusNoContent,
-		handler: s.handleResyncFederation})
+		Perm: auth.PermSitesManage, handler: s.handleResyncFederation})
 	s.add(&route{Method: "GET", Path: "/api/v1/sites", Tag: "Verbund", Summary: "Zentrale: Standorte mit Verbindungszustand und letzter Meldung",
 		Scope: scopeRead, Resp: []federation.Site{}, handler: s.handleSites})
 	s.add(&route{Method: "POST", Path: "/api/v1/sites", Tag: "Verbund", Summary: "Zentrale: Standort anlegen (liefert das Token einmalig)",
-		Scope: scopeWrite, Body: federation.SiteInput{}, Resp: siteCreated{}, Status: http.StatusCreated, handler: s.handleCreateSite})
+		Scope: scopeWrite, Body: federation.SiteInput{}, Resp: siteCreated{}, Status: http.StatusCreated, Perm: auth.PermSitesManage, handler: s.handleCreateSite})
 	s.add(&route{Method: "GET", Path: "/api/v1/sites/{id}", Tag: "Verbund", Summary: "Zentrale: ein Standort", Scope: scopeRead,
 		Params: []param{{Name: "id", In: "path", Type: "integer", Required: true}}, Resp: federation.Site{}, handler: s.handleSite})
 	s.add(&route{Method: "PATCH", Path: "/api/v1/sites/{id}", Tag: "Verbund", Summary: "Zentrale: Standort umbenennen oder Adresse ändern",
 		Scope: scopeWrite, Params: []param{{Name: "id", In: "path", Type: "integer", Required: true}}, Body: federation.SiteInput{},
-		Resp: federation.Site{}, handler: s.handleUpdateSite})
+		Resp: federation.Site{}, Perm: auth.PermSitesManage, handler: s.handleUpdateSite})
 	s.add(&route{Method: "POST", Path: "/api/v1/sites/{id}/token", Tag: "Verbund",
 		Summary: "Zentrale: neues Token für einen Standort (das alte gilt sofort nicht mehr)", Scope: scopeWrite,
-		Params: []param{{Name: "id", In: "path", Type: "integer", Required: true}}, Resp: siteToken{}, handler: s.handleSiteToken})
+		Params: []param{{Name: "id", In: "path", Type: "integer", Required: true}}, Resp: siteToken{}, Perm: auth.PermSitesManage, handler: s.handleSiteToken})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/sites/{id}", Tag: "Verbund",
 		Summary: "Zentrale: Standort mit allen gelieferten Geräten und Events entfernen", Scope: scopeWrite, Status: http.StatusNoContent,
-		Params: []param{{Name: "id", In: "path", Type: "integer", Required: true}}, handler: s.handleDeleteSite})
+		Params: []param{{Name: "id", In: "path", Type: "integer", Required: true}}, Perm: auth.PermSitesManage, handler: s.handleDeleteSite})
 	s.add(&route{Method: "POST", Path: wire.IngestPath, Tag: "Verbund",
 		Summary: "Zentrale: Lieferung eines Standorts annehmen (nur mit Standort-Token nss_…; gzip erlaubt)", Scope: scopePublic,
 		Body: wire.Batch{}, Resp: wire.Response{}, handler: s.handleIngest})

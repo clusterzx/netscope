@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"netscope/internal/auth"
 	"netscope/internal/events"
 	"netscope/internal/inventory"
 	"netscope/internal/plugin"
@@ -90,28 +91,28 @@ func (s *Server) registerDevices() {
 			{Name: "limit", Type: "integer"}, {Name: "offset", Type: "integer"}, {Name: "ports", Type: "boolean", Desc: "Portliste mitliefern"}},
 		Resp: deviceList{}, handler: s.handleDevices})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices", Tag: "Geräte", Summary: "Gerät manuell anlegen", Scope: scopeWrite,
-		Body: createDeviceRequest{}, Resp: idResponse{}, Status: http.StatusCreated, handler: s.handleCreateDevice})
+		Body: createDeviceRequest{}, Resp: idResponse{}, Status: http.StatusCreated, Perm: auth.PermDevicesEdit, handler: s.handleCreateDevice})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/bulk", Tag: "Geräte", Summary: "Massenaktion (Tags, Gruppe, Zustand, Kritikalität, Löschen, Plugin-Aktion wie WOL)",
-		Scope: scopeWrite, Body: bulkRequest{}, Resp: bulkResponse{}, handler: s.handleBulk})
+		Scope: scopeWrite, Body: bulkRequest{}, Resp: bulkResponse{}, Perm: auth.PermDevicesEdit, handler: s.handleBulk})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/merge", Tag: "Geräte", Summary: "Geräte zusammenführen", Scope: scopeWrite,
-		Body: mergeRequest{}, Resp: okResponse{}, handler: s.handleMerge})
+		Body: mergeRequest{}, Resp: okResponse{}, Perm: auth.PermDevicesDelete, handler: s.handleMerge})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}", Tag: "Geräte", Summary: "Gerätedetail", Scope: scopeRead,
 		Resp: inventory.DeviceDetail{}, handler: s.handleDevice})
 	s.add(&route{Method: "PATCH", Path: "/api/v1/devices/{id}", Tag: "Geräte", Summary: "Manuelle Daten ändern", Scope: scopeWrite,
-		Body: inventory.DeviceUpdate{}, Resp: inventory.DeviceDetail{}, handler: s.handleUpdateDevice})
+		Body: inventory.DeviceUpdate{}, Resp: inventory.DeviceDetail{}, Perm: auth.PermDevicesEdit, handler: s.handleUpdateDevice})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/devices/{id}", Tag: "Geräte", Summary: "Gerät löschen (Events bleiben)", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteDevice})
+		Resp: okResponse{}, Perm: auth.PermDevicesDelete, handler: s.handleDeleteDevice})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/split", Tag: "Geräte", Summary: "MAC-Adressen in ein neues Gerät abspalten",
-		Scope: scopeWrite, Body: splitRequest{}, Resp: idResponse{}, handler: s.handleSplit})
+		Scope: scopeWrite, Body: splitRequest{}, Resp: idResponse{}, Perm: auth.PermDevicesDelete, handler: s.handleSplit})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/ips", Tag: "Geräte",
 		Summary: "IP-Adresse von Hand vergeben (z. B. für VMs, deren Hypervisor keine Adressen meldet)", Scope: scopeWrite,
-		Body: ipRequest{}, Resp: inventory.DeviceDetail{}, handler: s.handleAddIP})
+		Body: ipRequest{}, Resp: inventory.DeviceDetail{}, Perm: auth.PermDevicesEdit, handler: s.handleAddIP})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/devices/{id}/ips/{ip}", Tag: "Geräte", Summary: "Von Hand vergebene IP-Adresse entfernen",
-		Scope: scopeWrite, Resp: inventory.DeviceDetail{}, handler: s.handleRemoveIP})
+		Scope: scopeWrite, Resp: inventory.DeviceDetail{}, Perm: auth.PermDevicesEdit, handler: s.handleRemoveIP})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/scan", Tag: "Geräte", Summary: "Scanner jetzt für dieses Gerät ausführen",
-		Scope: scopeWrite, Body: scanRequest{}, Resp: scanResponse{}, Status: http.StatusAccepted, handler: s.handleScanDevice})
+		Scope: scopeWrite, Body: scanRequest{}, Resp: scanResponse{}, Status: http.StatusAccepted, Perm: auth.PermDevicesScan, handler: s.handleScanDevice})
 	s.add(&route{Method: "POST", Path: "/api/v1/devices/{id}/actions/{plugin}/{action}", Tag: "Geräte", Summary: "Geräteaktion eines Plugins (z. B. WOL)",
-		Scope: scopeWrite, Body: actionRequest{}, Resp: pluginhost.ActionOutcome{}, handler: s.handleDeviceAction})
+		Scope: scopeWrite, Body: actionRequest{}, Resp: pluginhost.ActionOutcome{}, Perm: auth.PermDevicesActions, handler: s.handleDeviceAction})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/ports", Tag: "Geräte", Summary: "Ports & Dienste", Scope: scopeRead, Params: idp,
 		Resp: []inventory.PortView{}, handler: s.handleDevicePorts})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/http", Tag: "Geräte", Summary: "HTTP-Endpunkte und erkannte Web-Apps", Scope: scopeRead,
@@ -127,7 +128,7 @@ func (s *Server) registerDevices() {
 		Scope: scopeRead, Resp: map[string]any{}, handler: s.handleDeviceInventory})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/credentials", Tag: "Geräte",
 		Summary: "Passende Zugangsdaten (nach Geltungsbereich, spezifischste zuerst)", Scope: scopeRead,
-		Resp: []deviceCredential{}, handler: s.handleDeviceCredentials})
+		Resp: []deviceCredential{}, Perm: auth.PermCredentialsView, handler: s.handleDeviceCredentials})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/health", Tag: "Geräte", Summary: "Health-Checks des Geräts", Scope: scopeRead,
 		Resp: []healthcheck.Check{}, handler: s.handleDeviceHealth})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/events", Tag: "Geräte", Summary: "Events des Geräts", Scope: scopeRead,
@@ -234,6 +235,12 @@ func (s *Server) handleBulk(w http.ResponseWriter, r *http.Request) {
 	var req bulkRequest
 	if err := decode(r, &req); err != nil {
 		s.fail(w, r, err)
+		return
+	}
+	// the route needs devices.edit; deleting and plugin actions need their own permission
+	need := map[string]string{"delete": auth.PermDevicesDelete, "plugin_action": auth.PermDevicesActions}[req.Action]
+	if !principal(r).Has(need) {
+		forbidden(w, need)
 		return
 	}
 	if req.Action == "plugin_action" {

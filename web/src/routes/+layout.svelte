@@ -10,8 +10,8 @@
 
 	theme.init();
 
-	// the login page (and errors before login) render without the shell
-	const bare = $derived(page.url.pathname === '/login');
+	// login and the first-login setup render without the shell
+	const bare = $derived(page.url.pathname === '/login' || page.url.pathname === '/setup');
 </script>
 
 {#if bare}

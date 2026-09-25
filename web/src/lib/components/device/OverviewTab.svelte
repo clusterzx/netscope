@@ -13,6 +13,7 @@
 	import JsonView from '$lib/components/ui/JsonView.svelte';
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import StatusDot from '$lib/components/ui/StatusDot.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { customFields } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -69,7 +70,8 @@
 
 	// ---------------------------------------------------------------- manual addresses
 	/** addresses of a site device are kept at the site */
-	const canEditIPs = $derived(!d.siteRef);
+	const canEdit = $derived(auth.can('devices.edit'));
+	const canEditIPs = $derived(!d.siteRef && canEdit);
 	let ipAdding = $state(false);
 	let newIp = $state('');
 	let ipError = $state<string | null>(null);
@@ -350,7 +352,9 @@
 		{#if defs.length}
 			<Card title="Custom Fields" icon="tag" padding="md">
 				{#snippet actions()}
-					<Button size="xs" variant="ghost" icon="edit" onclick={onedit}>Bearbeiten</Button>
+					{#if canEdit}
+						<Button size="xs" variant="ghost" icon="edit" onclick={onedit}>Bearbeiten</Button>
+					{/if}
 				{/snippet}
 				{#if filledDefs.length}
 					<dl class="grid grid-cols-1 gap-2.5">
@@ -443,7 +447,7 @@
 			{/if}
 		</Card>
 
-		{#if !d.siteRef}
+		{#if !d.siteRef && auth.can('credentials.view')}
 			<!-- credentials of a site device live at the site -->
 			<CredentialsCard deviceId={d.id} {version} {active} />
 		{/if}

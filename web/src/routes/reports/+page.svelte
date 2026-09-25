@@ -9,6 +9,7 @@
 	import SendReportModal from '$lib/components/reports/SendReportModal.svelte';
 	import { RANGE_PRESETS } from '$lib/components/reports/reports';
 	import { Button, Card, ErrorState, Input, PageHeader, Skeleton } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDateTime, fromDateTimeLocal, toDateTimeLocal } from '$lib/utils/format';
@@ -104,6 +105,7 @@
 	}
 
 	let sendOpen = $state(false);
+	const canSend = $derived(auth.can('reports.send'));
 </script>
 
 <PageHeader title="Reports" description="Inventar-Export, Änderungsberichte und geplanter Versand" />
@@ -179,7 +181,9 @@
 					disabled={!!downloading}
 					onclick={() => download('pdf')}>PDF</Button
 				>
-				<Button variant="primary" icon="send" onclick={() => (sendOpen = true)}>Jetzt versenden</Button>
+				{#if canSend}
+					<Button variant="primary" icon="send" onclick={() => (sendOpen = true)}>Jetzt versenden</Button>
+				{/if}
 			</div>
 
 			{#if report.error && !report.data}
@@ -199,4 +203,6 @@
 	</Card>
 </div>
 
-<SendReportModal bind:open={sendOpen} from={query.from} to={query.to || undefined} {rangeText} />
+{#if canSend}
+	<SendReportModal bind:open={sendOpen} from={query.from} to={query.to || undefined} {rangeText} />
+{/if}

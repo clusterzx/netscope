@@ -6,6 +6,47 @@ kann.
 
 ---
 
+## FR-003: Mehrere Benutzer mit Rollen und Zwei-Faktor-Anmeldung
+
+**Status:** umgesetzt am 25.09.2026 · erfasst am 25.09.2026 – Bedienung im README
+(„Benutzer, Rollen und Zwei-Faktor-Anmeldung“), Technik in ARCHITECTURE („Benutzer und Rechte“)
+
+### Anlass
+
+NetScope kannte nur einen Administrator. Wer weiteren Personen Einblick geben wollte, musste
+das Admin-Passwort teilen oder ein API-Token herausgeben. Gewünscht: mehrere Benutzer mit
+unterschiedlichen Rechten (RBAC) und eine Zwei-Faktor-Anmeldung.
+
+### Festgelegt
+
+| Frage | Entscheidung |
+|---|---|
+| Rollenmodell | **Frei definierbare Rollen** mit einer Berechtigungsmatrix; vorgegeben sind Administrator (fest, alle Rechte), Bearbeiter und Betrachter. |
+| Art der 2FA | **TOTP und Passkeys** (WebAuthn), dazu Wiederherstellungscodes. |
+| 2FA-Pflicht | **Pro Rolle einstellbar**; Betroffene richten sie beim nächsten Login ein. |
+| Beschränkung auf Standorte | **Nein, vorerst nicht.** Jeder Benutzer sieht alle Standorte; jede Instanz hat eigene Benutzer. |
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Lesen braucht kein Recht.** 20 Rechte in vier Bereichen regeln nur Änderungen sowie das
+  Einsehen von Credentials, Backups und Protokollen. Kritische Rechte (Plugins, Credentials,
+  Subnetze, Verbund, System, Backups, Benutzer) sind im Rollen-Editor markiert.
+- **Start-Passwort:** Ein vom Administrator angelegtes oder zurückgesetztes Konto muss beim
+  ersten Login ein eigenes Passwort wählen; bis dahin ist die Sitzung auf die Einrichtung
+  beschränkt – ebenso bei fehlendem zweiten Faktor trotz 2FA-Pflicht.
+- **Passkeys als zweiter Faktor** nach dem Passwort, nicht passwortlos. Sie funktionieren nur
+  über HTTPS mit Hostnamen (Browser-Vorgabe); über `http://<IP>` bietet die Oberfläche nur
+  TOTP an.
+- **API-Tokens** bleiben ohne zweiten Faktor, haben aber höchstens die Rechte der Rolle ihres
+  Benutzers; Anlegen braucht das Recht „Eigene API-Tokens anlegen“.
+- **Sperre gegen Aussperren:** Mindestens ein aktiver Administrator bleibt immer; das eigene
+  Konto lässt sich weder löschen noch deaktivieren. Im Notfall: `netscope 2fa-reset` und
+  `netscope passwd --user` im Container.
+- **Nicht umgesetzt:** Anmeldung über OIDC/SSO und Benutzer je Standort; beides lässt sich
+  auf dem Rechte-Modell später ergänzen.
+
+---
+
 ## FR-002: Mehrere NetScope-Instanzen bündeln (Zentrale und Standorte)
 
 **Status:** umgesetzt am 24.09.2026 · erfasst am 24.09.2026 – Bedienung im README

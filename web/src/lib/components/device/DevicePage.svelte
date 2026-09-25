@@ -27,6 +27,7 @@
 		Tabs
 	} from '$lib/components/ui';
 	import type { MenuItem, TabItem } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { customFields, meta as metaStore } from '$lib/stores/catalog.svelte';
 	import { live } from '$lib/stores/live.svelte';
@@ -213,7 +214,13 @@
 	const siteLink = $derived(
 		site?.url && site.remoteId ? `${site.url.replace(/\/$/, '')}/devices/${site.remoteId}` : site?.url || ''
 	);
-	const deviceActions = $derived(site ? [] : (metaStore.value?.deviceActions ?? []));
+	const canEdit = $derived(auth.can('devices.edit'));
+	const canDelete = $derived(auth.can('devices.delete'));
+	const canScan = $derived(auth.can('devices.scan'));
+	const canHealth = $derived(auth.can('health.manage'));
+	const deviceActions = $derived(
+		site || !auth.can('devices.actions') ? [] : (metaStore.value?.deviceActions ?? [])
+	);
 	const wol = $derived(deviceActions.find((a) => a.plugin === 'wol'));
 
 	async function runAction(a: DeviceAction, params: Record<string, unknown> = {}) {
@@ -270,6 +277,25 @@
 		}
 	}
 
+	const deviceItems = $derived<MenuItem[]>([
+		...(site || !canHealth
+			? []
+			: [{ label: 'Health-Check anlegen …', icon: 'activity' as const, onclick: () => (healthOpen = true) }]),
+		...(canEdit ? [{ label: 'Notiz bearbeiten', icon: 'note' as const, onclick: editNotes }] : []),
+		...(canDelete
+			? [
+					{
+						label: 'MAC-Adressen abspalten …',
+						icon: 'split' as const,
+						disabled: (d?.macs?.length ?? 0) < 2,
+						hint: (d?.macs?.length ?? 0) < 2 ? 'nur eine MAC' : undefined,
+						onclick: () => (splitOpen = true)
+					},
+					{ label: 'Löschen …', icon: 'trash' as const, danger: true, onclick: remove }
+				]
+			: [])
+	]);
+
 	const menuItems = $derived<MenuItem[]>([
 		...(deviceActions.length
 			? [
@@ -283,19 +309,7 @@
 					}))
 				]
 			: []),
-		{ separator: true, label: 'Gerät' },
-		...(site
-			? []
-			: [{ label: 'Health-Check anlegen …', icon: 'activity' as const, onclick: () => (healthOpen = true) }]),
-		{ label: 'Notiz bearbeiten', icon: 'note', onclick: editNotes },
-		{
-			label: 'MAC-Adressen abspalten …',
-			icon: 'split',
-			disabled: (d?.macs?.length ?? 0) < 2,
-			hint: (d?.macs?.length ?? 0) < 2 ? 'nur eine MAC' : undefined,
-			onclick: () => (splitOpen = true)
-		},
-		{ label: 'Löschen …', icon: 'trash', danger: true, onclick: remove }
+		...(deviceItems.length ? [{ separator: true as const, label: 'Gerät' }, ...deviceItems] : [])
 	]);
 
 	function onChanged(next?: DeviceDetail) {
@@ -390,11 +404,15 @@
 							><span class="hidden sm:inline">Wake-on-LAN</span></Button
 						>
 					{/if}
-					<Button icon="edit" label="Manuelle Daten bearbeiten" onclick={() => (editOpen = true)}
-						><span class="hidden sm:inline">Bearbeiten</span></Button
-					>
+					{#if canEdit}
+						<Button icon="edit" label="Manuelle Daten bearbeiten" onclick={() => (editOpen = true)}
+							><span class="hidden sm:inline">Bearbeiten</span></Button
+						>
+					{/if}
 					{#if !site}
-						<Button variant="primary" icon="radar" onclick={() => (scanOpen = true)}>Scan jetzt</Button>
+						{#if canScan}
+							<Button variant="primary" icon="radar" onclick={() => (scanOpen = true)}>Scan jetzt</Button>
+						{/if}
 					{:else if siteLink}
 						<a
 							href={siteLink}
@@ -404,13 +422,15 @@
 							><Icon name="external" size={16} />Am Standort öffnen</a
 						>
 					{/if}
-					<Menu
-						label="Weitere Aktionen"
-						icon="more-vertical"
-						variant="secondary"
-						size="md"
-						items={menuItems}
-					/>
+					{#if menuItems.length}
+						<Menu
+							label="Weitere Aktionen"
+							icon="more-vertical"
+							variant="secondary"
+							size="md"
+							items={menuItems}
+						/>
+					{/if}
 				</div>
 			{/if}
 		{/snippet}

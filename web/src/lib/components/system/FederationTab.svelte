@@ -15,6 +15,7 @@
 		RelativeTime,
 		Skeleton
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
@@ -67,6 +68,7 @@
 
 	const current = $derived(data.data?.settings);
 	const managed = $derived(!!current?.managed);
+	const canManage = $derived(auth.can('sites.manage'));
 	const dirty = $derived(
 		!!current &&
 			(role !== current.role ||
@@ -189,7 +191,7 @@
 			novalidate
 			onsubmit={(e) => {
 				e.preventDefault();
-				save();
+				if (canManage) save();
 			}}
 			class="flex flex-col gap-4"
 		>
@@ -199,89 +201,95 @@
 					Die Anbindung an die Zentrale kommt aus NETSCOPE_CENTRAL_URL und NETSCOPE_CENTRAL_TOKEN und kann
 					hier nicht geändert werden.
 				</Alert>
+			{:else if !canManage}
+				<p class="text-xs text-fg-subtle">
+					Nur lesen – dafür fehlt die Berechtigung „Verbund und Standorte verwalten“.
+				</p>
 			{/if}
 
-			<Card title="Rolle dieser Instanz" icon="globe">
-				<fieldset disabled={managed}>
-					<legend class="sr-only">Rolle</legend>
-					<div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-						{#each ROLES as r (r.value)}
-							<label
-								class="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2.5 text-sm has-focus-visible:ring-2 has-focus-visible:ring-focus
+			<fieldset disabled={!canManage} class="contents">
+				<Card title="Rolle dieser Instanz" icon="globe">
+					<fieldset disabled={managed}>
+						<legend class="sr-only">Rolle</legend>
+						<div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+							{#each ROLES as r (r.value)}
+								<label
+									class="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2.5 text-sm has-focus-visible:ring-2 has-focus-visible:ring-focus
 									{role === r.value ? 'border-accent bg-accent-soft' : 'border-border hover:bg-surface-2'}"
-							>
-								<input
-									type="radio"
-									name="fed-role"
-									value={r.value}
-									bind:group={role}
-									class="mt-0.5 accent-(--accent)"
-								/>
-								<span>
-									<span class="block font-medium">{r.label}</span>
-									<span class="block text-xs text-fg-subtle">{r.text}</span>
-								</span>
-							</label>
-						{/each}
-					</div>
-				</fieldset>
-				{#if role === 'central'}
-					<div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-						<Input
-							label="Name dieser Instanz"
-							bind:value={localName}
-							maxlength={64}
-							placeholder="Zentrale"
-							hint="So heißt diese Instanz in der Standort-Auswahl (z. B. „Zuhause“)."
-							error={errors.localName}
-						/>
-					</div>
-					<p class="mt-3 text-sm text-fg-muted">
-						Standorte werden unter <a href="/sites" class="text-accent hover:underline">Standorte</a> angelegt;
-						dort gibt es das Token für die Anbindung.
-					</p>
-				{/if}
-			</Card>
-
-			{#if role === 'site'}
-				<Card title="Zentrale" icon="send">
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-						<Input
-							label="Adresse der Zentrale"
-							type="url"
-							bind:value={centralUrl}
-							placeholder="https://netscope.example.org"
-							hint="Der Standort baut die Verbindung auf; hier sind keine Freigaben nötig."
-							error={errors.centralUrl}
-							disabled={managed}
-							required
-							class="md:col-span-2"
-						/>
-						<Input
-							label="Token des Standorts"
-							type="password"
-							autocomplete="off"
-							bind:value={token}
-							placeholder={current?.hasToken ? 'gespeichert – leer lassen, um es zu behalten' : 'nss_…'}
-							hint="Wird in der Zentrale beim Anlegen des Standorts einmalig angezeigt. Es erlaubt nur das Einliefern."
-							error={errors.token}
-							disabled={managed}
-							mono
-						/>
-						<Input
-							label="Zertifikat-Fingerprint (optional)"
-							bind:value={fingerprint}
-							placeholder="SHA-256, z. B. 3a:9f:…"
-							hint="Nur für selbst signierte Zertifikate: dann gilt genau dieses Zertifikat statt der üblichen Prüfung."
-							error={errors.fingerprint}
-							disabled={managed}
-							mono
-						/>
-					</div>
+								>
+									<input
+										type="radio"
+										name="fed-role"
+										value={r.value}
+										bind:group={role}
+										class="mt-0.5 accent-(--accent)"
+									/>
+									<span>
+										<span class="block font-medium">{r.label}</span>
+										<span class="block text-xs text-fg-subtle">{r.text}</span>
+									</span>
+								</label>
+							{/each}
+						</div>
+					</fieldset>
+					{#if role === 'central'}
+						<div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+							<Input
+								label="Name dieser Instanz"
+								bind:value={localName}
+								maxlength={64}
+								placeholder="Zentrale"
+								hint="So heißt diese Instanz in der Standort-Auswahl (z. B. „Zuhause“)."
+								error={errors.localName}
+							/>
+						</div>
+						<p class="mt-3 text-sm text-fg-muted">
+							Standorte werden unter <a href="/sites" class="text-accent hover:underline">Standorte</a> angelegt;
+							dort gibt es das Token für die Anbindung.
+						</p>
+					{/if}
 				</Card>
-			{/if}
 
-			{#if !managed}
+				{#if role === 'site'}
+					<Card title="Zentrale" icon="send">
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+							<Input
+								label="Adresse der Zentrale"
+								type="url"
+								bind:value={centralUrl}
+								placeholder="https://netscope.example.org"
+								hint="Der Standort baut die Verbindung auf; hier sind keine Freigaben nötig."
+								error={errors.centralUrl}
+								disabled={managed}
+								required
+								class="md:col-span-2"
+							/>
+							<Input
+								label="Token des Standorts"
+								type="password"
+								autocomplete="off"
+								bind:value={token}
+								placeholder={current?.hasToken ? 'gespeichert – leer lassen, um es zu behalten' : 'nss_…'}
+								hint="Wird in der Zentrale beim Anlegen des Standorts einmalig angezeigt. Es erlaubt nur das Einliefern."
+								error={errors.token}
+								disabled={managed}
+								mono
+							/>
+							<Input
+								label="Zertifikat-Fingerprint (optional)"
+								bind:value={fingerprint}
+								placeholder="SHA-256, z. B. 3a:9f:…"
+								hint="Nur für selbst signierte Zertifikate: dann gilt genau dieses Zertifikat statt der üblichen Prüfung."
+								error={errors.fingerprint}
+								disabled={managed}
+								mono
+							/>
+						</div>
+					</Card>
+				{/if}
+			</fieldset>
+
+			{#if !managed && canManage}
 				<div
 					class="z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-border bg-surface/95 px-3 py-2 backdrop-blur
 						{dirty ? 'sticky bottom-2 shadow-md' : ''}"
@@ -299,10 +307,12 @@
 		{#if current?.role === 'site'}
 			<Card title="Verbindung zur Zentrale" icon="activity">
 				{#snippet actions()}
-					<Button size="sm" icon="refresh" onclick={resync} loading={syncing}>Vollabgleich</Button>
-					<Button size="sm" variant="primary" icon="zap" onclick={runTest} loading={testing}
-						>Verbindung testen</Button
-					>
+					{#if canManage}
+						<Button size="sm" icon="refresh" onclick={resync} loading={syncing}>Vollabgleich</Button>
+						<Button size="sm" variant="primary" icon="zap" onclick={runTest} loading={testing}
+							>Verbindung testen</Button
+						>
+					{/if}
 				{/snippet}
 				{#if test}
 					<Alert

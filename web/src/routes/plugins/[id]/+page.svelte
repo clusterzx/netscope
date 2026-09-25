@@ -32,6 +32,7 @@
 		scopeSummary,
 		targetsLabel
 	} from '$lib/components/plugins/plugin';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { groups } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { live } from '$lib/stores/live.svelte';
@@ -76,12 +77,13 @@
 	const notFound = $derived(data.error instanceof ApiError && data.error.isNotFound);
 	const activeRun = $derived(p ? (runs.forPlugin(p.info.id)[0] ?? p.running) : undefined);
 	const groupName = (gid: number) => groups.value?.find((g) => g.id === gid)?.name ?? `#${gid}`;
+	const canManage = $derived(auth.can('plugins.manage'));
 
 	// ---------------------------------------------------------------- tabs (URL synced)
 	const tabs = $derived.by((): TabItem[] => {
 		if (!p) return [];
 		const out: TabItem[] = [{ id: 'settings', label: 'Einstellungen', icon: 'system' }];
-		if ((p.actions ?? []).length || isPublisher(p))
+		if (canManage && ((p.actions ?? []).length || isPublisher(p)))
 			out.push({ id: 'actions', label: 'Aktionen', icon: 'zap', count: (p.actions ?? []).length || null });
 		if (hasRuns(p)) out.push({ id: 'runs', label: 'Läufe', icon: 'history' });
 		return out;
@@ -195,8 +197,10 @@
 	{/snippet}
 	{#snippet actions()}
 		{#if p?.config}
-			<Toggle checked={p.config.enabled} onchange={setEnabled} disabled={enabledBusy} label="Aktiv" />
-			{#if canRun(p)}
+			{#if canManage}
+				<Toggle checked={p.config.enabled} onchange={setEnabled} disabled={enabledBusy} label="Aktiv" />
+			{/if}
+			{#if canRun(p) && auth.can('devices.scan')}
 				<Button variant="primary" icon="play" loading={starting} onclick={runNow}>Jetzt ausführen</Button>
 			{/if}
 		{/if}

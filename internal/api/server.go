@@ -91,6 +91,11 @@ type route struct {
 	Tag     string
 	Summary string
 	Scope   string
+	// Perm is the permission the route needs ("" = every signed-in user).
+	Perm string
+	// Setup routes stay usable while a session first has to change its password or set up
+	// a second factor.
+	Setup   bool
 	Params  []param
 	Body    any
 	Resp    any
@@ -117,7 +122,8 @@ func New(d Deps) *Server {
 	s.registerTopology()
 	s.registerReports()
 	s.registerDashboard()
-	s.mux.HandleFunc("GET /api/v1/stream", s.withAuth(scopeRead, s.handleStream))
+	s.registerUsers()
+	s.mux.HandleFunc("GET /api/v1/stream", s.withAuth(&route{Scope: scopeRead, handler: s.handleStream}))
 	s.mux.HandleFunc("GET /metrics", s.handleMetrics)
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)
 	s.mux.HandleFunc("GET /api/docs", s.handleDocs)
@@ -132,7 +138,7 @@ func New(d Deps) *Server {
 
 func (s *Server) add(r *route) {
 	s.routes = append(s.routes, r)
-	s.mux.HandleFunc(r.Method+" "+r.Path, s.withAuth(r.Scope, r.handler))
+	s.mux.HandleFunc(r.Method+" "+r.Path, s.withAuth(r))
 }
 
 // Handler returns the root handler with all middleware.
@@ -340,7 +346,8 @@ func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) (*auth.Pri
 	return p, true
 }
 
-func (s *Server) withAuth(scope string, h http.HandlerFunc) http.HandlerFunc {
+func (s *Server) withAuth(rt *route) http.HandlerFunc {
+	scope, h := rt.Scope, rt.handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		if scope == scopePublic {
 			h(w, r)
@@ -358,6 +365,22 @@ func (s *Server) withAuth(scope string, h http.HandlerFunc) http.HandlerFunc {
 		}
 		if (scope == scopeWrite || unsafe) && !p.CanWrite() {
 			writeError(w, http.StatusForbidden, "forbidden", "Dieses Token darf nur lesen", nil)
+			return
+		}
+		switch p.Restricted() {
+		case "password":
+			if !rt.Setup {
+				writeError(w, http.StatusForbidden, "password_change_required", "Bitte zuerst das Start-Passwort ändern", nil)
+				return
+			}
+		case "mfa":
+			if !rt.Setup {
+				writeError(w, http.StatusForbidden, "mfa_setup_required", "Deine Rolle verlangt einen zweiten Faktor – bitte zuerst einrichten", nil)
+				return
+			}
+		}
+		if !p.Has(rt.Perm) {
+			writeError(w, http.StatusForbidden, "forbidden", "Dazu fehlt die Berechtigung „"+permLabel(rt.Perm)+"“", nil)
 			return
 		}
 		h(w, r.WithContext(context.WithValue(r.Context(), keyPrincipal, p)))
@@ -409,6 +432,12 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusBadRequest, "validation", ce.Error(), []plugin.FieldError{{Field: ce.Field, Message: ce.Message}})
 	case errors.Is(err, auth.ErrInvalidCredentials):
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", err.Error(), nil)
+	case errors.Is(err, auth.ErrInvalidCode):
+		writeError(w, http.StatusUnauthorized, "invalid_code", err.Error(), nil)
+	case errors.Is(err, auth.ErrChallengeExpired):
+		writeError(w, http.StatusUnauthorized, "challenge_expired", err.Error(), nil)
+	case errors.Is(err, auth.ErrAccountDisabled):
+		writeError(w, http.StatusForbidden, "account_disabled", err.Error(), nil)
 	case errors.Is(err, auth.ErrRateLimited):
 		writeError(w, http.StatusTooManyRequests, "rate_limited", err.Error(), nil)
 	case errors.Is(err, auth.ErrUnauthenticated):
@@ -530,6 +559,8 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	}
 	sub := s.Bus.Subscribe(256, topics...)
 	defer sub.Close()
+	// server log lines are for those who may read the log
+	logs := principal(r).Has(auth.PermAuditView)
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache")
@@ -553,6 +584,9 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
+			if msg.Topic == bus.TopicLog && !logs {
+				continue
+			}
 			b, err := json.Marshal(msg)
 			if err != nil {
 				continue
@@ -563,4 +597,19 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 			fl.Flush()
 		}
 	}
+}
+
+// permLabel returns the display name of a permission.
+func permLabel(key string) string {
+	for _, p := range auth.Permissions {
+		if p.Key == key {
+			return p.Label
+		}
+	}
+	return key
+}
+
+// forbidden answers a request that lacks a permission a handler checks itself.
+func forbidden(w http.ResponseWriter, perm string) {
+	writeError(w, http.StatusForbidden, "forbidden", "Dazu fehlt die Berechtigung „"+permLabel(perm)+"“", nil)
 }

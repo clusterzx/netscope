@@ -14,6 +14,7 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import TagInput from '$lib/components/ui/TagInput.svelte';
 	import StatusDot from '$lib/components/ui/StatusDot.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { groups, meta, tags } from '$lib/stores/catalog.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -37,6 +38,11 @@
 		tags.load().catch(() => {});
 		groups.load().catch(() => {});
 	});
+
+	const canEdit = $derived(auth.can('devices.edit'));
+	const canDelete = $derived(auth.can('devices.delete'));
+	const canActions = $derived(auth.can('devices.actions'));
+	const canCreateGroup = $derived(auth.can('inventory.config'));
 
 	const n = $derived(ids.length);
 	const target = $derived(n === 1 ? '1 Gerät' : `${formatNumber(n)} Geräte`);
@@ -209,7 +215,7 @@
 	}
 
 	const actionItems = $derived<MenuItem[]>([
-		...((meta.value?.deviceActions ?? []).length
+		...(canActions && (meta.value?.deviceActions ?? []).length
 			? [
 					{ separator: true as const, label: 'Plugin-Aktionen' },
 					...(meta.value?.deviceActions ?? []).map((a) => ({
@@ -220,9 +226,13 @@
 					}))
 				]
 			: []),
-		{ separator: true, label: 'Inventar' },
-		{ label: 'Zusammenführen …', icon: 'merge', disabled: n < 2, onclick: openMerge },
-		{ label: 'Löschen …', icon: 'trash', danger: true, onclick: remove }
+		...(canDelete
+			? [
+					{ separator: true as const, label: 'Inventar' },
+					{ label: 'Zusammenführen …', icon: 'merge' as const, disabled: n < 2, onclick: openMerge },
+					{ label: 'Löschen …', icon: 'trash' as const, danger: true, onclick: remove }
+				]
+			: [])
 	]);
 </script>
 
@@ -234,67 +244,72 @@
 	<span class="text-sm font-medium text-fg">{target} ausgewählt</span>
 	<Button size="sm" variant="ghost" onclick={onclear}>Auswahl aufheben</Button>
 	<span class="mx-1 hidden h-5 w-px bg-border sm:block"></span>
-	<Menu
-		text="Tags"
-		label="Tags"
-		size="sm"
-		variant="secondary"
-		placement="bottom-start"
-		disabled={busy}
-		items={[
-			{ label: 'Tags hinzufügen …', icon: 'plus', onclick: () => openTags('add_tags') },
-			{ label: 'Tags entfernen …', icon: 'minus', onclick: () => openTags('remove_tags') }
-		]}
-	/>
-	<Menu
-		text="Gruppe"
-		label="Gruppe"
-		size="sm"
-		variant="secondary"
-		placement="bottom-start"
-		disabled={busy}
-		items={[
-			{ label: 'Zu Gruppe hinzufügen …', icon: 'plus', onclick: () => openGroups('add_group') },
-			{ label: 'Aus Gruppe entfernen …', icon: 'minus', onclick: () => openGroups('remove_group') }
-		]}
-	/>
-	<Menu
-		text="Zustand"
-		label="Zustand setzen"
-		size="sm"
-		variant="secondary"
-		placement="bottom-start"
-		disabled={busy}
-		items={(['known', 'unknown', 'ignored'] as const).map((s) => ({
-			label: `Als „${stateLabel[s]}“ markieren`,
-			onclick: () =>
-				bulk({ action: 'set_state', value: s }, `Zustand „${stateLabel[s]}“ gesetzt`).catch(() => {})
-		}))}
-	/>
-	<Menu
-		text="Kritikalität"
-		label="Kritikalität setzen"
-		size="sm"
-		variant="secondary"
-		placement="bottom-start"
-		disabled={busy}
-		items={CRITICALITIES.map((c) => ({
-			label: criticalityLabel[c],
-			onclick: () =>
-				bulk({ action: 'set_criticality', value: c }, `Kritikalität „${criticalityLabel[c]}“ gesetzt`).catch(
-					() => {}
-				)
-		}))}
-	/>
-	<Menu
-		text="Weitere"
-		label="Weitere Aktionen"
-		size="sm"
-		variant="secondary"
-		placement="bottom-start"
-		disabled={busy}
-		items={actionItems}
-	/>
+	{#if canEdit}
+		<Menu
+			text="Tags"
+			label="Tags"
+			size="sm"
+			variant="secondary"
+			placement="bottom-start"
+			disabled={busy}
+			items={[
+				{ label: 'Tags hinzufügen …', icon: 'plus', onclick: () => openTags('add_tags') },
+				{ label: 'Tags entfernen …', icon: 'minus', onclick: () => openTags('remove_tags') }
+			]}
+		/>
+		<Menu
+			text="Gruppe"
+			label="Gruppe"
+			size="sm"
+			variant="secondary"
+			placement="bottom-start"
+			disabled={busy}
+			items={[
+				{ label: 'Zu Gruppe hinzufügen …', icon: 'plus', onclick: () => openGroups('add_group') },
+				{ label: 'Aus Gruppe entfernen …', icon: 'minus', onclick: () => openGroups('remove_group') }
+			]}
+		/>
+		<Menu
+			text="Zustand"
+			label="Zustand setzen"
+			size="sm"
+			variant="secondary"
+			placement="bottom-start"
+			disabled={busy}
+			items={(['known', 'unknown', 'ignored'] as const).map((s) => ({
+				label: `Als „${stateLabel[s]}“ markieren`,
+				onclick: () =>
+					bulk({ action: 'set_state', value: s }, `Zustand „${stateLabel[s]}“ gesetzt`).catch(() => {})
+			}))}
+		/>
+		<Menu
+			text="Kritikalität"
+			label="Kritikalität setzen"
+			size="sm"
+			variant="secondary"
+			placement="bottom-start"
+			disabled={busy}
+			items={CRITICALITIES.map((c) => ({
+				label: criticalityLabel[c],
+				onclick: () =>
+					bulk(
+						{ action: 'set_criticality', value: c },
+						`Kritikalität „${criticalityLabel[c]}“ gesetzt`
+					).catch(() => {})
+			}))}
+		/>
+	{/if}
+	{#if actionItems.length}
+		<Menu
+			text="Weitere"
+			label="Weitere Aktionen"
+			size="sm"
+			variant="secondary"
+			placement="bottom-start"
+			disabled={busy}
+			items={actionItems}
+		/>
+	{/if}
 </div>
 
 <Modal
@@ -345,7 +360,7 @@
 				Es gibt noch keine manuellen Gruppen. Regelbasierte Gruppen ergeben sich aus ihrem Filter.
 			</p>
 		{/if}
-		{#if groupMode === 'add_group'}
+		{#if groupMode === 'add_group' && canCreateGroup}
 			<Input
 				label="… oder neue manuelle Gruppe anlegen"
 				bind:value={newGroup}

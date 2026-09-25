@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"netscope/internal/auth"
 	"netscope/internal/db"
 	"netscope/internal/events"
 	"netscope/internal/federation"
@@ -77,7 +78,7 @@ func (s *Server) registerReports() {
 		Scope: scopeRead, Params: []param{{Name: "from"}, {Name: "to"}, {Name: "format", Desc: "json | md | pdf"}},
 		Resp: reports.ChangeReport{}, handler: s.handleChangeReport})
 	s.add(&route{Method: "POST", Path: "/api/v1/reports/send", Tag: "Reports", Summary: "Änderungsbericht jetzt über Publisher versenden",
-		Scope: scopeWrite, Body: sendReportRequest{}, Resp: okResponse{}, Status: http.StatusAccepted, handler: s.handleSendReport})
+		Scope: scopeWrite, Body: sendReportRequest{}, Resp: okResponse{}, Status: http.StatusAccepted, Perm: auth.PermReportsSend, handler: s.handleSendReport})
 }
 
 func (s *Server) registerDashboard() {

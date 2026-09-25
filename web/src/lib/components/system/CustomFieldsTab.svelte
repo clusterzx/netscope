@@ -16,6 +16,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { customFields as cfCatalog } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -25,6 +26,8 @@
 
 	const TYPES = ['text', 'number', 'date', 'url', 'bool'];
 	const KEY_RE = /^[a-z][a-z0-9_]{0,39}$/;
+
+	const canManage = $derived(auth.can('inventory.config'));
 
 	const list = new AsyncData<CustomField[]>();
 	$effect(() => {
@@ -143,6 +146,7 @@
 		{ key: 'description', label: 'Beschreibung', hideBelow: 'md' },
 		{ key: 'actions', label: '', align: 'right', width: '3rem' }
 	];
+	const shownColumns = $derived(canManage ? columns : columns.filter((c) => c.key !== 'actions'));
 </script>
 
 <Card
@@ -152,13 +156,15 @@
 	padding="none"
 >
 	{#snippet actions()}
-		<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Feld anlegen</Button>
+		{#if canManage}
+			<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Feld anlegen</Button>
+		{/if}
 	{/snippet}
 	{#if list.error && !list.data}
 		<ErrorState error={list.error} onretry={() => list.reload()} />
 	{:else}
 		<Table
-			{columns}
+			columns={shownColumns}
 			rows={list.data ?? []}
 			key={(c) => c.id}
 			loading={list.loading && !list.data}

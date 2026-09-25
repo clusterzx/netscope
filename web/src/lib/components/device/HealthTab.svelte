@@ -9,6 +9,7 @@
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import StatusDot from '$lib/components/ui/StatusDot.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatMs, formatPercent, formatSeconds } from '$lib/utils/format';
 	import { healthStateLabel, healthTone } from '$lib/utils/labels';
@@ -25,6 +26,8 @@
 	}
 
 	let { deviceId, deviceIp, version, active, oncreate }: Props = $props();
+
+	const canManage = $derived(auth.can('health.manage'));
 
 	const data = new LazyData<HealthCheck[]>();
 	$effect(() => {
@@ -79,7 +82,7 @@
 	<div class="flex flex-wrap items-center gap-2">
 		<h2 class="flex-1 text-sm font-semibold">Health-Checks</h2>
 		<Button size="sm" href="/health" variant="ghost" iconRight="arrow-right">Statusboard</Button>
-		{#if oncreate}
+		{#if oncreate && canManage}
 			<Button size="sm" variant="primary" icon="plus" onclick={oncreate}>Health-Check anlegen</Button>
 		{/if}
 	</div>
@@ -98,7 +101,7 @@
 					: 'Health-Checks für Geräte eines Standorts werden am Standort angelegt; ihre Ausfälle kommen als Events hierher.'}
 			>
 				{#snippet actions()}
-					{#if oncreate}
+					{#if oncreate && canManage}
 						<Button variant="primary" icon="plus" onclick={oncreate}>Health-Check anlegen</Button>
 					{/if}
 				{/snippet}
@@ -150,9 +153,11 @@
 					<div class="flex flex-wrap items-center gap-2 text-xs text-fg-subtle">
 						{#if c.stateSince}<span class="flex-1">Zustand seit <RelativeTime value={c.stateSince} /></span
 							>{/if}
-						<Button size="xs" icon="play" loading={running === c.id} onclick={() => runNow(c)}
-							>Jetzt prüfen</Button
-						>
+						{#if canManage}
+							<Button size="xs" icon="play" loading={running === c.id} onclick={() => runNow(c)}
+								>Jetzt prüfen</Button
+							>
+						{/if}
 						<Button size="xs" variant="ghost" href="/health" iconRight="arrow-right">Details</Button>
 					</div>
 				</li>

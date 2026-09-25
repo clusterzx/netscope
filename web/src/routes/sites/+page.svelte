@@ -23,6 +23,7 @@
 		RelativeTime,
 		Skeleton
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { federation, siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
@@ -45,6 +46,7 @@
 	});
 
 	const isCentral = $derived(federation.role === 'central');
+	const canManage = $derived(auth.can('sites.manage'));
 	const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
 	function failedPlugins(s: Site) {
@@ -171,7 +173,7 @@
 	description="NetScope-Instanzen, die ihre Netze an diese Zentrale liefern. Die Zentrale liest nur – gescannt und konfiguriert wird am Standort."
 >
 	{#snippet actions()}
-		{#if isCentral}
+		{#if isCentral && canManage}
 			<Button variant="primary" icon="plus" onclick={openCreate}>Standort anlegen</Button>
 		{/if}
 	{/snippet}
@@ -187,16 +189,16 @@
 {:else if !list.data}
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-2"><Card><Skeleton lines={6} /></Card></div>
 {:else if list.data.length === 0}
+	{#snippet create()}
+		<Button variant="primary" icon="plus" onclick={openCreate}>Standort anlegen</Button>
+	{/snippet}
 	<Card>
 		<EmptyState
 			icon="globe"
 			title="Noch keine Standorte"
 			description="Einen Standort anlegen, das Token am Standort unter System → Verbund eintragen – ab dann liefert er seine Geräte, Events und Zustände hierher."
-		>
-			{#snippet actions()}
-				<Button variant="primary" icon="plus" onclick={openCreate}>Standort anlegen</Button>
-			{/snippet}
-		</EmptyState>
+			actions={canManage ? create : undefined}
+		/>
 	</Card>
 {:else}
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -230,25 +232,33 @@
 						{/if}
 						<Menu
 							label="Aktionen für {s.name}"
-							items={[
-								{ label: 'Bearbeiten', icon: 'edit', onclick: () => openEdit(s) },
-								{
-									label: 'Geräte anzeigen',
-									icon: 'devices',
-									href: `/devices?q=${encodeURIComponent('site:' + s.slug)}`
-								},
-								{ label: 'Neues Token', icon: 'key', onclick: () => rotate(s) },
-								{ separator: true },
-								{
-									label: 'Entfernen …',
-									icon: 'trash',
-									danger: true,
-									onclick: () => {
-										deleting = s;
-										deleteOpen = true;
-									}
-								}
-							]}
+							items={canManage
+								? [
+										{ label: 'Bearbeiten', icon: 'edit', onclick: () => openEdit(s) },
+										{
+											label: 'Geräte anzeigen',
+											icon: 'devices',
+											href: `/devices?q=${encodeURIComponent('site:' + s.slug)}`
+										},
+										{ label: 'Neues Token', icon: 'key', onclick: () => rotate(s) },
+										{ separator: true },
+										{
+											label: 'Entfernen …',
+											icon: 'trash',
+											danger: true,
+											onclick: () => {
+												deleting = s;
+												deleteOpen = true;
+											}
+										}
+									]
+								: [
+										{
+											label: 'Geräte anzeigen',
+											icon: 'devices',
+											href: `/devices?q=${encodeURIComponent('site:' + s.slug)}`
+										}
+									]}
 						/>
 					</div>
 				{/snippet}

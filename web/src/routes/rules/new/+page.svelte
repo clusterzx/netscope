@@ -2,9 +2,12 @@
 	import { page } from '$app/state';
 	import { api } from '$lib/api';
 	import type { Rule } from '$lib/api';
-	import { Card, ErrorState, PageHeader, Skeleton } from '$lib/components/ui';
+	import { Button, Card, EmptyState, ErrorState, PageHeader, Skeleton } from '$lib/components/ui';
 	import RuleEditor from '$lib/components/rules/RuleEditor.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
+
+	const canManage = $derived(auth.can('rules.manage'));
 
 	/** ?from=<id> duplicates an existing rule */
 	const from = $derived(Number(page.url.searchParams.get('from') ?? 0));
@@ -12,6 +15,7 @@
 	// all rules: the new rule is appended to the evaluation order; the template for duplicates
 	const data = new AsyncData<Rule[]>();
 	$effect(() => {
+		if (!canManage) return;
 		data.run(async (signal) => (await api.get('/api/v1/rules', { signal })) ?? []);
 	});
 
@@ -19,7 +23,18 @@
 	const template = $derived(from > 0 ? ((data.data ?? []).find((r) => r.id === from) ?? null) : null);
 </script>
 
-{#if data.error && !data.data}
+{#if !canManage}
+	<PageHeader title="Neue Regel" />
+	<EmptyState
+		icon="lock"
+		title="Keine Berechtigung"
+		description="Zum Anlegen von Regeln fehlt die Berechtigung „Regeln verwalten“."
+	>
+		{#snippet actions()}
+			<Button href="/rules">Zur Regelliste</Button>
+		{/snippet}
+	</EmptyState>
+{:else if data.error && !data.data}
 	<PageHeader title="Neue Regel" />
 	<ErrorState error={data.error} onretry={() => data.reload()} />
 {:else if !data.data}

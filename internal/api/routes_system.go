@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"netscope/internal/audit"
+	"netscope/internal/auth"
 	"netscope/internal/config"
 	"netscope/internal/cron"
 	"netscope/internal/db"
@@ -135,34 +136,34 @@ func (s *Server) registerSystem() {
 	s.add(&route{Method: "GET", Path: "/api/v1/system/settings", Tag: "System", Summary: "Systemeinstellungen", Scope: scopeRead,
 		Resp: settings.System{}, handler: s.handleGetSettings})
 	s.add(&route{Method: "PUT", Path: "/api/v1/system/settings", Tag: "System", Summary: "Systemeinstellungen speichern", Scope: scopeWrite,
-		Body: settings.System{}, Resp: settings.System{}, handler: s.handlePutSettings})
+		Body: settings.System{}, Resp: settings.System{}, Perm: auth.PermSystemManage, handler: s.handlePutSettings})
 	s.add(&route{Method: "PUT", Path: "/api/v1/system/loglevel", Tag: "System", Summary: "Log-Level zur Laufzeit ändern", Scope: scopeWrite,
-		Body: logLevelRequest{}, Resp: logLevelRequest{}, handler: s.handleLogLevel})
+		Body: logLevelRequest{}, Resp: logLevelRequest{}, Perm: auth.PermSystemManage, handler: s.handleLogLevel})
 	s.add(&route{Method: "GET", Path: "/api/v1/system/logs", Tag: "System", Summary: "Anwendungsprotokoll (Ringpuffer)", Scope: scopeRead,
 		Params: []param{{Name: "level", Desc: "Mindest-Level: debug, info, warn, error"}, {Name: "plugin"}, {Name: "q", Desc: "Textsuche"},
-			{Name: "limit", Type: "integer"}}, Resp: []logging.Entry{}, handler: s.handleLogs})
+			{Name: "limit", Type: "integer"}}, Resp: []logging.Entry{}, Perm: auth.PermAuditView, handler: s.handleLogs})
 	s.add(&route{Method: "GET", Path: "/api/v1/system/backups", Tag: "System", Summary: "Backups auflisten", Scope: scopeRead,
-		Resp: []backupInfo{}, handler: s.handleListBackups})
+		Resp: []backupInfo{}, Perm: auth.PermBackupsManage, handler: s.handleListBackups})
 	s.add(&route{Method: "POST", Path: "/api/v1/system/backups", Tag: "System", Summary: "Backup der Datenbank erstellen", Scope: scopeWrite,
-		Resp: backupInfo{}, Status: http.StatusCreated, handler: s.handleCreateBackup})
+		Resp: backupInfo{}, Status: http.StatusCreated, Perm: auth.PermBackupsManage, handler: s.handleCreateBackup})
 	s.add(&route{Method: "GET", Path: "/api/v1/system/backups/{name}", Tag: "System", Summary: "Backup herunterladen", Scope: scopeWrite,
-		Content: "application/octet-stream", handler: s.handleDownloadBackup})
+		Content: "application/octet-stream", Perm: auth.PermBackupsManage, handler: s.handleDownloadBackup})
 	s.add(&route{Method: "DELETE", Path: "/api/v1/system/backups/{name}", Tag: "System", Summary: "Backup löschen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleDeleteBackup})
+		Resp: okResponse{}, Perm: auth.PermBackupsManage, handler: s.handleDeleteBackup})
 	s.add(&route{Method: "POST", Path: "/api/v1/system/restore", Tag: "System",
 		Summary: "Datenbank wiederherstellen (multipart „file“ oder JSON {name}); startet die Dienste neu", Scope: scopeWrite,
-		Resp: okResponse{}, Status: http.StatusAccepted, handler: s.handleRestore})
+		Resp: okResponse{}, Status: http.StatusAccepted, Perm: auth.PermBackupsManage, handler: s.handleRestore})
 	s.add(&route{Method: "POST", Path: "/api/v1/system/vault/rotate", Tag: "System", Summary: "Master-Key des Vaults rotieren", Scope: scopeWrite,
-		Resp: map[string]string{}, handler: s.handleRotate})
+		Resp: map[string]string{}, Perm: auth.PermSystemManage, handler: s.handleRotate})
 	s.add(&route{Method: "GET", Path: "/api/v1/audit", Tag: "System", Summary: "Audit-Log", Scope: scopeRead,
 		Params: []param{{Name: "entity"}, {Name: "id"}, {Name: "action"}, {Name: "q"}, {Name: "limit", Type: "integer"}, {Name: "offset", Type: "integer"}},
-		Resp:   auditList{}, handler: s.handleAudit})
+		Resp:   auditList{}, Perm: auth.PermAuditView, handler: s.handleAudit})
 	s.add(&route{Method: "GET", Path: "/api/v1/cron/describe", Tag: "System", Summary: "Cron-Ausdruck prüfen und in Klartext beschreiben",
 		Scope: scopeRead, Params: []param{{Name: "expr", Required: true}}, Resp: cronResponse{}, handler: s.handleCron})
 	s.add(&route{Method: "GET", Path: "/api/v1/meta", Tag: "System", Summary: "Kataloge und Metadaten für die Oberfläche", Scope: scopeRead,
 		Resp: metaResponse{}, handler: s.handleMeta})
 	s.add(&route{Method: "POST", Path: "/api/v1/uploads", Tag: "System", Summary: "Datei hochladen (multipart „file“, z. B. für Importer)",
-		Scope: scopeWrite, Resp: uploadResponse{}, Status: http.StatusCreated, handler: s.handleUpload})
+		Scope: scopeWrite, Resp: uploadResponse{}, Status: http.StatusCreated, Perm: auth.PermPluginsManage, handler: s.handleUpload})
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

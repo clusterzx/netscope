@@ -26,6 +26,7 @@
 		Skeleton,
 		StatusDot
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { formatNumber, formatPercent, formatTime } from '$lib/utils/format';
@@ -128,6 +129,7 @@
 		setParams({ check: null });
 	}
 
+	const canManage = $derived(auth.can('health.manage'));
 	let formOpen = $state(false);
 	let editing = $state<HealthCheck | null>(null);
 	let preset = $state<Partial<CheckForm> | undefined>(undefined);
@@ -146,7 +148,7 @@
 	// /health?new=1&device=12[&type=tcp&port=22&target=…&name=…] (links from the device page)
 	onMount(async () => {
 		const q = page.url.searchParams;
-		if (q.get('new') !== '1') return;
+		if (q.get('new') !== '1' || !canManage) return;
 		const p: Partial<CheckForm> = {};
 		const type = q.get('type');
 		if (type && (CHECK_TYPES as readonly string[]).includes(type)) p.type = type as CheckType;
@@ -211,12 +213,14 @@
 			loading={board.loading && !!board.data}
 			onclick={() => board.reload()}
 		/>
-		<Button
-			variant="primary"
-			icon="plus"
-			onclick={() => openCreate(fDevice ? { deviceId: fDevice, deviceName: deviceLabel } : undefined)}
-			>Check anlegen</Button
-		>
+		{#if canManage}
+			<Button
+				variant="primary"
+				icon="plus"
+				onclick={() => openCreate(fDevice ? { deviceId: fDevice, deviceName: deviceLabel } : undefined)}
+				>Check anlegen</Button
+			>
+		{/if}
 	{/snippet}
 </PageHeader>
 
@@ -327,16 +331,16 @@
 				{/each}
 			</div>
 		{:else if checks.length === 0}
+			{#snippet create()}
+				<Button variant="primary" icon="plus" onclick={() => openCreate()}>Ersten Check anlegen</Button>
+			{/snippet}
 			<Card>
 				<EmptyState
 					icon="health"
 					title="Noch keine Health-Checks"
 					description="Checks prüfen Dienste regelmäßig per TCP, HTTP, TLS oder Ping, messen die Latenz und melden Ausfälle als Event."
-				>
-					{#snippet actions()}
-						<Button variant="primary" icon="plus" onclick={() => openCreate()}>Ersten Check anlegen</Button>
-					{/snippet}
-				</EmptyState>
+					actions={canManage ? create : undefined}
+				/>
 			</Card>
 		{:else if filtered.length === 0}
 			<Card>
@@ -401,4 +405,6 @@
 	}}
 />
 
-<CheckFormModal bind:open={formOpen} check={editing} {preset} onsaved={onSaved} />
+{#if canManage}
+	<CheckFormModal bind:open={formOpen} check={editing} {preset} onsaved={onSaved} />
+{/if}

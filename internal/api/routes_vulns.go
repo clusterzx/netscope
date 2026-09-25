@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"netscope/internal/auth"
 	"netscope/internal/plugins/cve"
 )
 
@@ -47,7 +48,7 @@ func (s *Server) registerVulns() {
 	s.add(&route{Method: "GET", Path: "/api/v1/vulnerabilities/status", Tag: "Schwachstellen", Summary: "NVD-Sync-Status und Übersicht",
 		Scope: scopeRead, Resp: vulnStatus{}, handler: s.handleVulnStatus})
 	s.add(&route{Method: "POST", Path: "/api/v1/vulnerabilities/ignore", Tag: "Schwachstellen", Summary: "CVE für ein Gerät als irrelevant markieren (oder zurücknehmen)",
-		Scope: scopeWrite, Body: ignoreRequest{}, Resp: okResponse{}, handler: s.handleIgnoreCVE})
+		Scope: scopeWrite, Body: ignoreRequest{}, Resp: okResponse{}, Perm: auth.PermVulnsManage, handler: s.handleIgnoreCVE})
 	s.add(&route{Method: "GET", Path: "/api/v1/vulnerabilities/{cve}", Tag: "Schwachstellen", Summary: "Details einer CVE mit betroffenen Geräten",
 		Scope: scopeRead, Resp: cveDetail{}, handler: s.handleVulnDetail})
 	s.add(&route{Method: "GET", Path: "/api/v1/devices/{id}/cves", Tag: "Geräte", Summary: "CVEs eines Geräts", Scope: scopeRead,

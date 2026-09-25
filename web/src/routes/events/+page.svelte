@@ -346,7 +346,7 @@
 	description="Was im Netzwerk passiert ist – neue Geräte, Ports, Zertifikate, Ausfälle"
 >
 	{#snippet actions()}
-		{#if auth.canWrite}
+		{#if auth.can('events.ack')}
 			<Button
 				icon="check"
 				disabled={!canAckAll}
@@ -492,7 +492,7 @@
 				<span class="text-fg-muted">({formatNumber(openSelected.length)} offen)</span>
 			{/if}
 			<span class="flex-1"></span>
-			{#if auth.canWrite}
+			{#if auth.can('events.ack')}
 				<Button
 					size="sm"
 					variant="primary"
@@ -514,7 +514,7 @@
 			{columns}
 			{rows}
 			key={(r) => r.id}
-			selectable={auth.canWrite}
+			selectable={auth.can('events.ack')}
 			bind:selected
 			loading={data.loading}
 			dense
@@ -569,7 +569,7 @@
 						>
 							<span class="inline-block size-1.5 rounded-full bg-ok"></span> Quittiert
 						</span>
-					{:else if auth.canWrite}
+					{:else if auth.can('events.ack')}
 						<Button size="xs" variant="ghost" icon="check" onclick={() => quickAck(ev)}>Quittieren</Button>
 					{:else}
 						<span class="text-xs text-warn">Offen</span>
@@ -623,7 +623,7 @@
 	id={openId}
 	prevId={openIndex > 0 ? rows[openIndex - 1].id : null}
 	nextId={openIndex >= 0 && openIndex < rows.length - 1 ? rows[openIndex + 1].id : null}
-	canWrite={auth.canWrite}
+	canWrite={auth.can('events.ack')}
 	onclose={() => openEvent(null)}
 	onnavigate={(id) => openEvent(id)}
 	onacked={() => data.reload()}

@@ -205,6 +205,9 @@ func (s *Server) Spec() map[string]any {
 			if rt.Scope == scopeWrite || rt.Method != http.MethodGet {
 				desc = "Schreibzugriff (Token-Scope write)"
 			}
+			if rt.Perm != "" {
+				desc += " · Berechtigung „" + permLabel(rt.Perm) + "“ (" + rt.Perm + ")"
+			}
 			op["description"] = desc
 		}
 		if paths[rt.Path] == nil {
@@ -221,7 +224,7 @@ func (s *Server) Spec() map[string]any {
 	return map[string]any{
 		"openapi": "3.1.0",
 		"info": map[string]any{"title": "NetScope API", "version": s.Version,
-			"description": "JSON-API von NetScope. Authentifizierung per Session-Cookie (Web-UI, zusätzlich Header X-NetScope-CSRF bei schreibenden Anfragen) oder per API-Token (Authorization: Bearer ns_…; Scope read oder write)."},
+			"description": "JSON-API von NetScope. Authentifizierung per Session-Cookie (Web-UI, zusätzlich Header X-NetScope-CSRF bei schreibenden Anfragen) oder per API-Token (Authorization: Bearer ns_…; Scope read oder write). Ein Token hat höchstens die Rechte der Rolle seines Benutzers; die nötige Berechtigung steht bei jedem Endpunkt."},
 		"servers": []any{map[string]any{"url": "/"}},
 		"paths":   paths,
 		"components": map[string]any{

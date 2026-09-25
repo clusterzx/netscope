@@ -19,6 +19,7 @@
 		TimeSeriesChart,
 		Toggle
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -247,18 +248,20 @@
 			{/if}
 
 			<!-- actions -->
-			<section class="flex flex-wrap items-center gap-2">
-				<Button variant="primary" icon="play" loading={running} onclick={runNow}>Jetzt prüfen</Button>
-				<Button icon="edit" onclick={() => onedit?.(c)}>Bearbeiten</Button>
-				<Button variant="ghost" icon="trash" class="text-danger" onclick={remove}>Löschen</Button>
-				<Toggle
-					class="ml-auto"
-					checked={c.enabled}
-					disabled={toggling}
-					label="Aktiv"
-					onchange={(v) => setEnabled(v)}
-				/>
-			</section>
+			{#if auth.can('health.manage')}
+				<section class="flex flex-wrap items-center gap-2">
+					<Button variant="primary" icon="play" loading={running} onclick={runNow}>Jetzt prüfen</Button>
+					<Button icon="edit" onclick={() => onedit?.(c)}>Bearbeiten</Button>
+					<Button variant="ghost" icon="trash" class="text-danger" onclick={remove}>Löschen</Button>
+					<Toggle
+						class="ml-auto"
+						checked={c.enabled}
+						disabled={toggling}
+						label="Aktiv"
+						onchange={(v) => setEnabled(v)}
+					/>
+				</section>
+			{/if}
 
 			{#if result}
 				<div aria-live="polite">

@@ -3,6 +3,7 @@
 	import { api, errorMessage } from '$lib/api/client';
 	import Button from '$lib/components/ui/Button.svelte';
 	import FormField from '$lib/components/ui/FormField.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { formatBytes } from '$lib/utils/format';
 
 	interface Props {
@@ -52,17 +53,19 @@
 				class="mono h-8.5 min-w-0 flex-1 rounded-md border bg-surface px-2.5 text-sm text-fg shadow-sm placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-focus focus:outline-none
 					{error || uploadError ? 'border-danger' : 'border-border'}"
 			/>
-			<input
-				bind:this={fileInput}
-				type="file"
-				class="hidden"
-				onchange={onFile}
-				tabindex="-1"
-				aria-hidden="true"
-			/>
-			<Button icon="upload" loading={busy} {disabled} onclick={() => fileInput?.click()}
-				>Datei hochladen</Button
-			>
+			{#if auth.can('plugins.manage')}
+				<input
+					bind:this={fileInput}
+					type="file"
+					class="hidden"
+					onchange={onFile}
+					tabindex="-1"
+					aria-hidden="true"
+				/>
+				<Button icon="upload" loading={busy} {disabled} onclick={() => fileInput?.click()}
+					>Datei hochladen</Button
+				>
+			{/if}
 		</div>
 	{/snippet}
 </FormField>

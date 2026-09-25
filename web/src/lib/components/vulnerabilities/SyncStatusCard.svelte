@@ -19,6 +19,7 @@
 		Skeleton
 	} from '$lib/components/ui';
 	import type { ApiVulnStatus } from '$lib/api/generated';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatBytes, formatDateTime, formatNumber } from '$lib/utils/format';
@@ -195,24 +196,26 @@
 				</ul>
 			{/if}
 
-			<div class="flex flex-wrap gap-2">
-				<Button
-					variant={status.empty ? 'primary' : 'secondary'}
-					icon="download"
-					loading={pending === 'sync'}
-					disabled={busy}
-					onclick={() => {
-						fullSync = false;
-						syncOpen = true;
-					}}>NVD jetzt synchronisieren</Button
-				>
-				<Button
-					icon="refresh"
-					loading={pending === 'match'}
-					disabled={busy || status.empty}
-					onclick={() => runAction('match')}>Abgleich jetzt ausführen</Button
-				>
-			</div>
+			{#if auth.can('plugins.manage')}
+				<div class="flex flex-wrap gap-2">
+					<Button
+						variant={status.empty ? 'primary' : 'secondary'}
+						icon="download"
+						loading={pending === 'sync'}
+						disabled={busy}
+						onclick={() => {
+							fullSync = false;
+							syncOpen = true;
+						}}>NVD jetzt synchronisieren</Button
+					>
+					<Button
+						icon="refresh"
+						loading={pending === 'match'}
+						disabled={busy || status.empty}
+						onclick={() => runAction('match')}>Abgleich jetzt ausführen</Button
+					>
+				</div>
+			{/if}
 
 			<div>
 				<button

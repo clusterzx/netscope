@@ -16,12 +16,15 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { groups as groupCatalog } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatNumber } from '$lib/utils/format';
 	import { apiErrors, queryValue } from './system';
+
+	const canManage = $derived(auth.can('inventory.config'));
 
 	const list = new AsyncData<Group[]>();
 	$effect(() => {
@@ -151,7 +154,9 @@
 	padding="none"
 >
 	{#snippet actions()}
-		<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Gruppe anlegen</Button>
+		{#if canManage}
+			<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Gruppe anlegen</Button>
+		{/if}
 	{/snippet}
 	{#if list.error && !list.data}
 		<ErrorState error={list.error} onretry={() => list.reload()} />
@@ -190,12 +195,14 @@
 				{:else if col.key === 'actions'}
 					<Menu
 						label="Aktionen für {g.name}"
-						items={[
-							{ label: 'Bearbeiten', icon: 'edit', onclick: () => openForm(g) },
-							{ label: 'Geräte anzeigen', icon: 'devices', href: devicesHref(g) },
-							{ separator: true },
-							{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(g) }
-						]}
+						items={canManage
+							? [
+									{ label: 'Bearbeiten', icon: 'edit', onclick: () => openForm(g) },
+									{ label: 'Geräte anzeigen', icon: 'devices', href: devicesHref(g) },
+									{ separator: true },
+									{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(g) }
+								]
+							: [{ label: 'Geräte anzeigen', icon: 'devices', href: devicesHref(g) }]}
 					/>
 				{/if}
 			{/snippet}

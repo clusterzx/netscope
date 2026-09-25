@@ -24,6 +24,7 @@
 		Textarea,
 		Toggle
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { groups, subnets, tags, eventTypes } from '$lib/stores/catalog.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
@@ -67,6 +68,7 @@
 	});
 
 	const isNew = $derived(!rule);
+	const canManage = $derived(auth.can('rules.manage'));
 	const pubs = $derived(publishers.value ?? []);
 
 	function initial(): Rule {
@@ -285,255 +287,266 @@
 			<Button variant="ghost" icon="bell" href="/rules?tab=notifications&rule={stored.id}"
 				>Benachrichtigungen</Button
 			>
-			<Button icon="copy" href="/rules/new?from={stored.id}">Duplizieren</Button>
-			<Button variant="danger" icon="trash" loading={deleting} onclick={remove}>Löschen</Button>
+			{#if canManage}
+				<Button icon="copy" href="/rules/new?from={stored.id}">Duplizieren</Button>
+				<Button variant="danger" icon="trash" loading={deleting} onclick={remove}>Löschen</Button>
+			{/if}
 		{/if}
 	{/snippet}
 </PageHeader>
 
-<div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_27rem]">
+<div class="grid grid-cols-1 items-start gap-4 {canManage ? 'xl:grid-cols-[minmax(0,1fr)_27rem]' : ''}">
 	<form
 		class="flex min-w-0 flex-col gap-4"
 		novalidate
 		onsubmit={(e) => {
 			e.preventDefault();
-			save();
+			if (canManage) save();
 		}}
 	>
-		<Card title="Allgemein" icon="rules">
-			<div class="flex flex-col gap-4">
-				<Input
-					id="rule-name"
-					label="Name"
-					required
-					bind:value={draft.name}
-					error={err('name')}
-					maxlength={200}
-				/>
-				<Textarea id="rule-desc" label="Beschreibung" bind:value={draft.description} rows={2} />
-				<div class="flex flex-col gap-3 sm:flex-row sm:gap-8">
-					<Toggle
-						bind:checked={draft.enabled}
-						label="Aktiv"
-						description="Inaktive Regeln werden nicht ausgewertet."
+		{#if !canManage}
+			<p class="text-xs text-fg-subtle">Nur lesen – dafür fehlt die Berechtigung „Regeln verwalten“.</p>
+		{/if}
+		<fieldset disabled={!canManage} class="contents">
+			<Card title="Allgemein" icon="rules">
+				<div class="flex flex-col gap-4">
+					<Input
+						id="rule-name"
+						label="Name"
+						required
+						bind:value={draft.name}
+						error={err('name')}
+						maxlength={200}
 					/>
-					<Toggle
-						bind:checked={draft.stop}
-						label="Auswertung stoppen"
-						description="Greift diese Regel, werden nachfolgende Regeln nicht mehr ausgewertet."
-					/>
-				</div>
-			</div>
-		</Card>
-
-		<Card title="Wenn …" description="Alle gesetzten Bedingungen müssen erfüllt sein." icon="filter">
-			<div class="flex flex-col gap-6">
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
-					<EventTypePicker
-						id="rule-types"
-						bind:value={draft.conditions.eventTypes}
-						error={err('conditions.eventTypes')}
-						hint="Leer = alle Event-Typen. Muster wie „port.*“ decken ganze Bereiche ab."
-					/>
-					<Select
-						id="rule-sev"
-						label="Mindest-Schweregrad"
-						options={severityOptions}
-						placeholder="beliebig"
-						bind:value={draft.conditions.minSeverity}
-						error={err('conditions.minSeverity')}
-					/>
-				</div>
-
-				{#if federation.role === 'central' && (federation.sites.length || siteIds.length)}
-					<MultiSelect
-						id="rule-sites"
-						label="Standorte (einer davon)"
-						options={siteOptions}
-						bind:value={siteIds}
-						onchange={(v) => (draft.conditions.sites = v.length ? v.map(Number) : undefined)}
-						placeholder="alle Standorte"
-						hint="Events der Standorte kommen mit ihrem Gerät hierher; leer = Events von überall."
-						error={err('conditions.sites')}
-					/>
-				{/if}
-
-				<fieldset class="flex flex-col gap-3">
-					<legend class="mb-1 text-sm font-semibold text-fg">Gerät</legend>
-					<p class="-mt-1 text-xs text-fg-subtle">
-						Gerätebedingungen gelten nur für Events mit Gerät; Events ohne Gerät passen dann nicht.
-					</p>
-					<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-						<TagInput
-							id="rule-tags"
-							label="Tags (eines davon)"
-							bind:value={draft.conditions.tags}
-							suggestions={(tags.value ?? []).map((t) => t.tag)}
-							normalize={(s) => s.trim().toLowerCase()}
-							placeholder="Tag hinzufügen …"
+					<Textarea id="rule-desc" label="Beschreibung" bind:value={draft.description} rows={2} />
+					<div class="flex flex-col gap-3 sm:flex-row sm:gap-8">
+						<Toggle
+							bind:checked={draft.enabled}
+							label="Aktiv"
+							description="Inaktive Regeln werden nicht ausgewertet."
 						/>
-						<MultiSelect
-							id="rule-groups"
-							label="Gruppen (eine davon)"
-							options={groupOptions}
-							bind:value={groupIds}
-							onchange={(v) => (draft.conditions.groups = v.map(Number))}
-							placeholder={groupOptions.length ? 'Gruppen wählen …' : 'Keine Gruppen angelegt'}
-						/>
-						<TagInput
-							id="rule-subnets"
-							label="Subnetze (eines davon)"
-							bind:value={draft.conditions.subnets}
-							suggestions={(subnets.value ?? []).map((s) => s.cidr)}
-							placeholder="CIDR, z. B. 192.168.1.0/24"
-							error={err('conditions.subnets')}
-						/>
-						<MultiSelect
-							id="rule-states"
-							label="Gerätezustand"
-							options={stateOptions}
-							bind:value={draft.conditions.deviceStates}
-							placeholder="beliebig"
-							hint="Ignorierte Geräte lösen nie Benachrichtigungen aus."
-							error={err('conditions.deviceStates')}
+						<Toggle
+							bind:checked={draft.stop}
+							label="Auswertung stoppen"
+							description="Greift diese Regel, werden nachfolgende Regeln nicht mehr ausgewertet."
 						/>
 					</div>
-					<Checkbox
-						id="rule-unknown"
-						bind:checked={draft.conditions.onlyUnknown}
-						label="Nur Geräte, die nicht als bekannt markiert sind"
-					/>
-					<QueryInput
-						id="rule-query"
-						label="Geräte-Filter (Abfragesprache)"
-						showLabel
-						bind:value={draft.conditions.deviceQuery}
-						placeholder="z. B. tag:server crit>=high"
-					/>
-				</fieldset>
-
-				<fieldset class="flex flex-col gap-2">
-					<legend class="mb-1 text-sm font-semibold text-fg">Payload</legend>
-					<PayloadConditions bind:value={draft.conditions.payload} types={typesForPayload} {errors} />
-				</fieldset>
-
-				<fieldset class="flex flex-col gap-2">
-					<legend class="mb-1 text-sm font-semibold text-fg">Zeitfenster</legend>
-					<Checkbox
-						id="rule-tw"
-						checked={!!draft.conditions.timeWindow}
-						onchange={(e) => setTimeWindow((e.currentTarget as HTMLInputElement).checked)}
-						label="Nur zu bestimmten Zeiten"
-						description="Außerhalb des Zeitfensters greift die Regel nicht (Zeitzone des Servers)."
-					/>
-					{#if draft.conditions.timeWindow}
-						{@const tw = draft.conditions.timeWindow}
-						<div class="flex flex-col gap-3 sm:ml-6">
-							<div role="group" aria-label="Wochentage" class="flex flex-wrap gap-1">
-								{#each WEEKDAYS as d (d.value)}
-									{@const on = (tw.days ?? []).includes(d.value)}
-									<button
-										type="button"
-										aria-pressed={on}
-										title={d.long}
-										onclick={() => toggleDay(d.value)}
-										class="h-8 w-10 rounded-md border text-sm font-medium transition-colors
-											{on
-											? 'border-accent/50 bg-accent-soft text-accent'
-											: 'border-border text-fg-muted hover:border-border-strong hover:text-fg'}"
-									>
-										{d.short}
-									</button>
-								{/each}
-							</div>
-							{#if err('conditions.timeWindow.days')}
-								<p class="text-xs text-danger">{err('conditions.timeWindow.days')}</p>
-							{/if}
-							<p class="text-xs text-fg-subtle">
-								{(tw.days ?? []).length ? '' : 'Kein Tag gewählt = jeden Tag. '}Liegt „Bis“ vor „Von“, reicht
-								das Fenster über Mitternacht.
-							</p>
-							<div class="grid grid-cols-2 gap-3 sm:w-80">
-								<Input
-									id="rule-tw-from"
-									type="time"
-									label="Von"
-									bind:value={tw.from}
-									error={err('conditions.timeWindow.from')}
-								/>
-								<Input
-									id="rule-tw-to"
-									type="time"
-									label="Bis"
-									bind:value={tw.to}
-									error={err('conditions.timeWindow.to')}
-								/>
-							</div>
-						</div>
-					{/if}
-				</fieldset>
-			</div>
-		</Card>
-
-		<Card title="Dann …" description="Aktionen werden der Reihe nach ausgeführt." icon="bell">
-			<div class="flex flex-col gap-3">
-				{#if errors.actions}<Alert tone="danger">{fieldMessage(errors.actions)}</Alert>{/if}
-				{#if publishers.value && !pubs.some((p) => p.enabled)}
-					<Alert tone="warn" title="Kein Publisher aktiv">
-						Benachrichtigungen werden erst verschickt, wenn mindestens ein Publisher eingerichtet und
-						aktiviert ist.
-						<a class="link" href="/plugins#kind-publisher">Publisher einrichten</a>
-					</Alert>
-				{/if}
-				{#each draft.actions as _, i (i)}
-					<ActionEditor
-						bind:action={draft.actions[i]}
-						index={i}
-						publishers={pubs}
-						{errors}
-						count={draft.actions.length}
-						canRemove={draft.actions.length > 1}
-						onremove={() => removeAction(i)}
-						onmove={(dir) => moveAction(i, dir)}
-					/>
-				{/each}
-				<div>
-					<Button icon="plus" onclick={addAction}>Aktion hinzufügen</Button>
 				</div>
-			</div>
-		</Card>
+			</Card>
+
+			<Card title="Wenn …" description="Alle gesetzten Bedingungen müssen erfüllt sein." icon="filter">
+				<div class="flex flex-col gap-6">
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
+						<EventTypePicker
+							id="rule-types"
+							bind:value={draft.conditions.eventTypes}
+							error={err('conditions.eventTypes')}
+							hint="Leer = alle Event-Typen. Muster wie „port.*“ decken ganze Bereiche ab."
+						/>
+						<Select
+							id="rule-sev"
+							label="Mindest-Schweregrad"
+							options={severityOptions}
+							placeholder="beliebig"
+							bind:value={draft.conditions.minSeverity}
+							error={err('conditions.minSeverity')}
+						/>
+					</div>
+
+					{#if federation.role === 'central' && (federation.sites.length || siteIds.length)}
+						<MultiSelect
+							id="rule-sites"
+							label="Standorte (einer davon)"
+							options={siteOptions}
+							bind:value={siteIds}
+							onchange={(v) => (draft.conditions.sites = v.length ? v.map(Number) : undefined)}
+							placeholder="alle Standorte"
+							hint="Events der Standorte kommen mit ihrem Gerät hierher; leer = Events von überall."
+							error={err('conditions.sites')}
+						/>
+					{/if}
+
+					<fieldset class="flex flex-col gap-3">
+						<legend class="mb-1 text-sm font-semibold text-fg">Gerät</legend>
+						<p class="-mt-1 text-xs text-fg-subtle">
+							Gerätebedingungen gelten nur für Events mit Gerät; Events ohne Gerät passen dann nicht.
+						</p>
+						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+							<TagInput
+								id="rule-tags"
+								label="Tags (eines davon)"
+								bind:value={draft.conditions.tags}
+								suggestions={(tags.value ?? []).map((t) => t.tag)}
+								normalize={(s) => s.trim().toLowerCase()}
+								placeholder="Tag hinzufügen …"
+							/>
+							<MultiSelect
+								id="rule-groups"
+								label="Gruppen (eine davon)"
+								options={groupOptions}
+								bind:value={groupIds}
+								onchange={(v) => (draft.conditions.groups = v.map(Number))}
+								placeholder={groupOptions.length ? 'Gruppen wählen …' : 'Keine Gruppen angelegt'}
+							/>
+							<TagInput
+								id="rule-subnets"
+								label="Subnetze (eines davon)"
+								bind:value={draft.conditions.subnets}
+								suggestions={(subnets.value ?? []).map((s) => s.cidr)}
+								placeholder="CIDR, z. B. 192.168.1.0/24"
+								error={err('conditions.subnets')}
+							/>
+							<MultiSelect
+								id="rule-states"
+								label="Gerätezustand"
+								options={stateOptions}
+								bind:value={draft.conditions.deviceStates}
+								placeholder="beliebig"
+								hint="Ignorierte Geräte lösen nie Benachrichtigungen aus."
+								error={err('conditions.deviceStates')}
+							/>
+						</div>
+						<Checkbox
+							id="rule-unknown"
+							bind:checked={draft.conditions.onlyUnknown}
+							label="Nur Geräte, die nicht als bekannt markiert sind"
+						/>
+						<QueryInput
+							id="rule-query"
+							label="Geräte-Filter (Abfragesprache)"
+							showLabel
+							bind:value={draft.conditions.deviceQuery}
+							placeholder="z. B. tag:server crit>=high"
+						/>
+					</fieldset>
+
+					<fieldset class="flex flex-col gap-2">
+						<legend class="mb-1 text-sm font-semibold text-fg">Payload</legend>
+						<PayloadConditions bind:value={draft.conditions.payload} types={typesForPayload} {errors} />
+					</fieldset>
+
+					<fieldset class="flex flex-col gap-2">
+						<legend class="mb-1 text-sm font-semibold text-fg">Zeitfenster</legend>
+						<Checkbox
+							id="rule-tw"
+							checked={!!draft.conditions.timeWindow}
+							onchange={(e) => setTimeWindow((e.currentTarget as HTMLInputElement).checked)}
+							label="Nur zu bestimmten Zeiten"
+							description="Außerhalb des Zeitfensters greift die Regel nicht (Zeitzone des Servers)."
+						/>
+						{#if draft.conditions.timeWindow}
+							{@const tw = draft.conditions.timeWindow}
+							<div class="flex flex-col gap-3 sm:ml-6">
+								<div role="group" aria-label="Wochentage" class="flex flex-wrap gap-1">
+									{#each WEEKDAYS as d (d.value)}
+										{@const on = (tw.days ?? []).includes(d.value)}
+										<button
+											type="button"
+											aria-pressed={on}
+											title={d.long}
+											onclick={() => toggleDay(d.value)}
+											class="h-8 w-10 rounded-md border text-sm font-medium transition-colors
+											{on
+												? 'border-accent/50 bg-accent-soft text-accent'
+												: 'border-border text-fg-muted hover:border-border-strong hover:text-fg'}"
+										>
+											{d.short}
+										</button>
+									{/each}
+								</div>
+								{#if err('conditions.timeWindow.days')}
+									<p class="text-xs text-danger">{err('conditions.timeWindow.days')}</p>
+								{/if}
+								<p class="text-xs text-fg-subtle">
+									{(tw.days ?? []).length ? '' : 'Kein Tag gewählt = jeden Tag. '}Liegt „Bis“ vor „Von“,
+									reicht das Fenster über Mitternacht.
+								</p>
+								<div class="grid grid-cols-2 gap-3 sm:w-80">
+									<Input
+										id="rule-tw-from"
+										type="time"
+										label="Von"
+										bind:value={tw.from}
+										error={err('conditions.timeWindow.from')}
+									/>
+									<Input
+										id="rule-tw-to"
+										type="time"
+										label="Bis"
+										bind:value={tw.to}
+										error={err('conditions.timeWindow.to')}
+									/>
+								</div>
+							</div>
+						{/if}
+					</fieldset>
+				</div>
+			</Card>
+
+			<Card title="Dann …" description="Aktionen werden der Reihe nach ausgeführt." icon="bell">
+				<div class="flex flex-col gap-3">
+					{#if errors.actions}<Alert tone="danger">{fieldMessage(errors.actions)}</Alert>{/if}
+					{#if publishers.value && !pubs.some((p) => p.enabled)}
+						<Alert tone="warn" title="Kein Publisher aktiv">
+							Benachrichtigungen werden erst verschickt, wenn mindestens ein Publisher eingerichtet und
+							aktiviert ist.
+							<a class="link" href="/plugins#kind-publisher">Publisher einrichten</a>
+						</Alert>
+					{/if}
+					{#each draft.actions as _, i (i)}
+						<ActionEditor
+							bind:action={draft.actions[i]}
+							index={i}
+							publishers={pubs}
+							{errors}
+							count={draft.actions.length}
+							canRemove={draft.actions.length > 1}
+							onremove={() => removeAction(i)}
+							onmove={(dir) => moveAction(i, dir)}
+						/>
+					{/each}
+					<div>
+						<Button icon="plus" onclick={addAction}>Aktion hinzufügen</Button>
+					</div>
+				</div>
+			</Card>
+		</fieldset>
 
 		<!-- sticky save bar -->
-		<div
-			class="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface/95 px-3 py-2.5 shadow-md backdrop-blur"
-		>
-			<div class="flex min-w-0 flex-1 items-center gap-2 text-sm" aria-live="polite">
-				{#if formError}
-					<Icon name="x-circle" size={16} class="shrink-0 text-danger" />
-					<span class="min-w-0 truncate text-danger" title={formError}>{formError}</span>
-				{:else if dirty}
-					<Badge tone="warn" dot>{isNew ? 'Noch nicht gespeichert' : 'Ungespeicherte Änderungen'}</Badge>
+		{#if canManage}
+			<div
+				class="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface/95 px-3 py-2.5 shadow-md backdrop-blur"
+			>
+				<div class="flex min-w-0 flex-1 items-center gap-2 text-sm" aria-live="polite">
+					{#if formError}
+						<Icon name="x-circle" size={16} class="shrink-0 text-danger" />
+						<span class="min-w-0 truncate text-danger" title={formError}>{formError}</span>
+					{:else if dirty}
+						<Badge tone="warn" dot>{isNew ? 'Noch nicht gespeichert' : 'Ungespeicherte Änderungen'}</Badge>
+					{:else}
+						<span class="text-fg-subtle">Gespeichert</span>
+					{/if}
+				</div>
+				{#if !isNew}
+					<Button onclick={discard} disabled={!dirty || saving} icon="refresh">Zurücksetzen</Button>
 				{:else}
-					<span class="text-fg-subtle">Gespeichert</span>
+					<Button href="/rules" variant="ghost">Abbrechen</Button>
 				{/if}
+				<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!isNew && !dirty}>
+					{isNew ? 'Regel anlegen' : 'Speichern'}
+				</Button>
 			</div>
-			{#if !isNew}
-				<Button onclick={discard} disabled={!dirty || saving} icon="refresh">Zurücksetzen</Button>
-			{:else}
-				<Button href="/rules" variant="ghost">Abbrechen</Button>
-			{/if}
-			<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!isNew && !dirty}>
-				{isNew ? 'Regel anlegen' : 'Speichern'}
-			</Button>
-		</div>
+		{/if}
 	</form>
 
-	<Card
-		title="Event simulieren"
-		description="Prüft die Regel – auch ungespeichert – gegen ein Beispiel-Event."
-		icon="play"
-		class="xl:sticky xl:top-4"
-	>
-		<RuleSimulator rule={testRule} {blocked} />
-	</Card>
+	{#if canManage}
+		<Card
+			title="Event simulieren"
+			description="Prüft die Regel – auch ungespeichert – gegen ein Beispiel-Event."
+			icon="play"
+			class="xl:sticky xl:top-4"
+		>
+			<RuleSimulator rule={testRule} {blocked} />
+		</Card>
+	{/if}
 </div>

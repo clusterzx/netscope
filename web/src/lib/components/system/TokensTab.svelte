@@ -1,4 +1,5 @@
-<!-- API tokens: list, create (plain token shown once), revoke. -->
+<!-- API tokens: list, create (plain token shown once), revoke. A token never has more rights than
+     the role of its user; with user management all tokens are listed. -->
 <script lang="ts">
 	import { api } from '$lib/api';
 	import type { ApiToken, TokenCreated } from '$lib/api';
@@ -17,6 +18,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -114,24 +116,28 @@
 		}
 	}
 
-	const columns: Column<ApiToken>[] = [
+	const all = $derived(auth.can('users.manage'));
+	const columns: Column<ApiToken>[] = $derived([
 		{ key: 'name', label: 'Name' },
+		...(all ? [{ key: 'owner', label: 'Benutzer', hideBelow: 'md' as const }] : []),
 		{ key: 'scope', label: 'Berechtigung', width: '8rem' },
 		{ key: 'createdAt', label: 'Erstellt', hideBelow: 'md' },
 		{ key: 'expiresAt', label: 'Läuft ab' },
 		{ key: 'lastUsedAt', label: 'Zuletzt benutzt', hideBelow: 'lg' },
 		{ key: 'actions', label: '', align: 'right', width: '3rem' }
-	];
+	]);
 </script>
 
 <Card
 	title="API-Tokens"
-	description="Für Skripte: Header „Authorization: Bearer &lt;token&gt;“"
+	description="Für Skripte: Header „Authorization: Bearer &lt;token&gt;“ – mit höchstens den Rechten deiner Rolle"
 	icon="key"
 	padding="none"
 >
 	{#snippet actions()}
-		<Button size="sm" variant="primary" icon="plus" onclick={openCreate}>Token erstellen</Button>
+		{#if auth.can('tokens.create')}
+			<Button size="sm" variant="primary" icon="plus" onclick={openCreate}>Token erstellen</Button>
+		{/if}
 	{/snippet}
 	{#if list.error && !list.data}
 		<ErrorState error={list.error} onretry={() => list.reload()} />
@@ -148,6 +154,8 @@
 				{#if col.key === 'name'}
 					<span class="font-medium {expired(t) ? 'text-fg-subtle line-through' : ''}">{t.name}</span>
 					<span class="mono block text-xs text-fg-subtle">{t.prefix}…</span>
+				{:else if col.key === 'owner'}
+					<span class="text-fg-muted">{t.owner}</span>
 				{:else if col.key === 'scope'}
 					<Badge tone={t.scope === 'write' ? 'warn' : 'info'}
 						>{t.scope === 'write' ? 'Lesen & Schreiben' : 'Nur lesen'}</Badge
@@ -236,7 +244,7 @@
 			<fieldset>
 				<legend class="mb-1.5 text-[0.8125rem] font-medium text-fg">Berechtigung</legend>
 				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-					{#each [['read', 'Nur lesen', 'GET-Zugriffe, keine Änderungen'], ['write', 'Lesen & Schreiben', 'Voller API-Zugriff inkl. Aktionen']] as [v, l, d] (v)}
+					{#each [['read', 'Nur lesen', 'GET-Zugriffe, keine Änderungen'], ['write', 'Lesen & Schreiben', 'Alles, was deine Rolle darf']] as [v, l, d] (v)}
 						<label
 							class="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm has-focus-visible:ring-2 has-focus-visible:ring-focus
 								{scope === v ? 'border-accent bg-accent-soft' : 'border-border hover:bg-surface-2'}"

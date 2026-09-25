@@ -8,6 +8,7 @@
 	import { api, errorMessage, fieldErrors } from '$lib/api';
 	import type { Credential, TunnelStatus, TunnelSummary, TunnelTestResult } from '$lib/api';
 	import { Alert, Button, CopyButton, Input, RelativeTime, Select, Textarea } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { formatBytes } from '$lib/utils/format';
 	import TunnelState from './TunnelState.svelte';
 
@@ -108,10 +109,12 @@
 	}
 
 	const tunnelOptions = $derived(tunnels.map((t) => ({ value: String(t.id), label: t.name })));
+	/** a new configuration is stored as credential */
+	const canCreate = $derived(auth.can('credentials.manage'));
 </script>
 
 <div class="flex flex-col gap-4 rounded-lg border border-border bg-surface-2 p-4">
-	{#if tunnels.length}
+	{#if tunnels.length && canCreate}
 		<div class="flex flex-wrap gap-x-5 gap-y-2 text-sm" role="radiogroup" aria-label="Tunnel-Konfiguration">
 			<label class="flex cursor-pointer items-center gap-2">
 				<input type="radio" value="existing" bind:group={mode} class="accent-(--accent)" />
@@ -133,7 +136,9 @@
 			placeholder="Tunnel wählen …"
 			onchange={(e) => (credentialId = Number((e.currentTarget as HTMLSelectElement).value) || null)}
 			error={errors.tunnelCredentialId ?? (inspectError || null)}
-			hint="Mehrere Subnetze können denselben Tunnel nutzen, z. B. das LAN und das IPMI-Netz eines Rechenzentrums."
+			hint={canCreate
+				? 'Mehrere Subnetze können denselben Tunnel nutzen, z. B. das LAN und das IPMI-Netz eines Rechenzentrums.'
+				: 'Neue Tunnel-Konfigurationen anlegen erfordert die Berechtigung „Credentials verwalten“.'}
 		/>
 	{:else}
 		<Input

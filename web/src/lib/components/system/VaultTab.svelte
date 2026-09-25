@@ -13,15 +13,19 @@
 		ErrorState,
 		Skeleton
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { credentials } from '$lib/stores/catalog.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import StrongConfirm from './StrongConfirm.svelte';
 
+	const canView = $derived(auth.can('credentials.view'));
+	const canRotate = $derived(auth.can('system.manage'));
+
 	const info = new AsyncData<SystemInfo>();
 	$effect(() => {
 		info.run((signal) => api.get('/api/v1/system/info', { signal }));
-		credentials.load().catch(() => {});
+		if (canView) credentials.load().catch(() => {});
 	});
 
 	const fromEnv = $derived((info.data?.vaultKeySource ?? '').includes('NETSCOPE_MASTER_KEY'));
@@ -70,10 +74,12 @@
 					{info.data.vaultKeySource}
 					<Badge tone={fromEnv ? 'info' : 'neutral'} class="ml-1">{fromEnv ? 'Umgebung' : 'Datei'}</Badge>
 				</DescItem>
-				<DescItem
-					label="Gespeicherte Credentials"
-					value={credentials.value ? String(credentials.value.length) : '–'}
-				/>
+				{#if canView}
+					<DescItem
+						label="Gespeicherte Credentials"
+						value={credentials.value ? String(credentials.value.length) : '–'}
+					/>
+				{/if}
 			</DescList>
 		</Card>
 
@@ -108,9 +114,17 @@
 						Der Master-Key kommt aus <code class="mono">NETSCOPE_MASTER_KEY</code> und kann nur dort geändert werden.
 					</Alert>
 				{/if}
-				<div>
-					<Button variant="danger" icon="refresh" onclick={() => (open = true)}>Master-Key rotieren …</Button>
-				</div>
+				{#if canRotate}
+					<div>
+						<Button variant="danger" icon="refresh" onclick={() => (open = true)}
+							>Master-Key rotieren …</Button
+						>
+					</div>
+				{:else}
+					<p class="text-xs text-fg-subtle">
+						Nur lesen – dafür fehlt die Berechtigung „Systemeinstellungen ändern“.
+					</p>
+				{/if}
 			</div>
 		</Card>
 	</div>

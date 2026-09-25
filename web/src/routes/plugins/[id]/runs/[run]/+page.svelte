@@ -30,6 +30,7 @@
 		statLabel,
 		statValue
 	} from '$lib/components/plugins/plugin';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { groups } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { live } from '$lib/stores/live.svelte';
@@ -160,7 +161,7 @@
 		{/if}
 	{/snippet}
 	{#snippet actions()}
-		{#if run && active}
+		{#if run && active && auth.can('devices.scan')}
 			<Button variant="danger" icon="stop" loading={cancelling} onclick={cancel}>Abbrechen</Button>
 		{/if}
 		{#if run && !discarded && diffable(run.kind) && run.status === 'success' && run.trigger !== 'action'}

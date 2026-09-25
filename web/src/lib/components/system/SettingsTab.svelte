@@ -13,6 +13,7 @@
 		TagInput,
 		Toggle
 	} from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { meta } from '$lib/stores/catalog.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -54,6 +55,8 @@
 		csv: 'CSV-Import',
 		http: 'HTTP-Erkennung'
 	};
+
+	const canManage = $derived(auth.can('system.manage'));
 
 	const data = new AsyncData<SystemSettings>();
 	$effect(() => {
@@ -162,132 +165,141 @@
 			novalidate
 			onsubmit={(e) => {
 				e.preventDefault();
-				save();
+				if (canManage) save();
 			}}
 			class="flex flex-col gap-4"
 		>
+			{#if !canManage}
+				<p class="text-xs text-fg-subtle">
+					Nur lesen – dafür fehlt die Berechtigung „Systemeinstellungen ändern“.
+				</p>
+			{/if}
 			{#if general}<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>{/if}
 
-			<Card title="Allgemein" icon="globe">
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-					<Input
-						label="Öffentliche URL"
-						type="url"
-						bind:value={form.publicUrl}
-						placeholder="https://netscope.example.lan"
-						hint="Basis für Deep-Links in Benachrichtigungen und Berichten"
-						error={errors.publicUrl}
-						class="md:col-span-2"
-					/>
-					<Input
-						label="Offline nach verpassten Läufen"
-						type="number"
-						min={1}
-						max={100}
-						bind:value={form.offlineAfterMissed}
-						hint="Aufeinanderfolgende Präsenz-Läufe ohne Antwort, bis ein Gerät als offline gilt"
-						error={errors.offlineAfterMissed}
-						required
-					/>
-					<Input
-						label="Parallele Plugin-Läufe"
-						type="number"
-						min={1}
-						max={64}
-						bind:value={form.maxParallelRuns}
-						hint="Obergrenze gleichzeitig laufender Scans, Importe und Prozessoren"
-						error={errors.maxParallelRuns}
-						required
-					/>
-					<Input
-						label="Rohdaten je Beobachtung (KB)"
-						type="number"
-						min={0}
-						max={16384}
-						bind:value={form.observationRawMaxKb}
-						hint="Gespeicherte Rohausgabe pro Beobachtung (0 = keine Rohdaten)"
-						error={errors.observationRawMaxKb}
-						required
-					/>
-					<div class="flex flex-col gap-1.5">
-						<Toggle
-							bind:checked={form.metricsPublic}
-							label="Metriken öffentlich"
-							description="/metrics ohne Anmeldung ausliefern (für Prometheus ohne Token)"
+			<fieldset disabled={!canManage} class="contents">
+				<Card title="Allgemein" icon="globe">
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<Input
+							label="Öffentliche URL"
+							type="url"
+							bind:value={form.publicUrl}
+							placeholder="https://netscope.example.lan"
+							hint="Basis für Deep-Links in Benachrichtigungen und Berichten"
+							error={errors.publicUrl}
+							class="md:col-span-2"
 						/>
-						{#if form.metricsPublic}
-							<p class="text-xs text-warn">
-								Jeder im Netz kann dann Kennzahlen (Gerätezahlen, Plugin-Status) abrufen.
-							</p>
-						{/if}
+						<Input
+							label="Offline nach verpassten Läufen"
+							type="number"
+							min={1}
+							max={100}
+							bind:value={form.offlineAfterMissed}
+							hint="Aufeinanderfolgende Präsenz-Läufe ohne Antwort, bis ein Gerät als offline gilt"
+							error={errors.offlineAfterMissed}
+							required
+						/>
+						<Input
+							label="Parallele Plugin-Läufe"
+							type="number"
+							min={1}
+							max={64}
+							bind:value={form.maxParallelRuns}
+							hint="Obergrenze gleichzeitig laufender Scans, Importe und Prozessoren"
+							error={errors.maxParallelRuns}
+							required
+						/>
+						<Input
+							label="Rohdaten je Beobachtung (KB)"
+							type="number"
+							min={0}
+							max={16384}
+							bind:value={form.observationRawMaxKb}
+							hint="Gespeicherte Rohausgabe pro Beobachtung (0 = keine Rohdaten)"
+							error={errors.observationRawMaxKb}
+							required
+						/>
+						<div class="flex flex-col gap-1.5">
+							<Toggle
+								bind:checked={form.metricsPublic}
+								label="Metriken öffentlich"
+								description="/metrics ohne Anmeldung ausliefern (für Prometheus ohne Token)"
+							/>
+							{#if form.metricsPublic}
+								<p class="text-xs text-warn">
+									Jeder im Netz kann dann Kennzahlen (Gerätezahlen, Plugin-Status) abrufen.
+								</p>
+							{/if}
+						</div>
 					</div>
+				</Card>
+
+				<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+					<Card title="Hostname-Priorität" icon="sort">
+						<OrderedList
+							bind:value={form.hostnamePriority}
+							label="Quellen (höchste zuerst)"
+							hint="Der Hostname eines Geräts kommt aus der ersten Quelle der Liste, die einen liefert. Nicht gelistete Quellen folgen danach. Änderungen berechnen alle Gerätenamen neu."
+							suggestions={KNOWN_SOURCES}
+							itemLabel={(v) => sourceLabel[v] ?? v}
+							error={errors.hostnamePriority}
+						/>
+					</Card>
+					<Card title="Gerätetypen" icon="devices">
+						<TagInput
+							label="Auswählbare Typen"
+							bind:value={form.deviceTypes}
+							suggestions={[
+								'router',
+								'switch',
+								'access-point',
+								'firewall',
+								'server',
+								'hypervisor',
+								'vm',
+								'container',
+								'nas',
+								'desktop',
+								'laptop',
+								'phone',
+								'tablet',
+								'tv',
+								'media-player',
+								'speaker',
+								'printer',
+								'camera',
+								'smart-home',
+								'iot',
+								'game-console',
+								'ups',
+								'other'
+							]}
+							normalize={(s) => s.trim().toLowerCase().replace(/\s+/g, '-')}
+							hint="Kleinbuchstaben mit Bindestrich, z. B. access-point. Bekannte Typen haben deutsche Anzeigenamen."
+							error={errors.deviceTypes}
+						/>
+						<p class="mt-2 flex flex-wrap gap-1 text-xs text-fg-subtle">
+							{#each form.deviceTypes as t (t)}<span class="rounded bg-surface-2 px-1.5 py-0.5"
+									>{deviceTypeName(t)}</span
+								>{/each}
+						</p>
+					</Card>
 				</div>
-			</Card>
+			</fieldset>
 
-			<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-				<Card title="Hostname-Priorität" icon="sort">
-					<OrderedList
-						bind:value={form.hostnamePriority}
-						label="Quellen (höchste zuerst)"
-						hint="Der Hostname eines Geräts kommt aus der ersten Quelle der Liste, die einen liefert. Nicht gelistete Quellen folgen danach. Änderungen berechnen alle Gerätenamen neu."
-						suggestions={KNOWN_SOURCES}
-						itemLabel={(v) => sourceLabel[v] ?? v}
-						error={errors.hostnamePriority}
-					/>
-				</Card>
-				<Card title="Gerätetypen" icon="devices">
-					<TagInput
-						label="Auswählbare Typen"
-						bind:value={form.deviceTypes}
-						suggestions={[
-							'router',
-							'switch',
-							'access-point',
-							'firewall',
-							'server',
-							'hypervisor',
-							'vm',
-							'container',
-							'nas',
-							'desktop',
-							'laptop',
-							'phone',
-							'tablet',
-							'tv',
-							'media-player',
-							'speaker',
-							'printer',
-							'camera',
-							'smart-home',
-							'iot',
-							'game-console',
-							'ups',
-							'other'
-						]}
-						normalize={(s) => s.trim().toLowerCase().replace(/\s+/g, '-')}
-						hint="Kleinbuchstaben mit Bindestrich, z. B. access-point. Bekannte Typen haben deutsche Anzeigenamen."
-						error={errors.deviceTypes}
-					/>
-					<p class="mt-2 flex flex-wrap gap-1 text-xs text-fg-subtle">
-						{#each form.deviceTypes as t (t)}<span class="rounded bg-surface-2 px-1.5 py-0.5"
-								>{deviceTypeName(t)}</span
-							>{/each}
-					</p>
-				</Card>
-			</div>
-
-			<div
-				class="z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-border bg-surface/95 px-3 py-2 backdrop-blur
+			{#if canManage}
+				<div
+					class="z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-border bg-surface/95 px-3 py-2 backdrop-blur
 					{dirty ? 'sticky bottom-2 shadow-md' : ''}"
-			>
-				<span class="mr-auto text-sm {dirty ? 'text-warn' : 'text-fg-subtle'}">
-					{dirty ? 'Ungespeicherte Änderungen' : 'Alle Änderungen gespeichert'}
-				</span>
-				<Button onclick={reset} disabled={!dirty || saving}>Verwerfen</Button>
-				<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!dirty}
-					>Speichern</Button
 				>
-			</div>
+					<span class="mr-auto text-sm {dirty ? 'text-warn' : 'text-fg-subtle'}">
+						{dirty ? 'Ungespeicherte Änderungen' : 'Alle Änderungen gespeichert'}
+					</span>
+					<Button onclick={reset} disabled={!dirty || saving}>Verwerfen</Button>
+					<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!dirty}
+						>Speichern</Button
+					>
+				</div>
+			{/if}
 		</form>
 	{/if}
 
@@ -302,11 +314,16 @@
 				bind:value={level}
 				options={LOG_LEVELS.map((l) => ({ value: l, label: logLevelLabel[l] }))}
 				class="w-48"
+				disabled={!canManage}
 			/>
-			<Button onclick={saveLevel} loading={levelBusy} disabled={!level || level === levelLoaded}
-				>Übernehmen</Button
-			>
-			<Button variant="ghost" href="?tab=logs" iconRight="arrow-right">Log-Viewer</Button>
+			{#if canManage}
+				<Button onclick={saveLevel} loading={levelBusy} disabled={!level || level === levelLoaded}
+					>Übernehmen</Button
+				>
+			{/if}
+			{#if auth.can('audit.view')}
+				<Button variant="ghost" href="?tab=logs" iconRight="arrow-right">Log-Viewer</Button>
+			{/if}
 		</div>
 		{#if level === 'debug' && levelLoaded !== 'debug'}
 			<p class="mt-2 text-xs text-fg-subtle">

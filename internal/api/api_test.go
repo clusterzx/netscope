@@ -61,7 +61,7 @@ func newHarness(t *testing.T) *harness {
 	ring := logging.NewRing(100)
 	level := new(slog.LevelVar)
 	log := logging.New(io.Discard, "text", level, ring)
-	a := auth.New(d)
+	a := auth.New(d, v)
 	_, pw, err := a.EnsureAdmin(ctx, "")
 	if err != nil {
 		t.Fatal(err)

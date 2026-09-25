@@ -14,6 +14,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -21,8 +22,11 @@
 	import RestoreOverlay from './RestoreOverlay.svelte';
 	import StrongConfirm from './StrongConfirm.svelte';
 
+	const canManage = $derived(auth.can('backups.manage'));
+
 	const list = new AsyncData<BackupInfo[]>();
 	$effect(() => {
+		if (!canManage) return;
 		list.run(async (signal) => (await api.get('/api/v1/system/backups', { signal })) ?? []);
 	});
 
@@ -122,107 +126,121 @@
 	];
 </script>
 
-<div class="flex flex-col gap-4">
-	<Card
-		title="Backups"
-		description="Konsistente Kopie der SQLite-Datenbank im Datenverzeichnis (backups/)"
-		icon="disk"
-		padding="none"
-	>
-		{#snippet actions()}
-			<Button size="sm" variant="primary" icon="plus" loading={creating} onclick={create}
-				>Backup erstellen</Button
-			>
-		{/snippet}
-		{#if list.error && !list.data}
-			<ErrorState error={list.error} onretry={() => list.reload()} />
-		{:else}
-			<Table
-				{columns}
-				rows={list.data ?? []}
-				key={(b) => b.name}
-				loading={list.loading && !list.data}
-				class="rounded-none border-0"
-				caption="Backups"
-			>
-				{#snippet cell(b, col)}
-					{#if col.key === 'name'}
-						<span class="mono break-all">{b.name}</span>
-					{:else if col.key === 'createdAt'}
-						<span class="text-fg-muted">{formatDateTime(b.createdAt)}</span>
-					{:else if col.key === 'size'}
-						<span class="tabular text-fg-muted">{formatBytes(b.size)}</span>
-					{:else if col.key === 'actions'}
-						<Menu
-							label="Aktionen für {b.name}"
-							items={[
-								{
-									// plain link: large backups stream straight to disk (attachment)
-									label: 'Herunterladen',
-									icon: 'download',
-									href: `/api/v1/system/backups/${encodeURIComponent(b.name)}`,
-									hint: formatBytes(b.size)
-								},
-								{
-									label: 'Wiederherstellen …',
-									icon: 'history',
-									onclick: () => askRestore({ kind: 'backup', backup: b })
-								},
-								{ separator: true },
-								{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(b) }
-							]}
-						/>
-					{/if}
-				{/snippet}
-				{#snippet empty()}
-					<EmptyState
-						compact
-						icon="disk"
-						title="Noch keine Backups"
-						description="Ein Backup sichert Inventar, Einstellungen, Regeln und verschlüsselte Credentials (ohne Master-Key)."
-					/>
-				{/snippet}
-			</Table>
-		{/if}
-		{#snippet footer()}
-			<p class="text-xs text-fg-subtle">
-				Der Vault-Master-Key (<code class="mono">data/master.key</code>) ist nicht Teil des Backups – ohne ihn
-				sind gesicherte Credentials nicht lesbar. Den Key separat sichern.
-			</p>
-		{/snippet}
+{#if !canManage}
+	<Card>
+		<EmptyState
+			icon="lock"
+			title="Keine Berechtigung"
+			description="Für Backups fehlt die Berechtigung „Backups verwalten“."
+		/>
 	</Card>
-
-	<Card
-		title="Aus Datei wiederherstellen"
-		description="Ein heruntergeladenes Backup hochladen und einspielen"
-		icon="upload"
-	>
-		<div class="flex flex-col gap-3">
-			<FormField label="Backup-Datei" error={fileError} hint="SQLite-Datei (.db) aus „Backup herunterladen“">
-				{#snippet children(id, describedby)}
-					<input
-						bind:this={fileInput}
-						{id}
-						type="file"
-						accept=".db,.sqlite,.sqlite3,application/octet-stream"
-						aria-describedby={describedby}
-						onchange={onFile}
-						class="block w-full text-sm text-fg-muted file:mr-3 file:h-8 file:cursor-pointer file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:text-sm file:font-medium file:text-fg hover:file:bg-surface-2"
-					/>
-				{/snippet}
-			</FormField>
-			<div>
-				<Button
-					variant="danger"
-					icon="upload"
-					disabled={!pickedFile || !!fileError}
-					onclick={() => pickedFile && askRestore({ kind: 'file', file: pickedFile })}
-					>Hochladen & wiederherstellen …</Button
+{:else}
+	<div class="flex flex-col gap-4">
+		<Card
+			title="Backups"
+			description="Konsistente Kopie der SQLite-Datenbank im Datenverzeichnis (backups/)"
+			icon="disk"
+			padding="none"
+		>
+			{#snippet actions()}
+				<Button size="sm" variant="primary" icon="plus" loading={creating} onclick={create}
+					>Backup erstellen</Button
 				>
+			{/snippet}
+			{#if list.error && !list.data}
+				<ErrorState error={list.error} onretry={() => list.reload()} />
+			{:else}
+				<Table
+					{columns}
+					rows={list.data ?? []}
+					key={(b) => b.name}
+					loading={list.loading && !list.data}
+					class="rounded-none border-0"
+					caption="Backups"
+				>
+					{#snippet cell(b, col)}
+						{#if col.key === 'name'}
+							<span class="mono break-all">{b.name}</span>
+						{:else if col.key === 'createdAt'}
+							<span class="text-fg-muted">{formatDateTime(b.createdAt)}</span>
+						{:else if col.key === 'size'}
+							<span class="tabular text-fg-muted">{formatBytes(b.size)}</span>
+						{:else if col.key === 'actions'}
+							<Menu
+								label="Aktionen für {b.name}"
+								items={[
+									{
+										// plain link: large backups stream straight to disk (attachment)
+										label: 'Herunterladen',
+										icon: 'download',
+										href: `/api/v1/system/backups/${encodeURIComponent(b.name)}`,
+										hint: formatBytes(b.size)
+									},
+									{
+										label: 'Wiederherstellen …',
+										icon: 'history',
+										onclick: () => askRestore({ kind: 'backup', backup: b })
+									},
+									{ separator: true },
+									{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(b) }
+								]}
+							/>
+						{/if}
+					{/snippet}
+					{#snippet empty()}
+						<EmptyState
+							compact
+							icon="disk"
+							title="Noch keine Backups"
+							description="Ein Backup sichert Inventar, Einstellungen, Regeln und verschlüsselte Credentials (ohne Master-Key)."
+						/>
+					{/snippet}
+				</Table>
+			{/if}
+			{#snippet footer()}
+				<p class="text-xs text-fg-subtle">
+					Der Vault-Master-Key (<code class="mono">data/master.key</code>) ist nicht Teil des Backups – ohne
+					ihn sind gesicherte Credentials nicht lesbar. Den Key separat sichern.
+				</p>
+			{/snippet}
+		</Card>
+
+		<Card
+			title="Aus Datei wiederherstellen"
+			description="Ein heruntergeladenes Backup hochladen und einspielen"
+			icon="upload"
+		>
+			<div class="flex flex-col gap-3">
+				<FormField
+					label="Backup-Datei"
+					error={fileError}
+					hint="SQLite-Datei (.db) aus „Backup herunterladen“"
+				>
+					{#snippet children(id, describedby)}
+						<input
+							bind:this={fileInput}
+							{id}
+							type="file"
+							accept=".db,.sqlite,.sqlite3,application/octet-stream"
+							aria-describedby={describedby}
+							onchange={onFile}
+							class="block w-full text-sm text-fg-muted file:mr-3 file:h-8 file:cursor-pointer file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:text-sm file:font-medium file:text-fg hover:file:bg-surface-2"
+						/>
+					{/snippet}
+				</FormField>
+				<div>
+					<Button
+						variant="danger"
+						icon="upload"
+						disabled={!pickedFile || !!fileError}
+						onclick={() => pickedFile && askRestore({ kind: 'file', file: pickedFile })}
+						>Hochladen & wiederherstellen …</Button
+					>
+				</div>
 			</div>
-		</div>
-	</Card>
-</div>
+		</Card>
+	</div>
+{/if}
 
 <StrongConfirm
 	bind:open={confirmOpen}

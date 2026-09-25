@@ -10,13 +10,17 @@
 	import OverviewTab from '$lib/components/system/OverviewTab.svelte';
 	import SettingsTab from '$lib/components/system/SettingsTab.svelte';
 	import SubnetsTab from '$lib/components/system/SubnetsTab.svelte';
+	import RolesTab from '$lib/components/system/RolesTab.svelte';
 	import TokensTab from '$lib/components/system/TokensTab.svelte';
+	import UsersTab from '$lib/components/system/UsersTab.svelte';
 	import VaultTab from '$lib/components/system/VaultTab.svelte';
 	import { SYSTEM_TABS } from '$lib/components/system/system';
 	import { Icon, PageHeader } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 
+	const tabs = $derived(SYSTEM_TABS.filter((t) => !t.perm || auth.can(t.perm)));
 	const tabId = $derived(page.url.searchParams.get('tab') ?? 'overview');
-	const tab = $derived(SYSTEM_TABS.find((t) => t.id === tabId) ?? SYSTEM_TABS[0]);
+	const tab = $derived(tabs.find((t) => t.id === tabId) ?? tabs[0]);
 
 	// keep the active entry visible in the horizontally scrolling nav (phones)
 	let navList: HTMLUListElement | null = $state(null);
@@ -40,7 +44,7 @@
 			bind:this={navList}
 			class="flex gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] sm:px-6 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-0 lg:px-0"
 		>
-			{#each SYSTEM_TABS as t (t.id)}
+			{#each tabs as t (t.id)}
 				{@const active = t.id === tab.id}
 				<li class="shrink-0">
 					<a
@@ -75,6 +79,10 @@
 				<FederationTab />
 			{:else if tab.id === 'account'}
 				<AccountTab />
+			{:else if tab.id === 'users'}
+				<UsersTab />
+			{:else if tab.id === 'roles'}
+				<RolesTab />
 			{:else if tab.id === 'tokens'}
 				<TokensTab />
 			{:else if tab.id === 'subnets'}

@@ -6,8 +6,9 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Alert from '$lib/components/ui/Alert.svelte';
-	import { auth } from '$lib/stores/auth.svelte';
+	import { auth, type MfaStep } from '$lib/stores/auth.svelte';
 	import { theme } from '$lib/stores/theme.svelte';
+	import { passkeysSupported } from '$lib/utils/webauthn';
 
 	let username = $state('admin');
 	let password = $state('');
@@ -15,6 +16,17 @@
 	let busy = $state(false);
 	let pwInput: HTMLInputElement | null = $state(null);
 	let userInput: HTMLInputElement | null = $state(null);
+
+	// second step: code from the authenticator app, passkey or recovery code
+	let mfa = $state<MfaStep | null>(null);
+	let method = $state<'totp' | 'passkey' | 'recovery'>('totp');
+	let code = $state('');
+	let codeInput: HTMLInputElement | null = $state(null);
+	const canPasskey = passkeysSupported();
+	const methods = $derived(
+		(mfa?.methods ?? []).filter((m) => m !== 'passkey' || canPasskey) as ('totp' | 'passkey' | 'recovery')[]
+	);
+	const methodLabel = { totp: 'Code aus der App', passkey: 'Passkey', recovery: 'Wiederherstellungscode' };
 
 	/** only local paths are accepted as redirect target */
 	function target(): string {
@@ -25,7 +37,7 @@
 	onMount(async () => {
 		try {
 			if (await auth.check(true)) {
-				goto(target(), { replaceState: true });
+				await proceed();
 				return;
 			}
 		} catch {
@@ -33,6 +45,55 @@
 		}
 		(username ? pwInput : userInput)?.focus();
 	});
+
+	/** after the login: finish a pending setup first */
+	async function proceed() {
+		await goto(auth.restricted ? '/setup' : target(), { replaceState: true });
+	}
+
+	function useMethod(m: 'totp' | 'passkey' | 'recovery') {
+		method = m;
+		code = '';
+		error = '';
+		if (m !== 'passkey') queueMicrotask(() => codeInput?.focus());
+	}
+
+	function restart(msg = '') {
+		mfa = null;
+		password = '';
+		code = '';
+		error = msg;
+		queueMicrotask(() => pwInput?.focus());
+	}
+
+	async function second(e?: SubmitEvent) {
+		e?.preventDefault();
+		if (!mfa) return;
+		if (method !== 'passkey' && !code.trim()) {
+			error =
+				method === 'totp'
+					? 'Den 6-stelligen Code aus der App eingeben'
+					: 'Einen Wiederherstellungscode eingeben';
+			return;
+		}
+		busy = true;
+		error = '';
+		try {
+			if (method === 'totp') await auth.loginTotp(mfa.challenge, code);
+			else if (method === 'recovery') await auth.loginRecovery(mfa.challenge, code);
+			else await auth.loginPasskey(mfa.challenge);
+			await proceed();
+		} catch (err) {
+			if (err instanceof ApiError && err.code === 'challenge_expired') restart(err.message);
+			else {
+				error = errorMessage(err);
+				code = '';
+				codeInput?.focus();
+			}
+		} finally {
+			busy = false;
+		}
+	}
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
@@ -43,8 +104,14 @@
 		busy = true;
 		error = '';
 		try {
-			await auth.login(username.trim(), password);
-			await goto(target(), { replaceState: true });
+			const res = await auth.login(username.trim(), password);
+			if (res.mfa) {
+				mfa = res.mfa;
+				const avail = res.mfa.methods.filter((m) => m !== 'passkey' || canPasskey);
+				useMethod(avail.includes('passkey') ? 'passkey' : avail.includes('totp') ? 'totp' : 'recovery');
+				return;
+			}
+			await proceed();
 		} catch (err) {
 			error =
 				err instanceof ApiError && err.status === 401
@@ -87,31 +154,86 @@
 			</div>
 		</div>
 
-		<form onsubmit={submit} class="rounded-xl border border-border bg-surface p-6 shadow-md" novalidate>
-			<div class="flex flex-col gap-4">
-				{#if error}
-					<Alert tone="danger">{error}</Alert>
-				{/if}
-				<Input
-					label="Benutzername"
-					bind:value={username}
-					bind:ref={userInput}
-					autocomplete="username"
-					autocapitalize="none"
-					spellcheck={false}
-					required
-				/>
-				<Input
-					label="Passwort"
-					type="password"
-					bind:value={password}
-					bind:ref={pwInput}
-					autocomplete="current-password"
-					required
-				/>
-				<Button type="submit" variant="primary" full loading={busy}>Anmelden</Button>
-			</div>
-		</form>
+		{#if mfa}
+			<form onsubmit={second} class="rounded-xl border border-border bg-surface p-6 shadow-md" novalidate>
+				<div class="flex flex-col gap-4">
+					<div>
+						<h2 class="text-base font-semibold text-fg">Zweiter Faktor</h2>
+						<p class="mt-0.5 text-sm text-fg-muted">
+							{method === 'totp'
+								? 'Den aktuellen Code aus deiner Authenticator-App eingeben.'
+								: method === 'passkey'
+									? 'Mit deinem Passkey bestätigen (Fingerabdruck, Gesicht, PIN oder Sicherheitsschlüssel).'
+									: 'Einen deiner Wiederherstellungscodes eingeben – jeder gilt nur einmal.'}
+						</p>
+					</div>
+					{#if error}
+						<Alert tone="danger">{error}</Alert>
+					{/if}
+					{#if method === 'passkey'}
+						<Button type="submit" variant="primary" icon="key" full loading={busy}
+							>Mit Passkey bestätigen</Button
+						>
+					{:else}
+						<Input
+							label={methodLabel[method]}
+							bind:value={code}
+							bind:ref={codeInput}
+							inputmode={method === 'totp' ? 'numeric' : 'text'}
+							autocomplete="one-time-code"
+							autocapitalize="none"
+							spellcheck={false}
+							placeholder={method === 'totp' ? '123456' : 'xxxxx-xxxxx'}
+							mono
+							required
+						/>
+						<Button type="submit" variant="primary" full loading={busy}>Bestätigen</Button>
+					{/if}
+					{#if methods.length > 1}
+						<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+							{#each methods.filter((m) => m !== method) as m (m)}
+								<button type="button" class="text-accent hover:underline" onclick={() => useMethod(m)}>
+									{m === 'recovery' ? 'Wiederherstellungscode verwenden' : 'Stattdessen: ' + methodLabel[m]}
+								</button>
+							{/each}
+						</div>
+					{/if}
+					<button
+						type="button"
+						class="self-start text-xs text-fg-subtle hover:text-fg hover:underline"
+						onclick={() => restart()}
+					>
+						Zurück zur Anmeldung
+					</button>
+				</div>
+			</form>
+		{:else}
+			<form onsubmit={submit} class="rounded-xl border border-border bg-surface p-6 shadow-md" novalidate>
+				<div class="flex flex-col gap-4">
+					{#if error}
+						<Alert tone="danger">{error}</Alert>
+					{/if}
+					<Input
+						label="Benutzername"
+						bind:value={username}
+						bind:ref={userInput}
+						autocomplete="username"
+						autocapitalize="none"
+						spellcheck={false}
+						required
+					/>
+					<Input
+						label="Passwort"
+						type="password"
+						bind:value={password}
+						bind:ref={pwInput}
+						autocomplete="current-password"
+						required
+					/>
+					<Button type="submit" variant="primary" full loading={busy}>Anmelden</Button>
+				</div>
+			</form>
+		{/if}
 		<p class="mt-5 text-center text-xs text-fg-subtle">
 			Darstellung:
 			<button

@@ -17,6 +17,7 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { relationKindLabel } from '$lib/utils/labels';
@@ -32,6 +33,7 @@
 
 	let { device, version, active, onchanged }: Props = $props();
 	const id = $derived(device.id);
+	const canEdit = $derived(auth.can('devices.edit'));
 
 	const data = new LazyData<Relation[]>();
 	$effect(() => {
@@ -179,7 +181,7 @@
 {/snippet}
 {#snippet seenCell(r: Row)}<RelativeTime value={r.lastSeen} class="text-fg-muted" />{/snippet}
 {#snippet actionCell(r: Row)}
-	{#if r.source === 'manual' || r.protected}
+	{#if canEdit && (r.source === 'manual' || r.protected)}
 		<Button size="xs" variant="ghost" icon="trash" label="Verbindung löschen" onclick={() => remove(r)} />
 	{/if}
 {/snippet}
@@ -188,7 +190,9 @@
 	<div class="flex flex-wrap items-center gap-2">
 		<h2 class="flex-1 text-sm font-semibold">Beziehungen</h2>
 		<Button size="sm" variant="ghost" href="/topology" iconRight="arrow-right">Topologie</Button>
-		<Button size="sm" variant="primary" icon="plus" onclick={openAdd}>Verbindung hinzufügen</Button>
+		{#if canEdit}
+			<Button size="sm" variant="primary" icon="plus" onclick={openAdd}>Verbindung hinzufügen</Button>
+		{/if}
 	</div>
 	{#if data.error && !data.data}
 		<ErrorState error={data.error} onretry={() => data.reload()} />

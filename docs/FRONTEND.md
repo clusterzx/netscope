@@ -64,7 +64,8 @@ regenerate: `npm run gen:api -- http://192.168.8.123:8080` or `-- path/to/openap
 
 3. Stores  (src/lib/stores, all Svelte 5 runes classes – read properties directly)
 ----------------------------------------------------------------------------------
-auth.svelte.ts      auth.me {user, principal}, auth.canWrite, auth.login(), auth.logout()
+auth.svelte.ts      auth.me {user, principal}, auth.can(perm) (Rechte der Rolle – Aktionen ohne Recht
+                    ausblenden), auth.restricted, auth.login() (+ zweiter Schritt), auth.logout()
 live.svelte.ts      one shared SSE connection (/api/v1/stream, all topics, auto reconnect):
                       $effect(() => live.on('plugin', (m) => …));      // returns unsubscribe
                       $effect(() => live.on<RunLogMessageData>('run.log', (m) => …));

@@ -13,6 +13,7 @@
 	import { DEFAULT_COLUMNS, allColumns, tableColumns } from '$lib/components/devices/columns';
 	import { Button, EmptyState, ErrorState, Menu, PageHeader, Pagination, Table } from '$lib/components/ui';
 	import type { RowKey } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { customFields } from '$lib/stores/catalog.svelte';
 	import { siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
@@ -109,6 +110,8 @@
 	}
 
 	let createOpen = $state(false);
+	const canCreate = $derived(auth.can('devices.edit'));
+	const canBulk = $derived(canCreate || auth.can('devices.delete') || auth.can('devices.actions'));
 	const exportQuery = $derived(
 		(q ? `&q=${encodeURIComponent(q)}` : '') +
 			(siteFilter.value ? `&site=${encodeURIComponent(siteFilter.value)}` : '')
@@ -144,7 +147,9 @@
 				}
 			]}
 		/>
-		<Button variant="primary" icon="plus" onclick={() => (createOpen = true)}>Gerät anlegen</Button>
+		{#if canCreate}
+			<Button variant="primary" icon="plus" onclick={() => (createOpen = true)}>Gerät anlegen</Button>
+		{/if}
 	{/snippet}
 </PageHeader>
 
@@ -157,7 +162,7 @@
 		</div>
 	</div>
 
-	{#if selected.length}
+	{#if selected.length && canBulk}
 		<BulkBar ids={selectedIds} {rows} onclear={() => (selected = [])} ondone={() => data.reload()} />
 	{/if}
 
@@ -170,7 +175,7 @@
 			key={(r) => r.id}
 			{sort}
 			onsort={(s) => setParams({ sort: s === 'name' ? null : s, offset: null })}
-			selectable
+			selectable={canBulk}
 			bind:selected
 			loading={data.loading}
 			dense
@@ -203,8 +208,14 @@
 						description="Sobald ein Scanner läuft, erscheinen die gefundenen Geräte hier."
 					>
 						{#snippet actions()}
-							<Button href="/plugins" icon="plugins">Scanner konfigurieren</Button>
-							<Button variant="primary" icon="plus" onclick={() => (createOpen = true)}>Gerät anlegen</Button>
+							{#if auth.can('plugins.manage')}
+								<Button href="/plugins" icon="plugins">Scanner konfigurieren</Button>
+							{/if}
+							{#if canCreate}
+								<Button variant="primary" icon="plus" onclick={() => (createOpen = true)}
+									>Gerät anlegen</Button
+								>
+							{/if}
 						{/snippet}
 					</EmptyState>
 				{/if}
@@ -229,4 +240,6 @@
 	{/if}
 </div>
 
-<CreateDeviceModal bind:open={createOpen} />
+{#if canCreate}
+	<CreateDeviceModal bind:open={createOpen} />
+{/if}

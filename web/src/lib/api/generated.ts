@@ -42,6 +42,10 @@ export interface ApiBulkResponse {
 	outcome?: PluginhostActionOutcome;
 }
 
+export interface ApiChallengeRequest {
+	challenge: string;
+}
+
 export interface ApiCheckRunResult {
 	check?: HealthcheckCheck;
 	error?: string;
@@ -53,6 +57,11 @@ export interface ApiClientInfo {
 	host: string;
 	ip: string;
 	scheme: string;
+}
+
+export interface ApiCodeRequest {
+	challenge: string;
+	code: string;
 }
 
 export interface ApiCreateDeviceRequest {
@@ -249,6 +258,12 @@ export interface ApiLoginRequest {
 	username: string;
 }
 
+export interface ApiLoginResponse {
+	mfa?: ApiMfaChallenge;
+	principal?: AuthPrincipal;
+	user?: AuthUser;
+}
+
 export interface ApiMeResponse {
 	principal?: AuthPrincipal;
 	user?: AuthUser;
@@ -275,6 +290,20 @@ export interface ApiMetaResponse {
 	version: string;
 }
 
+export interface ApiMfaChallenge {
+	challenge: string;
+	methods: string[];
+}
+
+export interface ApiMfaResponse {
+	passkeys: AuthPasskey[];
+	passkeysAvailable: boolean;
+	recoveryCodes: number;
+	required: boolean;
+	rpId?: string;
+	totp: boolean;
+}
+
 export interface ApiNotificationList {
 	items: RulesNotificationView[];
 	total: number;
@@ -284,9 +313,32 @@ export interface ApiOkResponse {
 	ok: boolean;
 }
 
+export interface ApiPasskeyCreated {
+	passkey?: AuthPasskey;
+	recoveryCodes: string[];
+}
+
+export interface ApiPasskeyLoginRequest {
+	challenge: string;
+	credential: unknown;
+}
+
+export interface ApiPasskeyRequest {
+	credential: unknown;
+	name: string;
+}
+
+export interface ApiPasswordConfirm {
+	password: string;
+}
+
 export interface ApiPasswordRequest {
 	current: string;
 	new: string;
+}
+
+export interface ApiPasswordResponse {
+	password: string;
 }
 
 export interface ApiPluginShort {
@@ -306,6 +358,14 @@ export interface ApiPluginStatus {
 	name: string;
 	nextRun?: string;
 	running: boolean;
+}
+
+export interface ApiRecoveryCodesResponse {
+	recoveryCodes: string[];
+}
+
+export interface ApiRenameRequest {
+	name: string;
 }
 
 export interface ApiRuleOrderRequest {
@@ -433,6 +493,14 @@ export interface ApiTopCVE {
 	devices: number;
 }
 
+export interface ApiTotpConfirmRequest {
+	code: string;
+}
+
+export interface ApiTotpSetupRequest {
+	password?: string;
+}
+
 export interface ApiTunnelInput {
 	config?: string;
 	credentialId?: number;
@@ -449,6 +517,11 @@ export interface ApiUploadResponse {
 	name: string;
 	path: string;
 	size: number;
+}
+
+export interface ApiUserCreated {
+	password?: string;
+	user?: AuthUser;
 }
 
 export interface ApiVulnList {
@@ -485,13 +558,61 @@ export interface AuditEntry {
 	ts: string;
 }
 
+export interface AuthPasskey {
+	createdAt: string;
+	id: number;
+	lastUsedAt?: string;
+	name: string;
+	rpId: string;
+}
+
+export interface AuthPermission {
+	critical?: boolean;
+	group: string;
+	hint: string;
+	key: string;
+	label: string;
+}
+
 export interface AuthPrincipal {
+	admin: boolean;
+	displayName?: string;
 	kind: string;
+	mfaSetup?: boolean;
+	passwordChange?: boolean;
+	permissions: string[];
+	roleId: number;
+	roleName: string;
 	scope: string;
 	tokenId?: number;
 	tokenName?: string;
 	userId: number;
 	username: string;
+}
+
+export interface AuthRole {
+	admin: boolean;
+	createdAt: string;
+	description: string;
+	id: number;
+	name: string;
+	permissions: string[];
+	require2fa: boolean;
+	updatedAt: string;
+	users: number;
+}
+
+export interface AuthRoleInput {
+	description: string;
+	name: string;
+	permissions: string[];
+	require2fa: boolean;
+}
+
+export interface AuthTOTPSetup {
+	qr: string;
+	secret: string;
+	uri: string;
 }
 
 export interface AuthToken {
@@ -501,15 +622,36 @@ export interface AuthToken {
 	lastUsedAt?: string;
 	lastUsedIp?: string;
 	name: string;
+	owner: string;
 	prefix: string;
 	scope: string;
+	userId: number;
 }
 
 export interface AuthUser {
 	createdAt: string;
+	disabled: boolean;
+	displayName: string;
+	email: string;
 	id: number;
 	lastLoginAt?: string;
+	mfaRequired: boolean;
+	mustChangePassword: boolean;
+	passkeys: number;
+	recoveryCodes: number;
+	roleId: number;
+	roleName: string;
+	totp: boolean;
 	updatedAt: string;
+	username: string;
+}
+
+export interface AuthUserInput {
+	disabled: boolean;
+	displayName: string;
+	email: string;
+	password?: string;
+	roleId: number;
 	username: string;
 }
 
@@ -1754,20 +1896,70 @@ export interface ApiPaths {
 			response: ApiAuditList;
 		};
 	};
+	'/api/v1/auth/2fa': {
+		/** Eigene Zwei-Faktor-Anmeldung: TOTP, Passkeys, Wiederherstellungscodes */
+		get: { query: never; body: never; response: ApiMfaResponse };
+	};
+	'/api/v1/auth/2fa/recovery': {
+		/** Neue Wiederherstellungscodes erzeugen (alte werden ungültig) */
+		post: { query: never; body: ApiPasswordConfirm; response: ApiRecoveryCodesResponse };
+	};
+	'/api/v1/auth/2fa/totp': {
+		/** TOTP einrichten (Geheimnis und QR-Code; aktiv erst nach Bestätigung) */
+		post: { query: never; body: ApiTotpSetupRequest; response: AuthTOTPSetup };
+	};
+	'/api/v1/auth/2fa/totp/confirm': {
+		/** TOTP mit dem ersten Code aktivieren */
+		post: { query: never; body: ApiTotpConfirmRequest; response: ApiRecoveryCodesResponse };
+	};
+	'/api/v1/auth/2fa/totp/disable': {
+		/** TOTP abschalten (Passwort erforderlich) */
+		post: { query: never; body: ApiPasswordConfirm; response: ApiOkResponse };
+	};
 	'/api/v1/auth/login': {
-		/** Anmelden (setzt Session-Cookie) */
-		post: { query: never; body: ApiLoginRequest; response: ApiMeResponse };
+		/** Anmelden (setzt Session-Cookie oder verlangt den zweiten Faktor) */
+		post: { query: never; body: ApiLoginRequest; response: ApiLoginResponse };
+	};
+	'/api/v1/auth/login/passkey': {
+		/** Anmeldung mit Passkey abschließen */
+		post: { query: never; body: ApiPasskeyLoginRequest; response: ApiLoginResponse };
+	};
+	'/api/v1/auth/login/passkey/options': {
+		/** Passkey-Anmeldung beginnen (Optionen für navigator.credentials.get) */
+		post: { query: never; body: ApiChallengeRequest; response: Record<string, unknown> };
+	};
+	'/api/v1/auth/login/recovery': {
+		/** Anmeldung mit Wiederherstellungscode abschließen */
+		post: { query: never; body: ApiCodeRequest; response: ApiLoginResponse };
+	};
+	'/api/v1/auth/login/totp': {
+		/** Anmeldung mit TOTP-Code abschließen */
+		post: { query: never; body: ApiCodeRequest; response: ApiLoginResponse };
 	};
 	'/api/v1/auth/logout': {
 		/** Abmelden */
 		post: { query: never; body: never; response: ApiOkResponse };
 	};
 	'/api/v1/auth/me': {
-		/** Aktueller Benutzer */
+		/** Aktueller Benutzer mit Rolle und Berechtigungen */
 		get: { query: never; body: never; response: ApiMeResponse };
 	};
+	'/api/v1/auth/passkeys': {
+		/** Passkey registrieren */
+		post: { query: never; body: ApiPasskeyRequest; response: ApiPasskeyCreated };
+	};
+	'/api/v1/auth/passkeys/options': {
+		/** Passkey-Registrierung beginnen (Optionen für navigator.credentials.create) */
+		post: { query: never; body: never; response: Record<string, unknown> };
+	};
+	'/api/v1/auth/passkeys/{id}': {
+		/** Passkey umbenennen */
+		patch: { query: never; body: ApiRenameRequest; response: ApiOkResponse };
+		/** Passkey entfernen */
+		delete: { query: never; body: never; response: ApiOkResponse };
+	};
 	'/api/v1/auth/password': {
-		/** Passwort ändern (beendet andere Sessions) */
+		/** Eigenes Passwort ändern (beendet andere Sessions) */
 		put: { query: never; body: ApiPasswordRequest; response: ApiOkResponse };
 	};
 	'/api/v1/certificates': {
@@ -2081,6 +2273,10 @@ export interface ApiPaths {
 			response: ApiNotificationList;
 		};
 	};
+	'/api/v1/permissions': {
+		/** Katalog der Berechtigungen für Rollen */
+		get: { query: never; body: never; response: AuthPermission[] };
+	};
 	'/api/v1/plugins': {
 		/** Alle Plugins mit Schema, Konfiguration und Status */
 		get: { query: never; body: never; response: PluginhostPluginView[] };
@@ -2129,6 +2325,18 @@ export interface ApiPaths {
 	'/api/v1/reports/send': {
 		/** Änderungsbericht jetzt über Publisher versenden */
 		post: { query: never; body: ApiSendReportRequest; response: ApiOkResponse };
+	};
+	'/api/v1/roles': {
+		/** Rollen auflisten */
+		get: { query: never; body: never; response: AuthRole[] };
+		/** Rolle anlegen */
+		post: { query: never; body: AuthRoleInput; response: AuthRole };
+	};
+	'/api/v1/roles/{id}': {
+		/** Rolle ändern (Administrator: nur Beschreibung und 2FA-Pflicht) */
+		put: { query: never; body: AuthRoleInput; response: AuthRole };
+		/** Rolle löschen (nur ohne Benutzer) */
+		delete: { query: never; body: never; response: ApiOkResponse };
 	};
 	'/api/v1/rules': {
 		/** Benachrichtigungsregeln */
@@ -2273,13 +2481,13 @@ export interface ApiPaths {
 		get: { query: never; body: never; response: InventoryTagCount[] };
 	};
 	'/api/v1/tokens': {
-		/** API-Tokens auflisten */
+		/** API-Tokens auflisten (eigene; mit Benutzerverwaltung alle) */
 		get: { query: never; body: never; response: AuthToken[] };
 		/** API-Token erstellen (Klartext nur in dieser Antwort) */
 		post: { query: never; body: ApiTokenRequest; response: ApiTokenCreated };
 	};
 	'/api/v1/tokens/{id}': {
-		/** API-Token widerrufen */
+		/** API-Token widerrufen (eigene; mit Benutzerverwaltung alle) */
 		delete: { query: never; body: never; response: ApiOkResponse };
 	};
 	'/api/v1/topology': {
@@ -2322,6 +2530,28 @@ export interface ApiPaths {
 	'/api/v1/uploads': {
 		/** Datei hochladen (multipart „file“, z. B. für Importer) */
 		post: { query: never; body: never; response: ApiUploadResponse };
+	};
+	'/api/v1/users': {
+		/** Benutzer auflisten */
+		get: { query: never; body: never; response: AuthUser[] };
+		/** Benutzer anlegen (ohne Passwort wird eins erzeugt; Änderung beim ersten Login) */
+		post: { query: never; body: AuthUserInput; response: ApiUserCreated };
+	};
+	'/api/v1/users/{id}': {
+		/** Benutzer */
+		get: { query: never; body: never; response: AuthUser };
+		/** Benutzer ändern (Name, Rolle, deaktiviert) */
+		put: { query: never; body: AuthUserInput; response: AuthUser };
+		/** Benutzer löschen (mit Tokens und Sessions) */
+		delete: { query: never; body: never; response: ApiOkResponse };
+	};
+	'/api/v1/users/{id}/2fa/reset': {
+		/** Zweiten Faktor zurücksetzen (TOTP, Passkeys, Codes) */
+		post: { query: never; body: never; response: ApiOkResponse };
+	};
+	'/api/v1/users/{id}/password': {
+		/** Neues Start-Passwort erzeugen (Änderung beim nächsten Login) */
+		post: { query: never; body: never; response: ApiPasswordResponse };
 	};
 	'/api/v1/views': {
 		/** Gespeicherte Geräteansichten */

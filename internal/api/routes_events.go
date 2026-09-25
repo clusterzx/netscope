@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"netscope/internal/auth"
 	"netscope/internal/events"
 	"netscope/internal/inventory"
 	"netscope/internal/plugin"
@@ -54,7 +55,7 @@ func (s *Server) registerEvents() {
 	s.add(&route{Method: "GET", Path: "/api/v1/events/counts", Tag: "Events", Summary: "Offene Events je Schweregrad", Scope: scopeRead,
 		Resp: map[string]int{}, handler: s.handleEventCounts})
 	s.add(&route{Method: "POST", Path: "/api/v1/events/ack", Tag: "Events", Summary: "Events quittieren (IDs oder Filter)", Scope: scopeWrite,
-		Body: ackRequest{}, Resp: ackResponse{}, handler: s.handleAck})
+		Body: ackRequest{}, Resp: ackResponse{}, Perm: auth.PermEventsAck, handler: s.handleAck})
 	s.add(&route{Method: "GET", Path: "/api/v1/events/{id}", Tag: "Events", Summary: "Ein Event inkl. Benachrichtigungen", Scope: scopeRead,
 		Resp: eventDetail{}, handler: s.handleEvent})
 	s.add(&route{Method: "GET", Path: "/api/v1/diff", Tag: "Diff", Summary: "Zwei Läufe (runA/runB) oder zwei Zeitpunkte (from/to) vergleichen",

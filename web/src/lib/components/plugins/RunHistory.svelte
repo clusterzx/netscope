@@ -17,6 +17,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
@@ -230,7 +231,7 @@
 					{/if}
 				{:else if col.key === 'actions'}
 					<span class="inline-flex items-center justify-end gap-1">
-						{#if isActive(r.status)}
+						{#if isActive(r.status) && auth.can('devices.scan')}
 							<Button
 								size="xs"
 								variant="ghost"

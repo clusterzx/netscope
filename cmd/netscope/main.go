@@ -47,6 +47,8 @@ func main() {
 		err = token(args)
 	case "passwd":
 		err = passwd(args)
+	case "2fa-reset":
+		err = resetMFA(args)
 	case "healthcheck":
 		err = healthcheck()
 	case "openapi":
@@ -72,7 +74,9 @@ Befehle:
   serve                                   Server starten (Standard)
   token create --name NAME --scope read|write [--ttl 24h]
                                           API-Token erzeugen (wird einmalig ausgegeben)
-  passwd [--password PASSWORT]            Admin-Passwort zurücksetzen (sonst Eingabe über stdin)
+  passwd [--user NAME] [--password PASSWORT]
+                                          Passwort zurücksetzen (Standard admin; sonst Eingabe über stdin)
+  2fa-reset [--user NAME]                 zweiten Faktor (TOTP, Passkeys, Codes) eines Benutzers entfernen
   healthcheck                             prüft /api/v1/health des lokalen Servers
   openapi                                 OpenAPI-Spezifikation ausgeben
   version                                 Version ausgeben
@@ -119,7 +123,7 @@ func token(args []string) error {
 	}
 	defer d.Close()
 	ctx := context.Background()
-	svc := auth.New(d)
+	svc := auth.New(d, nil)
 	uid, err := svc.AdminID(ctx)
 	if err != nil {
 		return fmt.Errorf("kein Benutzer vorhanden – Server einmal starten: %w", err)
@@ -157,7 +161,7 @@ func passwd(args []string) error {
 		return err
 	}
 	defer d.Close()
-	if err := auth.New(d).ResetPassword(context.Background(), *user, *pw); err != nil {
+	if err := auth.New(d, nil).ResetPassword(context.Background(), *user, *pw); err != nil {
 		return err
 	}
 	_ = os.Remove(cfg.DataDir + "/" + app.InitialPasswordFile)
@@ -194,4 +198,23 @@ func openapi() error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(s.Spec())
+}
+
+// resetMFA removes the second factors of a user who lost the device (and the recovery codes).
+func resetMFA(args []string) error {
+	fs := flag.NewFlagSet("2fa-reset", flag.ContinueOnError)
+	user := fs.String("user", "admin", "Benutzer")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	_, d, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	if err := auth.New(d, nil).ResetMFAByName(context.Background(), *user); err != nil {
+		return err
+	}
+	fmt.Println("Zweiter Faktor entfernt, alle Sitzungen beendet. Verlangt die Rolle 2FA, wird sie beim nächsten Login neu eingerichtet.")
+	return nil
 }

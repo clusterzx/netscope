@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"netscope/internal/auth"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
 )
@@ -27,14 +28,14 @@ func (s *Server) registerPlugins() {
 		Resp: pluginhost.PluginView{}, handler: s.handlePlugin})
 	s.add(&route{Method: "PUT", Path: "/api/v1/plugins/{id}/config", Tag: "Plugins",
 		Summary: "Konfiguration ändern (aktiv, Zeitplan, Timeout, Retries, Parallelität, Scope, Einstellungen) – wirkt sofort",
-		Scope:   scopeWrite, Body: pluginhost.ConfigInput{}, Resp: pluginhost.PluginView{}, handler: s.handlePluginConfig})
+		Scope:   scopeWrite, Body: pluginhost.ConfigInput{}, Resp: pluginhost.PluginView{}, Perm: auth.PermPluginsManage, handler: s.handlePluginConfig})
 	s.add(&route{Method: "POST", Path: "/api/v1/plugins/{id}/run", Tag: "Plugins", Summary: "Jetzt ausführen", Scope: scopeWrite,
-		Body: runRequest{}, Resp: idResponse{}, Status: http.StatusAccepted, handler: s.handleRunPlugin})
+		Body: runRequest{}, Resp: idResponse{}, Status: http.StatusAccepted, Perm: auth.PermDevicesScan, handler: s.handleRunPlugin})
 	s.add(&route{Method: "POST", Path: "/api/v1/plugins/{id}/actions/{action}", Tag: "Plugins", Summary: "Plugin-Aktion ausführen",
 		Scope: scopeWrite, Params: []param{{Name: "wait", Type: "integer", Desc: "Sekunden auf das Ende warten (Standard 20, 0 = sofort mit runId antworten)"}},
-		Body: actionRequest{}, Resp: pluginhost.ActionOutcome{}, handler: s.handlePluginAction})
+		Body: actionRequest{}, Resp: pluginhost.ActionOutcome{}, Perm: auth.PermPluginsManage, handler: s.handlePluginAction})
 	s.add(&route{Method: "POST", Path: "/api/v1/plugins/{id}/test", Tag: "Plugins", Summary: "Testnachricht über einen Publisher senden",
-		Scope: scopeWrite, Resp: okResponse{}, handler: s.handleTestPublisher})
+		Scope: scopeWrite, Resp: okResponse{}, Perm: auth.PermPluginsManage, handler: s.handleTestPublisher})
 	s.add(&route{Method: "GET", Path: "/api/v1/runs", Tag: "Läufe", Summary: "Laufhistorie", Scope: scopeRead,
 		Params: []param{{Name: "plugin"}, {Name: "status", Desc: "kommagetrennt"}, {Name: "kind"},
 			{Name: "scope", Desc: "full = nur Läufe über ganze Subnetze (keine Einzelgeräte)"}, {Name: "before", Type: "integer", Desc: "nur Läufe mit kleinerer ID, z. B. ?plugin=nmap&status=success&before=123&limit=1 = Vorgängerlauf"}, {Name: "limit", Type: "integer"},
@@ -47,7 +48,7 @@ func (s *Server) registerPlugins() {
 		Params: []param{{Name: "after", Type: "integer", Desc: "nur Zeilen nach dieser ID"}, {Name: "limit", Type: "integer"}},
 		Resp:   []pluginhost.RunLog{}, handler: s.handleRunLogs})
 	s.add(&route{Method: "POST", Path: "/api/v1/runs/{id}/cancel", Tag: "Läufe", Summary: "Lauf abbrechen", Scope: scopeWrite,
-		Resp: okResponse{}, handler: s.handleCancelRun})
+		Resp: okResponse{}, Perm: auth.PermDevicesScan, handler: s.handleCancelRun})
 }
 
 func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {

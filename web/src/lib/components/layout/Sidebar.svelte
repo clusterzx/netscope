@@ -5,6 +5,7 @@
 	import { eventCounts } from '$lib/stores/eventCounts.svelte';
 	import { meta } from '$lib/stores/catalog.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 
 	let { onnavigate }: { onnavigate?: () => void } = $props();
 </script>
@@ -25,7 +26,7 @@
 					{section.label}
 				</p>
 				<ul class="flex flex-col gap-0.5">
-					{#each section.items.filter((i) => !i.central || federation.role === 'central') as item (item.href)}
+					{#each section.items.filter((i) => (!i.central || federation.role === 'central') && (!i.perm || auth.can(i.perm))) as item (item.href)}
 						{@const active = isActive(item.href, page.url.pathname)}
 						<li>
 							<a

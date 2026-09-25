@@ -9,6 +9,7 @@
 	import MarkdownView from '$lib/components/ui/MarkdownView.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 
 	interface Props {
@@ -75,7 +76,7 @@
 <div bind:this={card}>
 	<Card title="Notizen" icon="note" padding="md">
 		{#snippet actions()}
-			{#if !editing}
+			{#if !editing && auth.can('devices.edit')}
 				<Button size="xs" variant="ghost" icon="edit" onclick={() => (editing = true)}>
 					{device.notes ? 'Bearbeiten' : 'Hinzufügen'}
 				</Button>

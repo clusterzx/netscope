@@ -7,6 +7,7 @@
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Spinner from '$lib/components/ui/Spinner.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDuration } from '$lib/utils/format';
@@ -83,7 +84,7 @@
 					<div class="flex items-center gap-2">
 						<span class="min-w-0 flex-1 truncate text-sm font-medium">{r.pluginName}</span>
 						<Badge tone={runStatusTone(r.status)} dot>{runStatusLabel[r.status] ?? r.status}</Badge>
-						{#if r.status === 'running' || r.status === 'queued'}
+						{#if (r.status === 'running' || r.status === 'queued') && auth.can('devices.scan')}
 							<button
 								type="button"
 								class="rounded p-1 text-fg-subtle hover:bg-surface-3 hover:text-danger"

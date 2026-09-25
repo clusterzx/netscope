@@ -1,5 +1,6 @@
 // Sidebar navigation. `match` decides the active entry (prefix match on the path).
 import type { IconName } from '$lib/components/ui/icons';
+import type { Permission } from '$lib/stores/auth.svelte';
 
 export interface NavItem {
 	href: string;
@@ -9,6 +10,8 @@ export interface NavItem {
 	badge?: 'events';
 	/** only shown on a central instance */
 	central?: boolean;
+	/** only shown with this permission */
+	perm?: Permission;
 }
 
 export interface NavSection {
@@ -40,7 +43,7 @@ export const nav: NavSection[] = [
 		items: [
 			{ href: '/plugins', label: 'Plugins', icon: 'plugins' },
 			{ href: '/rules', label: 'Regeln', icon: 'rules' },
-			{ href: '/credentials', label: 'Credentials', icon: 'key' },
+			{ href: '/credentials', label: 'Credentials', icon: 'key', perm: 'credentials.view' },
 			{ href: '/reports', label: 'Reports', icon: 'reports' },
 			{ href: '/system', label: 'System', icon: 'system' }
 		]
