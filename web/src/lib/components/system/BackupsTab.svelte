@@ -89,8 +89,8 @@
 		const f = (e.currentTarget as HTMLInputElement).files?.[0] ?? null;
 		fileError = null;
 		pickedFile = f;
-		if (f && !/\.(db|sqlite3?)$/i.test(f.name))
-			fileError = 'Erwartet wird eine SQLite-Datei (.db) aus einem NetScope-Backup.';
+		if (f && !/\.(db|sqlite3?)(\.gz)?$/i.test(f.name))
+			fileError = 'Erwartet wird ein NetScope-Backup (.db.gz oder .db).';
 	}
 
 	async function doRestore() {
@@ -199,6 +199,7 @@
 			{/if}
 			{#snippet footer()}
 				<p class="text-xs text-fg-subtle">
+					Backups sind gzip-komprimiert und enthalten den NVD-Spiegel nicht – der wird bei Bedarf neu geladen.
 					Der Vault-Master-Key (<code class="mono">data/master.key</code>) ist nicht Teil des Backups – ohne
 					ihn sind gesicherte Credentials nicht lesbar. Den Key separat sichern.
 				</p>
@@ -214,14 +215,14 @@
 				<FormField
 					label="Backup-Datei"
 					error={fileError}
-					hint="SQLite-Datei (.db) aus „Backup herunterladen“"
+					hint="Datei (.db.gz) aus „Herunterladen“ – ältere unkomprimierte .db-Backups gehen auch"
 				>
 					{#snippet children(id, describedby)}
 						<input
 							bind:this={fileInput}
 							{id}
 							type="file"
-							accept=".db,.sqlite,.sqlite3,application/octet-stream"
+							accept=".gz,.db,.sqlite,.sqlite3,application/gzip,application/octet-stream"
 							aria-describedby={describedby}
 							onchange={onFile}
 							class="block w-full text-sm text-fg-muted file:mr-3 file:h-8 file:cursor-pointer file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:text-sm file:font-medium file:text-fg hover:file:bg-surface-2"

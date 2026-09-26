@@ -2,15 +2,18 @@
 //
 // SQLite allows exactly one writer. DB therefore keeps two pools: W with a single
 // connection for all writes (serialised in-process instead of fighting over the file
-// lock) and R with several connections for concurrent reads (WAL mode).
+// lock) and R with several connections for concurrent reads (WAL mode). Every connection
+// has the NVD mirror attached (see nvd.go).
 package db
 
 import (
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -35,10 +38,8 @@ func Open(ctx context.Context, path string) (*DB, error) {
 			return nil, fmt.Errorf("create db dir: %w", err)
 		}
 	}
-	w, err := sql.Open("sqlite", dsn(path, false))
-	if err != nil {
-		return nil, err
-	}
+	nvd := NVDPath(path)
+	w := sql.OpenDB(&connector{dsn: dsn(path, false), nvd: nvd})
 	w.SetMaxOpenConns(1)
 	w.SetMaxIdleConns(1)
 	w.SetConnMaxLifetime(0)
@@ -51,11 +52,11 @@ func Open(ctx context.Context, path string) (*DB, error) {
 		w.Close()
 		return nil, err
 	}
-	r, err := sql.Open("sqlite", dsn(path, true))
-	if err != nil {
+	if err := d.ensureNVD(ctx); err != nil {
 		w.Close()
 		return nil, err
 	}
+	r := sql.OpenDB(&connector{dsn: dsn(path, true), nvd: nvd, readOnly: true})
 	n := runtime.NumCPU()
 	if n < 4 {
 		n = 4
@@ -132,14 +133,52 @@ func (d *DB) Tx(ctx context.Context, fn func(tx *sql.Tx) error) (err error) {
 	return fn(tx)
 }
 
-// Backup writes a consistent copy of the database to dst (VACUUM INTO).
+// Backup writes a consistent copy of the database to dst (VACUUM INTO). The NVD mirror is
+// not part of it (it is downloaded again when missing).
 func (d *DB) Backup(ctx context.Context, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return err
 	}
 	_ = os.Remove(dst)
-	_, err := d.W.ExecContext(ctx, "VACUUM INTO ?", dst)
+	_, err := d.W.ExecContext(ctx, "VACUUM main INTO ?", dst)
 	return err
+}
+
+// BackupGzip writes a consistent, gzip-compressed copy of the database to dst.
+func (d *DB) BackupGzip(ctx context.Context, dst string) error {
+	tmp := dst + ".tmp"
+	if err := d.Backup(ctx, tmp); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	defer os.Remove(tmp)
+	in, err := os.Open(tmp)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	part := dst + ".part"
+	out, err := os.OpenFile(part, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o640)
+	if err != nil {
+		return err
+	}
+	zw := gzip.NewWriter(out)
+	if _, err := io.Copy(zw, in); err != nil {
+		zw.Close()
+		out.Close()
+		_ = os.Remove(part)
+		return err
+	}
+	if err := zw.Close(); err != nil {
+		out.Close()
+		_ = os.Remove(part)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		_ = os.Remove(part)
+		return err
+	}
+	return os.Rename(part, dst)
 }
 
 // Size returns the size of the database file plus its WAL in bytes.

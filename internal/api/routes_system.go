@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bufio"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -35,19 +37,21 @@ type healthResponse struct {
 }
 
 type systemInfo struct {
-	Version         string              `json:"version"`
-	GoVersion       string              `json:"goVersion"`
-	StartedAt       time.Time           `json:"startedAt"`
-	UptimeSeconds   int64               `json:"uptimeSeconds"`
-	DataDir         string              `json:"dataDir"`
-	ConfigPath      string              `json:"configPath"`
-	Listen          string              `json:"listen"`
-	LogLevel        string              `json:"logLevel"`
-	LogFormat       string              `json:"logFormat"`
-	TimeZone        string              `json:"timeZone"`
-	TrustedProxies  []string            `json:"trustedProxies"`
-	DBPath          string              `json:"dbPath"`
-	DBSizeBytes     int64               `json:"dbSizeBytes"`
+	Version        string    `json:"version"`
+	GoVersion      string    `json:"goVersion"`
+	StartedAt      time.Time `json:"startedAt"`
+	UptimeSeconds  int64     `json:"uptimeSeconds"`
+	DataDir        string    `json:"dataDir"`
+	ConfigPath     string    `json:"configPath"`
+	Listen         string    `json:"listen"`
+	LogLevel       string    `json:"logLevel"`
+	LogFormat      string    `json:"logFormat"`
+	TimeZone       string    `json:"timeZone"`
+	TrustedProxies []string  `json:"trustedProxies"`
+	DBPath         string    `json:"dbPath"`
+	DBSizeBytes    int64     `json:"dbSizeBytes"`
+	// NVDSizeBytes is the NVD mirror file (not part of backups).
+	NVDSizeBytes    int64               `json:"nvdSizeBytes"`
 	SchemaVersion   int                 `json:"schemaVersion"`
 	VaultKeyID      string              `json:"vaultKeyId"`
 	VaultKeySource  string              `json:"vaultKeySource"`
@@ -201,7 +205,7 @@ func (s *Server) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, systemInfo{Version: s.Version, GoVersion: runtime.Version(), StartedAt: s.StartedAt,
 		UptimeSeconds: int64(time.Since(s.StartedAt).Seconds()), DataDir: s.Config.DataDir, ConfigPath: s.Config.Path,
 		Listen: s.Config.Listen, LogLevel: s.LevelVar.Level().String(), LogFormat: s.Config.LogFormat, TimeZone: s.Config.Timezone,
-		TrustedProxies: s.Config.TrustedProxies, DBPath: s.DB.Path, DBSizeBytes: s.DB.Size(), SchemaVersion: ver,
+		TrustedProxies: s.Config.TrustedProxies, DBPath: s.DB.Path, DBSizeBytes: s.DB.Size(), NVDSizeBytes: s.DB.NVDSize(), SchemaVersion: ver,
 		VaultKeyID: s.Vault.KeyID(), VaultKeySource: keySrc, Plugins: len(views), MissingBinaries: missing,
 		Goroutines: runtime.NumGoroutine(), MemoryBytes: ms.Alloc, Client: client(r)})
 }
@@ -266,7 +270,8 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, entries)
 }
 
-var backupNameRe = regexp.MustCompile(`^[A-Za-z0-9._-]+\.db$`)
+// backupNameRe matches backups: gzip-compressed (.db.gz) or plain from older versions.
+var backupNameRe = regexp.MustCompile(`^[A-Za-z0-9._-]+\.db(\.gz)?$`)
 
 func (s *Server) backupDir() string { return filepath.Join(s.Config.DataDir, "backups") }
 
@@ -302,9 +307,9 @@ func (s *Server) handleListBackups(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCreateBackup(w http.ResponseWriter, r *http.Request) {
-	name := "netscope-" + time.Now().In(s.Config.Location).Format("20060102-150405") + ".db"
+	name := "netscope-" + time.Now().In(s.Config.Location).Format("20060102-150405") + ".db.gz"
 	p := filepath.Join(s.backupDir(), name)
-	if err := s.DB.Backup(r.Context(), p); err != nil {
+	if err := s.DB.BackupGzip(r.Context(), p); err != nil {
 		s.fail(w, r, err)
 		return
 	}
@@ -330,7 +335,11 @@ func (s *Server) handleDownloadBackup(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	st, _ := f.Stat()
-	w.Header().Set("Content-Type", "application/octet-stream")
+	ct := "application/octet-stream"
+	if strings.HasSuffix(p, ".gz") {
+		ct = "application/gzip"
+	}
+	w.Header().Set("Content-Type", ct)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(p)))
 	http.ServeContent(w, r, filepath.Base(p), st.ModTime(), f)
 }
@@ -369,18 +378,11 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer f.Close()
-		out, err := os.Create(target)
-		if err != nil {
-			s.fail(w, r, err)
-			return
-		}
-		if _, err := io.Copy(out, f); err != nil {
-			out.Close()
+		if err := stageBackup(target, f); err != nil {
 			os.Remove(target)
 			s.fail(w, r, err)
 			return
 		}
-		out.Close()
 		source = "Upload"
 	} else {
 		var req restoreRequest
@@ -399,11 +401,7 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, err)
 			return
 		}
-		out, err := os.Create(target)
-		if err == nil {
-			_, err = io.Copy(out, in)
-			out.Close()
-		}
+		err = stageBackup(target, in)
 		in.Close()
 		if err != nil {
 			os.Remove(target)
@@ -535,4 +533,27 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	s.record(r, "upload", "file", filepath.Base(p), fmt.Sprintf("Datei hochgeladen (%d Bytes)", n), nil, nil)
 	writeJSON(w, http.StatusCreated, uploadResponse{Path: p, Name: hdr.Filename, Size: n})
+}
+
+// stageBackup writes a backup to target, decompressing it when it is gzip-compressed.
+func stageBackup(target string, src io.Reader) error {
+	br := bufio.NewReader(src)
+	var in io.Reader = br
+	if magic, err := br.Peek(2); err == nil && magic[0] == 0x1f && magic[1] == 0x8b {
+		zr, err := gzip.NewReader(br)
+		if err != nil {
+			return fmt.Errorf("gzip: %w", err)
+		}
+		defer zr.Close()
+		in = zr
+	}
+	out, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }

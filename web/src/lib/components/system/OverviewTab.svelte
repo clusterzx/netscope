@@ -40,7 +40,7 @@
 {:else}
 	<div class="flex flex-col gap-4">
 		<section aria-label="Kennzahlen" class="grid grid-cols-2 gap-3 md:grid-cols-4">
-			{#each [['Version', i.version, i.goVersion], ['Laufzeit', formatSeconds(i.uptimeSeconds), `seit ${formatDateTime(i.startedAt)}`], ['Datenbank', formatBytes(i.dbSizeBytes), `Schema-Version ${i.schemaVersion}`], ['Speicher', formatBytes(i.memoryBytes), `${formatNumber(i.goroutines)} Goroutinen · ${i.plugins} Plugins`]] as [label, value, detail] (label)}
+			{#each [['Version', i.version, i.goVersion], ['Laufzeit', formatSeconds(i.uptimeSeconds), `seit ${formatDateTime(i.startedAt)}`], ['Datenbank', formatBytes(i.dbSizeBytes), `Schema ${i.schemaVersion} · NVD-Spiegel ${formatBytes(i.nvdSizeBytes)} (nicht im Backup)`], ['Speicher', formatBytes(i.memoryBytes), `${formatNumber(i.goroutines)} Goroutinen · ${i.plugins} Plugins`]] as [label, value, detail] (label)}
 				<div class="rounded-lg border border-border bg-surface p-3.5 shadow-sm">
 					<div class="text-[0.8125rem] font-medium text-fg-muted">{label}</div>
 					<div class="mt-0.5 truncate text-xl font-semibold tracking-tight tabular" title={value}>

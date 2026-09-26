@@ -465,6 +465,8 @@ Webhook/n8n-Payload: [docs/PUBLISHERS.md](docs/PUBLISHERS.md).
 Das Plugin `cve` spiegelt die NVD-Datenbank lokal (offizielle JSON-2.0-Feeds, danach
 inkrementell über den „modified“-Feed) und gleicht die CPEs der Geräte ab (nmap-Dienste,
 OS-Erkennung, erkannte Web-Apps, SSH-Pakete). Es gibt keinen Online-Lookup pro Gerät.
+Der Spiegel liegt in einer eigenen Datei (`data/netscope-nvd.db`, einige hundert MB) und
+ist nicht Teil der Backups.
 Der Versionsabgleich ist **heuristisch** – insbesondere Distributionspakete enthalten oft
 zurückportierte Sicherheitskorrekturen. Einzelne CVEs lassen sich pro Gerät als irrelevant
 markieren; die Markierung übersteht jeden Abgleich.
@@ -539,8 +541,13 @@ Administrator den zweiten Faktor zurück – oder im Container:
 
 ## Backup und Wiederherstellung
 
-**System → Backups** erstellt konsistente Kopien der Datenbank (`data/backups/`), die sich
-herunterladen und wiederherstellen lassen (auch per Upload). Bei der Wiederherstellung
+**System → Backups** erstellt konsistente, gzip-komprimierte Kopien der Datenbank
+(`data/backups/*.db.gz`), die sich herunterladen und wiederherstellen lassen (auch per
+Upload; unkomprimierte `.db`-Backups älterer Versionen gehen weiterhin). Den NVD-Spiegel
+enthalten Backups nicht: Er liegt in `data/netscope-nvd.db`, bleibt bei einer
+Wiederherstellung erhalten und wird auf einer neuen Installation einfach neu geladen. Beim
+ersten Start nach dem Update verschiebt NetScope einen vorhandenen Spiegel einmalig aus der
+Datenbank in diese Datei; dieser Start dauert entsprechend länger. Bei der Wiederherstellung
 starten die Dienste im Prozess neu; die vorherige Datenbank bleibt als
 `netscope.db.pre-restore-<zeit>` erhalten. Für ein vollständiges Backup zusätzlich
 `data/master.key` sichern: Das Backup einer anderen Instanz lässt sich nur mit deren

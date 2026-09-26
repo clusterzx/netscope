@@ -531,6 +531,7 @@ export interface ApiSystemInfo {
 	logLevel: string;
 	memoryBytes: number;
 	missingBinaries: Record<string, string[]>;
+	nvdSizeBytes: number;
 	plugins: number;
 	schemaVersion: number;
 	startedAt: string;

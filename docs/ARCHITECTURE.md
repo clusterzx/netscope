@@ -36,7 +36,7 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `cmd/netscope-agent` | NetScope-Agent für überwachte Linux-Systeme (`enroll`, `run`): Inventar, Messwerte, Long Poll, Selbst-Update |
 | `internal/app` | Verdrahtung, Start/Shutdown, In-Process-Neustart nach Restore |
 | `internal/config` | Bootstrap-Konfiguration (`/data/config.yaml`, `NETSCOPE_*`) |
-| `internal/db` | SQLite (modernc), Schreib-/Lese-Pools, eingebettete Migrationen, Backup |
+| `internal/db` | SQLite (modernc), Schreib-/Lese-Pools, eingebettete Migrationen, angehängter NVD-Spiegel, Backup (gzip) |
 | `internal/vault` | AES-256-GCM, Master-Key aus Env/Datei, Key-Rotation, Credentials |
 | `internal/auth` | Benutzer, Rollen und Rechte, Login (bcrypt, Session-Cookie) mit zweitem Faktor (TOTP, Passkeys, Wiederherstellungscodes), API-Tokens (read/write), Rate-Limit |
 | `internal/plugin` | Plugin-SDK: Interfaces, Settings-Schema, Observation, Change, Event-Katalog |
@@ -80,7 +80,17 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 | Events & Regeln | `events` (`site_id` bei Events eines Standorts), `rules`, `notifications`, `rule_throttle`, `escalations` |
 | Health | `health_checks`, `health_outages` |
 | Zeitreihen | `ts_series`, `ts_raw`, `ts_5m`, `ts_1h` |
-| Schwachstellen | `nvd_cves`, `nvd_cpe_matches`, `nvd_feeds`, `device_cves`*, `cve_ignores` |
+| Schwachstellen | `device_cves`*, `cve_ignores`; NVD-Spiegel: `nvd_cves`, `nvd_cpe_matches`, `nvd_feeds` (eigene Datei, s. u.) |
+
+**NVD-Spiegel:** Die öffentlichen NVD-Daten (mehrere hundert MB) liegen in einer eigenen
+Datei neben der Datenbank (`netscope.db` → `netscope-nvd.db`), die jede Verbindung als
+Schema `nvd` anhängt (`ATTACH`, eigener `driver.Connector`). SQLite löst unqualifizierte
+Tabellennamen auch in angehängten Datenbanken auf, die Abfragen des CVE-Plugins sind
+unverändert. Die Tabellen legt `ensureNVD` an (nicht die Migrationen); eine abweichende
+`nvd.user_version` verwirft sie, dann lädt das Plugin den Spiegel neu. Liegt der Spiegel noch
+in der Hauptdatenbank (ältere Installation oder eingespieltes altes Backup), wird er beim
+Start einmalig verschoben und die Hauptdatenbank mit `VACUUM` verkleinert. Backups
+(`VACUUM main INTO`, gzip) enthalten den Spiegel nicht.
 
 \* temporal. Manuelle Daten (Anzeigename, Aufstellort, Besitzer, Notizen, Tags, Custom Fields,
 Kritikalität, Zustand, manuelle Overrides mit Quelle `manual`) schreibt kein Scan und kein
