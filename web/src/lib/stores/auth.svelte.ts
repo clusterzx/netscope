@@ -30,6 +30,7 @@ export type Permission =
 	| 'credentials.manage'
 	| 'network.manage'
 	| 'sites.manage'
+	| 'agents.manage'
 	| 'system.manage'
 	| 'backups.manage'
 	| 'audit.view'

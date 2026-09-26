@@ -18,6 +18,7 @@ const (
 	PermCredentialsEdit = "credentials.manage"
 	PermNetworkManage   = "network.manage"
 	PermSitesManage     = "sites.manage"
+	PermAgentsManage    = "agents.manage"
 	PermSystemManage    = "system.manage"
 	PermBackupsManage   = "backups.manage"
 	PermAuditView       = "audit.view"
@@ -66,6 +67,8 @@ var Permissions = []Permission{
 		Hint: "Legt fest, welche Netze gescannt werden"},
 	{Key: PermSitesManage, Group: "Konfiguration", Label: "Verbund und Standorte verwalten", Critical: true,
 		Hint: "Rolle der Instanz, Standorte und ihre Tokens"},
+	{Key: PermAgentsManage, Group: "Konfiguration", Label: "Agents verwalten",
+		Hint: "Installationsbefehle für den NetScope-Agent erzeugen und Agents entfernen"},
 	{Key: PermSystemManage, Group: "System", Label: "Systemeinstellungen ändern", Critical: true,
 		Hint: "Einstellungen, Log-Level und Rotation des Vault-Schlüssels"},
 	{Key: PermBackupsManage, Group: "System", Label: "Backups verwalten", Critical: true,

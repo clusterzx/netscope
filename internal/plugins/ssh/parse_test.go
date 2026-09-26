@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"netscope/internal/hostscript"
 	"netscope/internal/plugin"
 	"netscope/internal/plugin/plugintest"
 )
@@ -54,8 +55,8 @@ func sec(t *testing.T, secs map[string]*sectionOutput, name string) *sectionOutp
 
 func TestSplitOutput(t *testing.T) {
 	secs := fixtureSections(t, "ubuntu2404")
-	if len(secs) != len(commands) {
-		t.Fatalf("sections = %d, want %d", len(secs), len(commands))
+	if len(secs) != hostscript.SectionCount() {
+		t.Fatalf("sections = %d, want %d", len(secs), hostscript.SectionCount())
 	}
 	for name, s := range secs {
 		if !s.Done {

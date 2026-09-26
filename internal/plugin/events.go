@@ -130,6 +130,10 @@ const (
 	EvTunnelUp              = "tunnel.up"
 	EvSiteDown              = "site.down"
 	EvSiteUp                = "site.up"
+	EvAgentOffline          = "agent.offline"
+	EvAgentOnline           = "agent.online"
+	EvDiskFull              = "disk.full"
+	EvDiskOK                = "disk.ok"
 )
 
 var deviceFields = []PayloadField{
@@ -202,6 +206,14 @@ var catalog = []EventSpec{
 		[]PayloadField{{"site", "string", "Name des Standorts"}, {"site_id", "number", "Standort"}, {"last_contact", "string", "Letzte Meldung (RFC3339)"}}},
 	{EvSiteUp, "system", "Standort meldet sich wieder", "Ein NetScope-Standort liefert wieder an die Zentrale.", SevInfo, "core",
 		[]PayloadField{{"site", "string", "Name des Standorts"}, {"site_id", "number", "Standort"}, {"down_seconds", "number", "Dauer ohne Meldung"}}},
+	{EvAgentOffline, "device", "Agent meldet sich nicht", "Der NetScope-Agent eines Systems hat sich mehrere Minuten nicht gemeldet – System aus, Netz weg oder Dienst gestoppt. Scannt kein anderer Scanner das Gerät, gilt es als offline.", SevMedium, "agent",
+		withDevice(PayloadField{"agent_id", "number", "Agent"}, PayloadField{"hostname", "string", "Hostname laut Agent"}, PayloadField{"last_contact", "string", "Letzte Meldung (RFC3339)"})},
+	{EvAgentOnline, "device", "Agent meldet sich wieder", "Der NetScope-Agent eines Systems liefert wieder.", SevInfo, "agent",
+		withDevice(PayloadField{"agent_id", "number", "Agent"}, PayloadField{"hostname", "string", "Hostname laut Agent"}, PayloadField{"down_seconds", "number", "Dauer ohne Meldung"})},
+	{EvDiskFull, "device", "Dateisystem fast voll", "Ein Dateisystem eines Systems mit Agent ist über der Schwelle aus den Agent-Einstellungen belegt.", SevHigh, "agent",
+		withDevice(PayloadField{"mount", "string", "Einhängepunkt"}, PayloadField{"used_pct", "number", "Belegung in %"}, PayloadField{"free_bytes", "number", "Freier Platz"}, PayloadField{"threshold", "number", "Schwelle in %"})},
+	{EvDiskOK, "device", "Dateisystem wieder unter der Schwelle", "Ein zuvor fast volles Dateisystem ist wieder unter der Schwelle.", SevInfo, "agent",
+		withDevice(PayloadField{"mount", "string", "Einhängepunkt"}, PayloadField{"used_pct", "number", "Belegung in %"})},
 }
 
 // Catalog returns the event type catalog sorted by category and type.

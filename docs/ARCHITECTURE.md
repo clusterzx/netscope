@@ -32,7 +32,8 @@ Benachrichtigungen plant und über Publisher zustellt.
 
 | Pfad | Inhalt |
 |---|---|
-| `cmd/netscope` | Einstiegspunkt und CLI (`serve`, `token create`, `passwd`, `healthcheck`, `openapi`) |
+| `cmd/netscope` | Einstiegspunkt und CLI (`serve`, `token create`, `passwd`, `2fa-reset`, `healthcheck`, `openapi`) |
+| `cmd/netscope-agent` | NetScope-Agent für überwachte Linux-Systeme (`enroll`, `run`): Inventar, Messwerte, Long Poll, Selbst-Update |
 | `internal/app` | Verdrahtung, Start/Shutdown, In-Process-Neustart nach Restore |
 | `internal/config` | Bootstrap-Konfiguration (`/data/config.yaml`, `NETSCOPE_*`) |
 | `internal/db` | SQLite (modernc), Schreib-/Lese-Pools, eingebettete Migrationen, Backup |
@@ -51,6 +52,8 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `internal/tunnel` | eigene WireGuard-Tunnel in entfernte Subnetze (Netlink, Handshake-Überwachung, Events) |
 | `internal/wgconf` | Parser für WireGuard-Client-Konfigurationen (wg-quick-Format) |
 | `internal/federation` | Verbund: Rolle, Pufferung und Zustellung am Standort, Annahme und Standort-Verwaltung in der Zentrale; `federation/wire` = Protokoll |
+| `internal/agent` | Agent-Dienst: Installations-Tokens, Anmeldung, Long Poll, Inventar und Messwerte als Beobachtungen, Offline-Erkennung, Auslieferung der Builds; `agent/proto` = Protokoll |
+| `internal/hostscript` | feste Liste der Lesebefehle für das Linux-Inventar und Zerlegung ihrer Ausgabe (SSH-Inventar und Agent) |
 | `internal/dockercli` | Parser für `docker ps`/`docker images` (SSH-Inventar, Docker in Proxmox-LXCs) |
 | `internal/sshx`, `internal/execx`, `internal/netutil` | gemeinsame Helfer (SSH mit TOFU, Prozesse streamend, Adressen) |
 | `web/` | SvelteKit-Quellen (TypeScript, Tailwind) |
@@ -67,6 +70,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 |---|---|
 | System | `settings`, `users` (Rolle, deaktiviert, Passwort-Änderung offen, TOTP verschlüsselt), `roles` (Rechte als JSON-Liste, 2FA-Pflicht), `user_passkeys`, `user_recovery_codes` (Hash), `sessions`, `api_tokens`, `audit_log` |
 | Verbund | `sites` (Zentrale: Standorte mit Token-Hash, Stream, letzter Meldung und Status), `site_devices` (Geräte-ID am Standort → Gerät hier), `federation_outbox` (Standort: Puffer) |
+| Agents | `agent_enrollments` (Installations-Tokens als Hash, Tags, Nutzungen, Ablauf), `agents` (Host, Version, Secret-Hash, Gerät, letzter Kontakt, Inventar/Messwerte, volle Dateisysteme) |
 | Vault | `vault_meta` (Key-Prüfwert), `credentials` (öffentliche Felder + AES-GCM-Blob + Geltungsbereich `scope`) |
 | Plugins | `plugin_configs` (inkl. verschlüsselter Secret-Felder), `runs`, `run_logs` |
 | Netz | `subnets` (inkl. Erreichbarkeit `access` und Tunnel-Credential) |
@@ -173,6 +177,31 @@ Protokollversion: die Zentrale nimmt `wire.MinProtocol` bis `wire.Protocol` an (
 mit Hinweis, welche Seite zu aktualisieren ist); unbekannte Eintragsarten werden
 übersprungen.
 
+## NetScope-Agent
+
+Der Agent (`cmd/netscope-agent`, ein statisches Go-Binary für linux-amd64/arm64/armv7) wird
+mit dem Image gebaut und von der Instanz unter `/agent/bin/linux-<arch>` (+ `.sha256`)
+ausgeliefert; `/agent/install.sh` richtet ihn als Dienst eines eigenen Benutzers ein. Er
+verbindet sich nur nach außen (Protokoll `internal/agent/proto`, JSON mit gzip):
+
+| Aufruf | Zweck |
+|---|---|
+| `POST /api/v1/agent/enroll` | Installations-Token `nse_…` → Agent-ID und Secret `nsag_…` (nur der Hash wird gespeichert). Gleiche Machine-ID = gleicher Agent (Neuinstallation). |
+| `GET /api/v1/agent/poll?wait=50` | Long Poll: Einstellungen, „Inventar jetzt“ (Knopf/Plugin-Lauf weckt den Poll), Update-Angebot (Version ≠ Instanz, mit SHA-256) |
+| `POST /api/v1/agent/inventory` | Ausgabe der Lesebefehle aus `internal/hostscript`; die Instanz zerlegt sie mit dem Code des SSH-Inventars (`ssh.AgentObservation`) |
+| `POST /api/v1/agent/metrics` | Stichproben (CPU, RAM, Swap, Last, Dateisysteme, Netz) mit eigener Zeit; der Agent puffert bis zu einem Tag |
+
+Beobachtungen tragen die Quelle `agent` (Plugin `internal/plugins/agents` hält die
+Einstellungen). Das Gerät wird über die Referenz `agent/<machine-id>` (sonst
+`agent-<id>`, IDs werden nie wiederverwendet), die MACs der physischen Schnittstellen und die
+Adressen in bekannten Subnetzen gefunden – wie beim SSH-Inventar, damit gleiche private
+Adressen in fremden Netzen nichts zusammenführen. Messwerte werden Zeitreihen
+`host.cpu`, `host.mem`, `host.swap`, `host.load1`, `host.disk` (Key = Einhängepunkt),
+`host.net_rx`/`host.net_tx` (Key = Schnittstelle). Ein Monitor (alle 30 s) setzt Agents ohne
+Kontakt auf offline und das Gerät per `Power` offline, wenn keine andere Präsenzquelle es
+kennt. Beim Beenden weckt der Dienst alle wartenden Polls, damit der HTTP-Server sofort
+herunterfährt.
+
 ## Plugin-Interfaces
 
 Siehe `internal/plugin/plugin.go` und die Anleitung [PLUGINS.md](PLUGINS.md).
@@ -224,6 +253,10 @@ aktiv, Cron-Zeitplan, Timeout, Wiederholungen + Backoff, Parallelität, Scope
 | `tunnel.up` | Tunnel wieder verbunden | info | tunnel |
 | `site.down` | Standort meldet sich nicht | high | core (Zentrale) |
 | `site.up` | Standort meldet sich wieder | info | core (Zentrale) |
+| `agent.offline` | Agent meldet sich nicht | medium | agent |
+| `agent.online` | Agent meldet sich wieder | info | agent |
+| `disk.full` | Dateisystem fast voll | high | agent |
+| `disk.ok` | Dateisystem wieder unter der Schwelle | info | agent |
 
 Payload-Felder je Typ: `GET /api/v1/events/types` bzw. `internal/plugin/events.go`.
 
@@ -270,6 +303,7 @@ Prometheus-Metriken unter `/metrics`.
 | Geräte | `GET/POST /devices`, `GET/PATCH/DELETE /devices/{id}`, `POST /devices/bulk`, `POST /devices/merge`, `POST /devices/{id}/split`, `POST /devices/{id}/ips` / `DELETE /devices/{id}/ips/{ip}` (IP von Hand vergeben/entfernen), `POST /devices/{id}/scan`, `POST /devices/{id}/actions/{plugin}/{action}`, Tabs: `…/ports`, `…/http`, `…/certificates`, `…/packages`, `…/containers`, `…/inventory`, `…/cves`, `…/health`, `…/events`, `…/timeline`, `…/relations`, `…/observations`, `…/timeseries`, `…/credentials` (passende Zugangsdaten mit Rang und Grund); `GET /tags`, `GET /certificates` |
 | Stammdaten | `/subnets` (mit Tunnel-Zustand), `/groups` (+ `/members`), `/custom-fields`, `/views` (CRUD) |
 | Verbund | `GET/PUT /federation` (Rolle, Anbindung, Zustellstatus), `POST /federation/test`, `POST /federation/resync`, `/sites` (CRUD, Zentrale), `POST /sites/{id}/token`, `POST /federation/ingest` (nur Standort-Token); `site` als Parameter von `/devices`, `/events`, `/topology`, `/vulnerabilities`, `/dashboard`, `/reports/inventory` |
+| Agents | `GET /agents` (mit Builds und Basis-URL; Filter `device`), `GET/DELETE /agents/{id}`, `POST /agents/{id}/refresh`, `GET/POST /agent-enrollments`, `DELETE /agent-enrollments/{id}`; Agent-Protokoll unter `/agent/…` (siehe NetScope-Agent); Downloads `/agent/install.sh`, `/agent/bin/{platform}` |
 | Tunnel | `GET /tunnels` (Verfügbarkeit und Zustand), `POST /tunnels/inspect` (Konfiguration prüfen, nur öffentliche Angaben), `POST /tunnels/test` (Handshake-Test) |
 | Plugins | `GET /plugins`, `GET /plugins/{id}`, `PUT /plugins/{id}/config`, `POST /plugins/{id}/run`, `POST /plugins/{id}/actions/{action}` (`?wait=0` antwortet sofort mit der Lauf-ID), `POST /plugins/{id}/test`, `GET /runs` (Filter `plugin`, `status`, `kind`, `before`, `scope=full`), `GET /runs/active`, `GET /runs/{id}`, `GET /runs/{id}/logs?after=`, `POST /runs/{id}/cancel` |
 | Events | `GET /events`, `GET /events/{id}`, `POST /events/ack`, `GET /events/types`, `GET /events/counts`, `GET /diff` |

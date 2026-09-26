@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"netscope/internal/agent"
 	"netscope/internal/audit"
 	"netscope/internal/auth"
 	"netscope/internal/bus"
@@ -52,9 +53,11 @@ type Deps struct {
 	Tunnels   *tunnel.Manager // nil in tests without tunnels
 	// Federation joins this instance with a central instance or sites (nil in tests).
 	Federation *federation.Service
-	Audit      *audit.Log
-	Version    string
-	StartedAt  time.Time
+	// Agents manages NetScope agents (nil in tests without agents).
+	Agents    *agent.Service
+	Audit     *audit.Log
+	Version   string
+	StartedAt time.Time
 	// Restore is called with the path of a validated database file; the application
 	// swaps the database and restarts its services.
 	Restore func(path string)
@@ -123,6 +126,7 @@ func New(d Deps) *Server {
 	s.registerReports()
 	s.registerDashboard()
 	s.registerUsers()
+	s.registerAgents()
 	s.mux.HandleFunc("GET /api/v1/stream", s.withAuth(&route{Scope: scopeRead, handler: s.handleStream}))
 	s.mux.HandleFunc("GET /metrics", s.handleMetrics)
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)

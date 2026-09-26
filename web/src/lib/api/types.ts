@@ -24,6 +24,10 @@ export type PermissionInfo = G.AuthPermission;
 export type Passkey = G.AuthPasskey;
 export type MfaStatus = G.ApiMfaResponse;
 export type TotpSetup = G.AuthTOTPSetup;
+export type Agent = G.AgentAgent;
+export type AgentEnrollment = G.AgentEnrollment;
+export type AgentsResponse = G.ApiAgentsResponse;
+export type EnrollmentCreated = G.ApiEnrollmentCreated;
 export type Meta = G.ApiMetaResponse;
 export type DeviceAction = G.ApiDeviceAction;
 export type PluginShort = G.ApiPluginShort;
@@ -200,7 +204,7 @@ export interface CVEIgnoreRequest {
 // ---------------------------------------------------------------- SSE (/api/v1/stream)
 
 export type LiveTopic =
-	'run' | 'run.log' | 'device' | 'event' | 'plugin' | 'notification' | 'health' | 'system' | 'log';
+	'run' | 'run.log' | 'device' | 'event' | 'plugin' | 'notification' | 'health' | 'system' | 'log' | 'agent';
 
 /** One message of the live stream (event name = topic). */
 export interface LiveMessage<T = unknown> {

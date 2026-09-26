@@ -21,6 +21,7 @@ const (
 	TopicHealth       = "health"       // health check state changed
 	TopicSystem       = "system"       // system messages (backup, nvd sync ...)
 	TopicLog          = "log"          // application log line (log viewer)
+	TopicAgent        = "agent"        // NetScope agent enrolled/updated/removed
 )
 
 // Message is one bus message.

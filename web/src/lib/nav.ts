@@ -42,6 +42,7 @@ export const nav: NavSection[] = [
 		label: 'Konfiguration',
 		items: [
 			{ href: '/plugins', label: 'Plugins', icon: 'plugins' },
+			{ href: '/agents', label: 'Agents', icon: 'cpu' },
 			{ href: '/rules', label: 'Regeln', icon: 'rules' },
 			{ href: '/credentials', label: 'Credentials', icon: 'key', perm: 'credentials.view' },
 			{ href: '/reports', label: 'Reports', icon: 'reports' },

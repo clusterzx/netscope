@@ -40,6 +40,9 @@ type Config struct {
 	CentralURL         string `yaml:"-"`
 	CentralToken       string `yaml:"-"`
 	CentralFingerprint string `yaml:"-"`
+	// AgentDir holds the NetScope agent binaries the instance hands out
+	// (NETSCOPE_AGENT_DIR; built into the container image).
+	AgentDir string `yaml:"-"`
 }
 
 // Default returns the default configuration.
@@ -53,7 +56,8 @@ func Default() Config {
 		MasterKeyFile: "",
 		TrustedProxies: []string{"127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12",
 			"192.168.0.0/16", "fc00::/7"},
-		UI: true,
+		UI:       true,
+		AgentDir: "/usr/share/netscope/agent",
 	}
 }
 
@@ -126,6 +130,7 @@ func applyEnv(cfg *Config) {
 	str("NETSCOPE_CENTRAL_URL", &cfg.CentralURL)
 	str("NETSCOPE_CENTRAL_TOKEN", &cfg.CentralToken)
 	str("NETSCOPE_CENTRAL_FINGERPRINT", &cfg.CentralFingerprint)
+	str("NETSCOPE_AGENT_DIR", &cfg.AgentDir)
 	if v := strings.ToLower(strings.TrimSpace(os.Getenv("NETSCOPE_UI"))); v != "" {
 		cfg.UI = v != "false" && v != "0" && v != "no" && v != "off"
 	}

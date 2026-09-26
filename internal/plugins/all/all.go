@@ -2,6 +2,7 @@
 package all
 
 import (
+	_ "netscope/internal/plugins/agents"
 	_ "netscope/internal/plugins/arpscan"
 	_ "netscope/internal/plugins/cleanup"
 	_ "netscope/internal/plugins/csv"

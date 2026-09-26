@@ -685,7 +685,11 @@ func (g *ingest) applyMetrics() error {
 		if err != nil {
 			return err
 		}
-		if err := timeseries.Append(g.ctx, g.tx, id, g.now, m.Min, m.Avg, m.Max); err != nil {
+		at := g.now
+		if !m.At.IsZero() && m.At.Before(g.now.Add(time.Minute)) {
+			at = m.At
+		}
+		if err := timeseries.Append(g.ctx, g.tx, id, at, m.Min, m.Avg, m.Max); err != nil {
 			return err
 		}
 	}

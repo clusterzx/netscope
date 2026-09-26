@@ -397,3 +397,35 @@ func (r *Result) observation(devID int64, ip, user string, subnets []netip.Prefi
 	}
 	return obs
 }
+
+// AgentObservation turns the output of the collection script a NetScope agent ran on its
+// own host into an observation. The agent reports from inside the host, so the device is
+// identified by its interfaces: MAC addresses of the physical interfaces with a global
+// address and the addresses in known subnets (like the SSH inventory). sections is 0 when
+// the output contains no sections at all.
+func AgentObservation(stdout, stderr []byte, truncated bool, subnets []netip.Prefix) (obs *plugin.Observation, sections int) {
+	r := parseResult(stdout, stderr, truncated)
+	obs = r.observation(0, "", "", subnets, string(stdout))
+	obs.MACs = hostMACs(r.Inventory.Interfaces)
+	return obs, r.Sections
+}
+
+// hostMACs returns the MAC addresses of the physical interfaces with a global address.
+func hostMACs(ifs []Interface) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, ifc := range ifs {
+		if ifc.MAC == "" || isVirtualInterface(ifc.Name) || seen[ifc.MAC] {
+			continue
+		}
+		for _, a := range ifc.Addresses {
+			addr, err := netip.ParseAddr(a.Address)
+			if err == nil && addr.Unmap().IsGlobalUnicast() && (a.Scope == "" || a.Scope == "global") {
+				seen[ifc.MAC] = true
+				out = append(out, ifc.MAC)
+				break
+			}
+		}
+	}
+	return out
+}

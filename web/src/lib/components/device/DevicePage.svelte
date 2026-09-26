@@ -8,7 +8,14 @@
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { api, ApiError } from '$lib/api';
-	import type { DeviceAction, DeviceDetail, DeviceMessageData, EventMessageData, RunView } from '$lib/api';
+	import type {
+		Agent,
+		DeviceAction,
+		DeviceDetail,
+		DeviceMessageData,
+		EventMessageData,
+		RunView
+	} from '$lib/api';
 	import ActionParamsDialog from '$lib/components/devices/ActionParamsDialog.svelte';
 	import { outcomeToast } from '$lib/components/devices/actions';
 	import {
@@ -45,6 +52,7 @@
 		stateTone
 	} from '$lib/utils/labels';
 	import { debounce, setParams } from '$lib/utils/url';
+	import AgentUsage from './AgentUsage.svelte';
 	import CertificatesTab from './CertificatesTab.svelte';
 	import ContainersTab from './ContainersTab.svelte';
 	import CvesTab from './CvesTab.svelte';
@@ -148,6 +156,19 @@
 	}
 
 	const counts = $derived(d?.counts ?? {});
+
+	// NetScope agent of this device (tab "Auslastung")
+	const agentData = new AsyncData<Agent | null>();
+	$effect(() => {
+		if (!validId) return;
+		void version; // reload after live updates of the device
+		agentData.run(async (signal) => {
+			const r = await api.get('/api/v1/agents', { query: { device: id }, signal });
+			return r.agents?.[0] ?? null;
+		});
+	});
+	$effect(() => live.on<{ id: number }>('agent', () => agentData.reload()));
+	const agent = $derived(agentData.data ?? null);
 	const tabs = $derived<TabItem[]>([
 		{ id: 'overview', label: 'Überblick' },
 		{ id: 'ports', label: 'Ports & Dienste', count: counts.ports ?? null },
@@ -156,6 +177,7 @@
 		{ id: 'certificates', label: 'Zertifikate', count: counts.certificates ?? null },
 		{ id: 'cves', label: 'CVEs', count: counts.cves ?? null },
 		{ id: 'health', label: 'Health', count: counts.health ?? null },
+		...(agent ? [{ id: 'usage', label: 'Auslastung' }] : []),
 		{ id: 'history', label: 'Historie', count: counts.events ?? null },
 		{ id: 'relations', label: 'Beziehungen', count: counts.relations ?? null },
 		{ id: 'raw', label: 'Rohdaten' }
@@ -498,6 +520,8 @@
 							active={tab === 'health'}
 							oncreate={site ? undefined : () => (healthOpen = true)}
 						/>
+					{:else if t.id === 'usage' && agent}
+						<AgentUsage deviceId={id} {agent} {version} active={tab === 'usage'} />
 					{:else if t.id === 'history'}
 						<HistoryTab deviceId={id} {version} active={tab === 'history'} />
 					{:else if t.id === 'relations'}

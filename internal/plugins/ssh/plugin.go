@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"netscope/internal/hostscript"
 	"netscope/internal/plugin"
 	"netscope/internal/sshx"
 )
@@ -119,10 +120,9 @@ func loadConfig(s plugin.Settings, dataDir string) config {
 	return c
 }
 
-// scriptTimeout bounds one script run: every command is limited by timeout(1) on the
-// host; this is the safety net when timeout(1) does not exist.
+// scriptTimeout bounds one script run (see hostscript.MaxDuration).
 func (c config) scriptTimeout() time.Duration {
-	return c.commandTimeout * time.Duration(len(commands)+2)
+	return hostscript.MaxDuration(c.commandTimeout)
 }
 
 type target struct {

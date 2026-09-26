@@ -49,6 +49,9 @@
   TLS (Zertifikate, schwache Protokolle/Cipher), SNMP (inkl. FDB/LLDP), SSH-Inventar
   (Pakete, Dienste, Sockets, Docker), Wake-on-LAN.
 - **Importer:** Proxmox VE, OpenWrt/GL.iNet (DHCP), Docker, NetAlertX, CSV.
+- **NetScope-Agent:** ein Befehl auf einem Linux-System, und es liefert Inventar (wie per SSH)
+  und Auslastung (CPU, RAM, Platten, Netz) von sich aus – ohne SSH-Zugang, auch hinter NAT;
+  aktualisiert sich selbst.
 - **Entfernte Netze:** Subnetze hinter Routern oder über einen eigenen WireGuard-Tunnel von
   NetScope (z. B. ins Rechenzentrum) – Konfiguration hochladen, fertig.
 - **Mehrere Standorte:** In jedem Netz eine eigene NetScope-Instanz, die an eine Zentrale
@@ -162,6 +165,7 @@ andere wird in der Oberfläche gepflegt. Jeder Wert ist per Umgebungsvariable ü
 | `ui` | `NETSCOPE_UI` | `true`; `false` = nur API (Standort als reiner Sammler) |
 | – | `NETSCOPE_CENTRAL_URL`, `NETSCOPE_CENTRAL_TOKEN` | Standort: Zentrale und Token (legen die Anbindung fest, siehe [Mehrere Standorte](#mehrere-standorte-verbund)) |
 | – | `NETSCOPE_CENTRAL_FINGERPRINT` | Standort: SHA-256 des Zertifikats der Zentrale (optional, für selbst signierte Zertifikate) |
+| – | `NETSCOPE_AGENT_DIR` | `/usr/share/netscope/agent` – Agent-Builds, die die Instanz ausliefert (im Image enthalten) |
 
 ## Plugins
 
@@ -195,6 +199,7 @@ sofort, ohne Neustart.
 | `snmp` | Scanner | aus | v2c/v3: System, Interfaces, ARP, Bridge-FDB, LLDP (für die Topologie) |
 | `ssh` | Scanner | aus | Linux-Inventar: OS, Kernel, CPU/RAM/Disks, Pakete, Dienste, Sockets, Docker, Uptime, Updates – nur feste Lesekommandos; abweichende SSH-Ports je Adresse/Netz oder aus dem Portscan |
 | `wol` | Aktion | – | Wake-on-LAN pro Gerät bzw. als Massenaktion |
+| `agent` | Importer | laufend | Einstellungen der NetScope-Agents: Inventar- und Messintervall, Pakete/Docker, Schwelle „Dateisystem fast voll“, Zeit bis „Agent meldet sich nicht“; manueller Lauf fordert bei allen Agents ein Inventar an |
 | `proxmox` | Importer | aus | VMs/CTs mit VMID, Status, MACs, Ressourcen, Node; verknüpft VM ↔ Gerät („läuft auf Node X“); Online-Status aus Proxmox für Gäste, die kein Scanner erreicht (Event nur bei Autostart); mehrere Hosts/Cluster; optional Docker-Container in LXCs |
 | `openwrt` | Importer | aus | DHCP-Leases und statische Leases (SSH oder LuCI-RPC), mehrere Router |
 | `docker` | Importer | aus | Container, Images, Ports, Compose-Projekte (lokaler Socket, TCP oder SSH-Tunnel) |
@@ -269,6 +274,43 @@ weiterleiten – egal, was NetScope sendet, der Node führt nur das Skript aus. 
 SSH-Credential (Benutzer `root`, privater Schlüssel) anlegen und unter „Gilt für“ den
 Proxmox-Node wählen. Ohne Forced Command funktioniert es auch mit einem normalen root-Zugang;
 NetScope schickt dann dasselbe Skript als Befehl mit.
+
+## NetScope-Agent
+
+Statt per SSH abzufragen, kann ein Linux-System den **NetScope-Agent** installieren. Er
+verbindet sich von sich aus mit NetScope (auch hinter NAT und Firewalls, ohne SSH-Zugang und
+ohne Zugangsdaten in NetScope) und liefert:
+
+- das **Inventar** wie das SSH-Inventar – dieselbe feste Liste von Lesebefehlen: OS, Kernel,
+  CPU/RAM/Platten, Pakete (für den CVE-Abgleich), Dienste, offene Ports, Docker, Updates;
+  standardmäßig stündlich und auf Knopfdruck,
+- die **Auslastung**: CPU, Arbeitsspeicher, Swap, Last, Belegung je Dateisystem und
+  Durchsatz je Netzwerkschnittstelle – als Verläufe im Tab **Auslastung** des Geräts.
+
+**Installieren:** Unter **Agents → Agent installieren** entsteht ein Befehl mit einem
+Installations-Token (gültig z. B. 30 Tage, für beliebig viele oder eine festgelegte Anzahl
+Systeme, optional mit Tags für die Geräte). Auf dem System als root ausführen:
+
+```bash
+curl -fsSL http://192.168.8.123:8080/agent/install.sh | sudo sh -s -- --token nse_…
+```
+
+Das Skript lädt den Agent von der Instanz (amd64, arm64, armv7), prüft die Prüfsumme, legt den
+Benutzer `netscope-agent` an und richtet einen systemd- bzw. OpenRC-Dienst ein. `--docker`
+nimmt den Agent in die Gruppe `docker` auf, damit er Container sieht – das entspricht
+root-Rechten auf dem System. Entfernen: dasselbe Skript mit `--uninstall`.
+
+**Betrieb:** Der Agent läuft ohne root, führt nur die festen Lesebefehle aus und nimmt von
+NetScope nichts entgegen außer „jetzt Inventar liefern“, seinen Einstellungen und einer neuen
+Version von sich selbst: Nach einem NetScope-Update holt er die passende Version von der
+Instanz, prüft die SHA-256-Prüfsumme und startet neu. Meldet sich ein Agent länger nicht
+(Standard 5 Minuten), entsteht das Event „Agent meldet sich nicht“; scannt kein anderer
+Scanner das Gerät, geht es offline. Ein Dateisystem über der Schwelle (Standard 90 %) löst
+„Dateisystem fast voll“ aus. Einstellungen im Plugin **NetScope-Agent**.
+
+Agents melden sich bei der Instanz an, deren Befehl sie ausführen – im Verbund also am
+Standort, der die Daten wie alles andere an die Zentrale liefert. Wird ein Agent in NetScope
+entfernt, beendet sich sein Dienst beim nächsten Kontakt; das Gerät bleibt.
 
 ## Entfernte Netze (Router, WireGuard)
 
@@ -449,10 +491,10 @@ legt fest, was jemand ändern darf:
 |---|---|
 | Inventar | Geräte bearbeiten · Geräte löschen und zusammenführen · Scans starten · Geräteaktionen (z. B. Wake-on-LAN) · Gruppen, Felder und Ansichten |
 | Überwachung | Events quittieren · Health-Checks verwalten · Schwachstellen bewerten · Regeln verwalten · Berichte versenden |
-| Konfiguration | Plugins konfigurieren* · Credentials einsehen · Credentials verwalten* · Subnetze und Tunnel* · Verbund und Standorte* |
-| System | Systemeinstellungen* · Backups* · Audit-Log und Server-Protokoll · eigene API-Tokens · Benutzer und Rollen* |
+| Konfiguration | Plugins konfigurieren\* · Credentials einsehen · Credentials verwalten\* · Subnetze und Tunnel\* · Verbund und Standorte\* · Agents verwalten |
+| System | Systemeinstellungen\* · Backups\* · Audit-Log und Server-Protokoll · eigene API-Tokens · Benutzer und Rollen\* |
 
-Die mit * markierten Rechte sind kritisch: Plugins nutzen die Credentials aus dem Vault, ein
+Die mit \* markierten Rechte sind kritisch: Plugins nutzen die Credentials aus dem Vault, ein
 Backup enthält alle Daten, und wer Benutzer verwalten darf, kann sich jedes Recht geben.
 Vorgegeben sind *Administrator* (immer alle Rechte, auch künftige), *Bearbeiter* und
 *Betrachter*; die beiden letzten lassen sich anpassen. Mindestens ein aktiver Administrator
@@ -546,6 +588,12 @@ Die Grafiken in diesem README (`docs/assets/*.svg`, hell und dunkel) erzeugt
   dem Host.
 - WireGuard-Tunnel führen keine Befehle aus der Konfiguration aus und leiten nur die
   zugeordneten Subnetze um; ihre Interfaces (`nswg<ID>`) räumt NetScope beim Beenden auf.
+- NetScope-Agents laufen als eigener Benutzer ohne root und führen nur feste Lesebefehle
+  aus. Installations-Tokens (`nse_…`) und die Secrets der Agents (`nsag_…`) speichert NetScope
+  nur als Hash; beide gelten nur für die Agent-Schnittstelle. Automatische Updates bedeuten:
+  Wer die NetScope-Instanz kontrolliert, kann den Agents neuen Code geben – mit den Rechten
+  des Benutzers `netscope-agent` (mit `--docker` faktisch root). Ohne HTTPS laufen Befehl
+  und Agent-Download unverschlüsselt durchs Netz.
 - Standort-Tokens (`nss_…`) gelten nur für das Einliefern bei der Zentrale, nie für die
   übrige API; die Zentrale speichert nur ihren Hash, der Standort das Token verschlüsselt.
   Zugangsdaten eines Standorts verlassen ihn nie, und die Zentrale kann am Standort nichts

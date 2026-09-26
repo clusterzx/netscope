@@ -6,6 +6,45 @@ kann.
 
 ---
 
+## FR-004: NetScope-Agent für überwachte Systeme
+
+**Status:** umgesetzt am 26.09.2026 · erfasst am 25.09.2026 – Bedienung im README
+(„NetScope-Agent“), Technik in ARCHITECTURE („NetScope-Agent“)
+
+### Anlass
+
+Linux-Systeme lassen sich bisher nur per SSH inventarisieren: NetScope braucht dafür Zugang,
+Zugangsdaten und Erreichbarkeit (keine NAT, passende Ports). Gewünscht: ein Befehl auf dem
+System, danach meldet es sich von selbst bei NetScope und lässt sich darüber abfragen.
+
+### Festgelegt
+
+| Frage | Entscheidung |
+|---|---|
+| Plattformen | **Linux** (amd64, arm64, armv7): VMs, LXCs, Server, Raspberry Pis. |
+| Umfang | **Inventar wie per SSH und Auslastung** (CPU, RAM, Platten, Netz) als Verläufe, mit Events für volle Dateisysteme. |
+| Darf NetScope etwas ausführen? | **Nein, nur lesen.** Einzige Anstöße: „jetzt Inventar liefern“ und neue Einstellungen. |
+| Updates | **Automatisch** von der Instanz, geprüft per SHA-256. |
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Gleiche Erfassung wie SSH:** Die feste Befehlsliste liegt in `internal/hostscript`; der Agent
+  führt sie lokal aus und schickt die Ausgabe, NetScope zerlegt sie mit dem Code des
+  SSH-Inventars. Dadurch bleibt der Agent klein (~6 MB) und beide Wege liefern dasselbe.
+- **Ohne root:** Der Agent läuft als Benutzer `netscope-agent`; ohne root fehlen nur die
+  Prozessnamen fremder Benutzer an offenen Ports. Docker nur mit `--docker` (Gruppe docker).
+- **Updates vs. „nur lesen“:** Automatische Updates geben der Instanz die Möglichkeit, neuen
+  Code auf die Systeme zu bringen – begrenzt auf die Rechte von `netscope-agent`. Das ist im
+  README unter Sicherheit beschrieben.
+- **Verbindung:** Long Poll statt dauerhafter WebSocket-Verbindung – funktioniert durch
+  Proxys, „Inventar jetzt“ kommt trotzdem sofort an.
+- **Installations-Tokens** mit Ablauf, Nutzungszahl und Tags; bereits installierte Agents
+  laufen nach dem Widerruf weiter. Entfernen in NetScope beendet den Dienst beim nächsten
+  Kontakt (Exit-Code 3, systemd startet ihn nicht neu).
+- **Nicht umgesetzt:** Windows-Agent, beliebige Befehle oder Aktionen über den Agent.
+
+---
+
 ## FR-003: Mehrere Benutzer mit Rollen und Zwei-Faktor-Anmeldung
 
 **Status:** umgesetzt am 25.09.2026 · erfasst am 25.09.2026 – Bedienung im README

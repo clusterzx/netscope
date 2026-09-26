@@ -13,6 +13,7 @@ export const DEVICE_TABS = [
 	'certificates',
 	'cves',
 	'health',
+	'usage',
 	'history',
 	'relations',
 	'raw'

@@ -19,7 +19,8 @@ export const LIVE_TOPICS: LiveTopic[] = [
 	'notification',
 	'health',
 	'system',
-	'log'
+	'log',
+	'agent'
 ];
 
 export type LiveStatus = 'idle' | 'connecting' | 'open' | 'reconnecting';

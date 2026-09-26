@@ -246,6 +246,9 @@ type Metric struct {
 	Min  float64 `json:"min"`
 	Avg  float64 `json:"avg"`
 	Max  float64 `json:"max"`
+	// At is the time of the measurement (zero = when the observation is stored); agents
+	// deliver buffered samples with their own time.
+	At time.Time `json:"at,omitzero"`
 }
 
 // Relation kinds.

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"netscope/internal/agent"
 	"netscope/internal/api"
 	"netscope/internal/audit"
 	"netscope/internal/auth"
@@ -44,6 +45,7 @@ type services struct {
 	rules   *rules.Engine
 	tunnels *tunnel.Manager
 	fed     *federation.Service
+	agents  *agent.Service
 	srv     *http.Server
 }
 
@@ -153,13 +155,15 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	if err != nil {
 		return fail(err)
 	}
+	agents := agent.New(agent.Deps{DB: d, Bus: b, Log: log.With("component", "agent"), Inventory: inv, Events: ev, Host: host,
+		BinDir: cfg.AgentDir, Version: version})
 	ui := webui.Handler()
 	if !cfg.UI {
 		ui = headless()
 		log.Info("Weboberfläche abgeschaltet (NETSCOPE_UI=false) – nur die API ist erreichbar")
 	}
 	server := api.New(api.Deps{Config: cfg, DB: d, Bus: b, Log: log, Logs: ring, LevelVar: level, Auth: authSvc, Vault: v, Settings: st,
-		Inventory: inv, Events: ev, Rules: engine, Host: host, Tunnels: tunnels, Federation: fed, Audit: audit.New(d), Version: version, StartedAt: started,
+		Inventory: inv, Events: ev, Rules: engine, Host: host, Tunnels: tunnels, Federation: fed, Agents: agents, Audit: audit.New(d), Version: version, StartedAt: started,
 		Restore: func(path string) {
 			select {
 			case restore <- path:
@@ -172,6 +176,7 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	host.Start(ctx)
 	engine.Start(ctx)
 	fed.Start(ctx)
+	agents.Start(ctx)
 	if role := fed.Role(); role != federation.RoleStandalone {
 		log.Info("Verbund aktiv", "role", role)
 	}
@@ -197,17 +202,21 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	}()
 	select {
 	case err := <-errCh:
-		stop(&services{db: d, host: host, rules: engine, tunnels: tunnels, fed: fed}, log)
+		stop(&services{db: d, host: host, rules: engine, tunnels: tunnels, fed: fed, agents: agents}, log)
 		return nil, fmt.Errorf("HTTP-Server: %w", err)
 	case <-time.After(200 * time.Millisecond):
 	}
 	log.Info("NetScope bereit", "listen", cfg.Listen, "plugins", len(host.IDs()))
-	return &services{db: d, host: host, rules: engine, tunnels: tunnels, fed: fed, srv: srv}, nil
+	return &services{db: d, host: host, rules: engine, tunnels: tunnels, fed: fed, agents: agents, srv: srv}, nil
 }
 
 // stop shuts down in order: HTTP, rule engine, plugins (running runs are cancelled),
 // database (WAL checkpoint).
 func stop(s *services, log *slog.Logger) {
+	// ends the long polls of the agents, so the HTTP server can shut down at once
+	if s.agents != nil {
+		s.agents.Stop()
+	}
 	if s.srv != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		if err := s.srv.Shutdown(ctx); err != nil {

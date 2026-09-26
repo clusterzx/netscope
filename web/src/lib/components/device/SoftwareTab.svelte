@@ -146,7 +146,7 @@
 					{#if isOpen}
 						{#if rawView[src]}
 							<JsonView value={entry.data} openDepth={2} />
-						{:else if src === 'ssh' && entry.data && typeof entry.data === 'object'}
+						{:else if (src === 'ssh' || src === 'agent') && entry.data && typeof entry.data === 'object'}
 							<SshInventory data={entry.data} />
 						{:else}
 							<GenericData value={entry.data} />
