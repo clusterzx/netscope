@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -170,8 +171,13 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 			default:
 			}
 		}, UI: ui})
+	// Shutdown does not cancel running requests; the event streams of open browser tabs
+	// would keep it waiting until its timeout, so their context ends when it starts.
+	reqCtx, endRequests := context.WithCancel(context.Background())
 	srv := &http.Server{Addr: cfg.Listen, Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second,
-		ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
+		ErrorLog:    slog.NewLogLogger(log.Handler(), slog.LevelWarn),
+		BaseContext: func(net.Listener) context.Context { return reqCtx }}
+	srv.RegisterOnShutdown(endRequests)
 	tunnels.Start(ctx)
 	host.Start(ctx)
 	engine.Start(ctx)
