@@ -129,4 +129,16 @@ func TestNVDMovedFromMainDatabase(t *testing.T) {
 	if idx != 1 {
 		t.Fatal("index of the matcher missing")
 	}
+	// the move leaves no grown WAL behind, and later WALs shrink after checkpoints
+	for _, p := range []string{path + "-wal", NVDPath(path) + "-wal"} {
+		if st, err := os.Stat(p); err == nil && st.Size() > 0 {
+			t.Fatalf("%s: %d bytes after the move", filepath.Base(p), st.Size())
+		}
+	}
+	for _, schema := range []string{"main", "nvd"} {
+		var limit int64
+		if err := d.W.QueryRow("PRAGMA " + schema + ".journal_size_limit").Scan(&limit); err != nil || limit != walLimit {
+			t.Fatalf("%s.journal_size_limit = %d %v", schema, limit, err)
+		}
+	}
 }

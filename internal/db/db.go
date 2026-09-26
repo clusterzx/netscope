@@ -72,6 +72,8 @@ func dsn(path string, readOnly bool) string {
 	q.Add("_pragma", "busy_timeout(15000)")
 	q.Add("_pragma", "journal_mode(WAL)")
 	q.Add("_pragma", "synchronous(NORMAL)")
+	// a WAL keeps the size of its largest transaction unless truncated when it restarts
+	q.Add("_pragma", fmt.Sprintf("journal_size_limit(%d)", walLimit))
 	q.Add("_pragma", "foreign_keys(1)")
 	q.Add("_pragma", "temp_store(MEMORY)")
 	q.Add("_pragma", "cache_size(-16000)")

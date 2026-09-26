@@ -22,6 +22,9 @@ import (
 // tables (the CVE plugin downloads the mirror again).
 const nvdVersion = 1
 
+// walLimit is the size a WAL is truncated to when it restarts after a checkpoint.
+const walLimit = 64 << 20
+
 // nvdTables in the order they are moved and dropped.
 var nvdTables = []string{"nvd_cves", "nvd_cpe_matches", "nvd_feeds"}
 
@@ -105,7 +108,8 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, fmt.Errorf("NVD-Spiegel %s anhängen: %w", c.nvd, err)
 	}
 	if !c.readOnly {
-		for _, q := range []string{"PRAGMA nvd.journal_mode=WAL", "PRAGMA nvd.synchronous=NORMAL"} {
+		for _, q := range []string{"PRAGMA nvd.journal_mode=WAL", "PRAGMA nvd.synchronous=NORMAL",
+			fmt.Sprintf("PRAGMA nvd.journal_size_limit=%d", walLimit)} {
 			if _, err := ex.ExecContext(ctx, q, nil); err != nil {
 				_ = conn.Close()
 				return nil, fmt.Errorf("NVD-Spiegel: %w", err)
@@ -145,8 +149,16 @@ func (d *DB) ensureNVD(ctx context.Context) error {
 	if _, err := d.W.ExecContext(ctx, nvdIndexSQL); err != nil {
 		return fmt.Errorf("NVD-Indizes: %w", err)
 	}
-	_, err := d.W.ExecContext(ctx, fmt.Sprintf("PRAGMA nvd.user_version = %d", nvdVersion))
-	return err
+	if _, err := d.W.ExecContext(ctx, fmt.Sprintf("PRAGMA nvd.user_version = %d", nvdVersion)); err != nil {
+		return err
+	}
+	if inMain > 0 {
+		// the move went through both WALs (copy, index build, VACUUM): give that space back
+		if _, err := d.W.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+			return fmt.Errorf("wal checkpoint: %w", err)
+		}
+	}
+	return nil
 }
 
 // moveNVD copies the mirror tables of the main database into the mirror file (unless it
