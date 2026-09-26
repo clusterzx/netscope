@@ -56,6 +56,12 @@ func Open(ctx context.Context, path string) (*DB, error) {
 		w.Close()
 		return nil, err
 	}
+	// Nobody reads yet, so this always shrinks the WALs: one left behind by an unclean
+	// shutdown keeps its size, and the NVD move or a migration may have grown them.
+	if _, err := w.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		w.Close()
+		return nil, fmt.Errorf("wal checkpoint: %w", err)
+	}
 	r := sql.OpenDB(&connector{dsn: dsn(path, true), nvd: nvd, readOnly: true})
 	n := runtime.NumCPU()
 	if n < 4 {

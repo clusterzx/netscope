@@ -149,16 +149,8 @@ func (d *DB) ensureNVD(ctx context.Context) error {
 	if _, err := d.W.ExecContext(ctx, nvdIndexSQL); err != nil {
 		return fmt.Errorf("NVD-Indizes: %w", err)
 	}
-	if _, err := d.W.ExecContext(ctx, fmt.Sprintf("PRAGMA nvd.user_version = %d", nvdVersion)); err != nil {
-		return err
-	}
-	if inMain > 0 {
-		// the move went through both WALs (copy, index build, VACUUM): give that space back
-		if _, err := d.W.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
-			return fmt.Errorf("wal checkpoint: %w", err)
-		}
-	}
-	return nil
+	_, err := d.W.ExecContext(ctx, fmt.Sprintf("PRAGMA nvd.user_version = %d", nvdVersion))
+	return err
 }
 
 // moveNVD copies the mirror tables of the main database into the mirror file (unless it

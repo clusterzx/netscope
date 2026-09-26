@@ -83,6 +83,44 @@ func TestNVDInOwnFile(t *testing.T) {
 	d.Close()
 }
 
+func walSize(p string) int64 {
+	st, err := os.Stat(p + "-wal")
+	if err != nil {
+		return 0
+	}
+	return st.Size()
+}
+
+// A process killed before Close leaves its WALs at full size; the next start shrinks them.
+func TestWALTruncatedOnOpen(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "netscope.db")
+	killed, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer killed.Close()
+	if _, err := killed.W.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2000)
+		INSERT INTO nvd_cves(id, description) SELECT 'CVE-2024-' || i, printf('%.4000c', 'x') FROM n`); err != nil {
+		t.Fatal(err)
+	}
+	if s := walSize(NVDPath(path)); s < 4<<20 {
+		t.Fatalf("mirror WAL only %d bytes, test does not grow it", s)
+	}
+	d, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	if s, m := walSize(NVDPath(path)), walSize(path); s != 0 || m != 0 {
+		t.Fatalf("WALs after start: mirror %d, main %d bytes", s, m)
+	}
+	var n int
+	if err := d.R.QueryRow("SELECT COUNT(*) FROM nvd_cves").Scan(&n); err != nil || n != 2000 {
+		t.Fatalf("mirror after start: %d %v", n, err)
+	}
+}
+
 func TestNVDMovedFromMainDatabase(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "netscope.db")
