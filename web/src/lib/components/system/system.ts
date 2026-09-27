@@ -47,6 +47,13 @@ export const SYSTEM_TABS: SystemTab[] = [
 		description: 'Welche Rechte eine Rolle hat und ob sie 2FA verlangt',
 		perm: 'users.manage'
 	},
+	{
+		id: 'auth',
+		label: 'Anmeldung',
+		icon: 'lock',
+		description: 'Zentrale Anmeldung über OIDC (SSO) und LDAP / Active Directory',
+		perm: 'users.manage'
+	},
 	{ id: 'tokens', label: 'API-Tokens', icon: 'key', description: 'Tokens für Skripte und Automatisierung' },
 	{
 		id: 'subnets',

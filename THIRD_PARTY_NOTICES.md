@@ -30,8 +30,11 @@ Paketquellen von Alpine Linux installiert.
 | Komponente | Version | Lizenz | Enthalten in |
 |---|---|---|---|
 | Go-Standardbibliothek | go1.26.1 | BSD-3-Clause | Server, Agent |
+| github.com/Azure/go-ntlmssp | v0.1.1 | MIT | Server |
 | github.com/dustin/go-humanize | v1.0.1 | MIT | Server |
 | github.com/fxamacker/cbor/v2 | v2.9.4 | MIT | Server |
+| github.com/go-asn1-ber/asn1-ber | v1.5.8 | MIT | Server |
+| github.com/go-ldap/ldap/v3 | v3.4.14 | MIT | Server |
 | github.com/go-pdf/fpdf | v0.9.0 | MIT | Server |
 | github.com/go-viper/mapstructure/v2 | v2.5.0 | MIT | Server |
 | github.com/go-webauthn/webauthn | v0.18.2 | BSD-3-Clause | Server |
@@ -109,6 +112,32 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+### github.com/Azure/go-ntlmssp v0.1.1
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2016 Microsoft
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### github.com/dustin/go-humanize v1.0.1
 
 ```text
@@ -141,6 +170,60 @@ SOFTWARE.
 MIT License
 
 Copyright (c) 2019-present Faye Amacker
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### github.com/go-asn1-ber/asn1-ber v1.5.8
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2011-2015 Michael Mitton (mmitton@gmail.com)
+Portions copyright (c) 2015-2016 go-asn1-ber Authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### github.com/go-ldap/ldap/v3 v3.4.14
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2011-2015 Michael Mitton (mmitton@gmail.com)
+Portions copyright (c) 2015-2024 go-ldap Authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

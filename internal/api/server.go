@@ -111,6 +111,7 @@ type route struct {
 func New(d Deps) *Server {
 	s := &Server{Deps: d, mux: http.NewServeMux(), start: time.Now()}
 	s.registerAuth()
+	s.registerExternalAuth()
 	s.registerSystem()
 	s.registerDevices()
 	s.registerMeta()
@@ -442,6 +443,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusUnauthorized, "challenge_expired", err.Error(), nil)
 	case errors.Is(err, auth.ErrAccountDisabled):
 		writeError(w, http.StatusForbidden, "account_disabled", err.Error(), nil)
+	case errors.Is(err, auth.ErrNoRole):
+		writeError(w, http.StatusForbidden, "no_role", err.Error(), nil)
 	case errors.Is(err, auth.ErrRateLimited):
 		writeError(w, http.StatusTooManyRequests, "rate_limited", err.Error(), nil)
 	case errors.Is(err, auth.ErrUnauthenticated):

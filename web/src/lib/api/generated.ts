@@ -267,6 +267,12 @@ export interface ApiEventList {
 	total: number;
 }
 
+export interface ApiExternalAuthResponse {
+	ldap: AuthLDAPConfig;
+	oidc: AuthOIDCConfig;
+	redirectUrl: string;
+}
+
 export interface ApiFederationView {
 	localName: string;
 	protocol: number;
@@ -314,6 +320,18 @@ export interface ApiIgnoreRequest {
 
 export interface ApiIpRequest {
 	ip: string;
+}
+
+export interface ApiLdapSaveRequest {
+	bindPassword?: string;
+	config: AuthLDAPConfig;
+}
+
+export interface ApiLdapTestRequest {
+	bindPassword?: string;
+	config: AuthLDAPConfig;
+	password?: string;
+	username?: string;
 }
 
 export interface ApiLogLevelRequest {
@@ -374,6 +392,15 @@ export interface ApiMfaResponse {
 export interface ApiNotificationList {
 	items: RulesNotificationView[];
 	total: number;
+}
+
+export interface ApiOidcSaveRequest {
+	clientSecret?: string;
+	config: AuthOIDCConfig;
+}
+
+export interface ApiOidcTestRequest {
+	config: AuthOIDCConfig;
 }
 
 export interface ApiOkResponse {
@@ -628,6 +655,66 @@ export interface AuditEntry {
 	ts: string;
 }
 
+export interface AuthLDAPConfig {
+	baseDn: string;
+	bindDn: string;
+	ca?: string;
+	defaultRoleId: number;
+	displayNameAttr: string;
+	emailAttr: string;
+	enabled: boolean;
+	groupAttr: string;
+	groupBaseDn: string;
+	groupFilter: string;
+	hasPassword: boolean;
+	insecureSkipVerify: boolean;
+	mappings: AuthRoleMapping[];
+	startTls: boolean;
+	syncRole: boolean;
+	url: string;
+	userFilter: string;
+	usernameAttr: string;
+}
+
+export interface AuthLDAPTest {
+	displayName?: string;
+	dn?: string;
+	email?: string;
+	groups?: string[];
+	ok: boolean;
+	roleId: number;
+	steps: AuthTestStep[];
+	username?: string;
+}
+
+export interface AuthOIDCConfig {
+	ca?: string;
+	clientId: string;
+	defaultRoleId: number;
+	enabled: boolean;
+	groupsClaim: string;
+	hasSecret: boolean;
+	insecureSkipVerify: boolean;
+	issuer: string;
+	mappings: AuthRoleMapping[];
+	name: string;
+	redirectUrl?: string;
+	scopes: string[];
+	syncRole: boolean;
+	usernameClaim: string;
+}
+
+export interface AuthOIDCTest {
+	authorizationEndpoint?: string;
+	keys: number;
+	ok: boolean;
+	signingAlgorithms?: string[];
+	steps: AuthTestStep[];
+	tokenEndpoint?: string;
+	tokenEndpointAuthMethods?: string[];
+	userinfoEndpoint?: string;
+}
+
 export interface AuthPasskey {
 	createdAt: string;
 	id: number;
@@ -660,6 +747,12 @@ export interface AuthPrincipal {
 	username: string;
 }
 
+export interface AuthProviders {
+	ldap: boolean;
+	oidc: boolean;
+	oidcName?: string;
+}
+
 export interface AuthRole {
 	admin: boolean;
 	createdAt: string;
@@ -679,10 +772,21 @@ export interface AuthRoleInput {
 	require2fa: boolean;
 }
 
+export interface AuthRoleMapping {
+	group: string;
+	roleId: number;
+}
+
 export interface AuthTOTPSetup {
 	qr: string;
 	secret: string;
 	uri: string;
+}
+
+export interface AuthTestStep {
+	error?: string;
+	name: string;
+	ok: boolean;
 }
 
 export interface AuthToken {
@@ -699,6 +803,7 @@ export interface AuthToken {
 }
 
 export interface AuthUser {
+	authSource: string;
 	createdAt: string;
 	disabled: boolean;
 	displayName: string;
@@ -2167,6 +2272,14 @@ export interface ApiPaths {
 		/** Aktueller Benutzer mit Rolle und Berechtigungen */
 		get: { query: never; body: never; response: ApiMeResponse };
 	};
+	'/api/v1/auth/oidc/callback': {
+		/** Rückkehr vom Identity Provider (setzt das Session-Cookie) */
+		get: { query: never; body: never; response: unknown };
+	};
+	'/api/v1/auth/oidc/start': {
+		/** Anmeldung per OIDC beginnen (Weiterleitung zum Identity Provider) */
+		get: { query: { next?: string | null }; body: never; response: unknown };
+	};
 	'/api/v1/auth/passkeys': {
 		/** Passkey registrieren */
 		post: { query: never; body: ApiPasskeyRequest; response: ApiPasskeyCreated };
@@ -2184,6 +2297,10 @@ export interface ApiPaths {
 	'/api/v1/auth/password': {
 		/** Eigenes Passwort ändern (beendet andere Sessions) */
 		put: { query: never; body: ApiPasswordRequest; response: ApiOkResponse };
+	};
+	'/api/v1/auth/providers': {
+		/** Anmeldeverfahren für die Login-Seite (OIDC, LDAP) */
+		get: { query: never; body: never; response: AuthProviders };
 	};
 	'/api/v1/certificates': {
 		/** Alle aktiven Zertifikate nach Ablaufdatum */
@@ -2656,6 +2773,26 @@ export interface ApiPaths {
 		put: { query: never; body: InventorySubnet; response: ApiSubnetView };
 		/** Subnetz löschen */
 		delete: { query: never; body: never; response: ApiOkResponse };
+	};
+	'/api/v1/system/auth': {
+		/** Anmeldung über LDAP und OIDC: Einstellungen */
+		get: { query: never; body: never; response: ApiExternalAuthResponse };
+	};
+	'/api/v1/system/auth/ldap': {
+		/** LDAP-Anmeldung einrichten */
+		put: { query: never; body: ApiLdapSaveRequest; response: AuthLDAPConfig };
+	};
+	'/api/v1/system/auth/ldap/test': {
+		/** LDAP-Einstellungen prüfen (Verbindung, Dienstkonto, Testbenutzer) */
+		post: { query: never; body: ApiLdapTestRequest; response: AuthLDAPTest };
+	};
+	'/api/v1/system/auth/oidc': {
+		/** OIDC-Anmeldung einrichten */
+		put: { query: never; body: ApiOidcSaveRequest; response: AuthOIDCConfig };
+	};
+	'/api/v1/system/auth/oidc/test': {
+		/** OIDC-Einstellungen prüfen (Discovery, Schlüssel) */
+		post: { query: never; body: ApiOidcTestRequest; response: AuthOIDCTest };
 	};
 	'/api/v1/system/backups': {
 		/** Backups auflisten */

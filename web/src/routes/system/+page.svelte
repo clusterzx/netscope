@@ -4,6 +4,7 @@
 	import AuditTab from '$lib/components/system/AuditTab.svelte';
 	import BackupsTab from '$lib/components/system/BackupsTab.svelte';
 	import CustomFieldsTab from '$lib/components/system/CustomFieldsTab.svelte';
+	import ExternalAuthTab from '$lib/components/system/ExternalAuthTab.svelte';
 	import FederationTab from '$lib/components/system/FederationTab.svelte';
 	import GroupsTab from '$lib/components/system/GroupsTab.svelte';
 	import LogsTab from '$lib/components/system/LogsTab.svelte';
@@ -83,6 +84,8 @@
 				<UsersTab />
 			{:else if tab.id === 'roles'}
 				<RolesTab />
+			{:else if tab.id === 'auth'}
+				<ExternalAuthTab />
 			{:else if tab.id === 'tokens'}
 				<TokensTab />
 			{:else if tab.id === 'subnets'}

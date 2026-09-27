@@ -197,6 +197,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			_ = s.Audit.Record(r.Context(), req.Username, "user", client(r).IP, "auth.login_failed", "user", "", "Fehlgeschlagene Anmeldung", nil, nil)
 		case errors.Is(err, auth.ErrAccountDisabled):
 			_ = s.Audit.Record(r.Context(), req.Username, "user", client(r).IP, "auth.login_failed", "user", "", "Anmeldung mit deaktiviertem Konto", nil, nil)
+		case errors.Is(err, auth.ErrNoRole):
+			_ = s.Audit.Record(r.Context(), req.Username, "user", client(r).IP, "auth.login_failed", "user", "", "LDAP-Anmeldung ohne passende Gruppe", nil, nil)
 		}
 		s.fail(w, r, err)
 		return

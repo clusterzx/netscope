@@ -57,7 +57,9 @@
 - **Mehrere Standorte:** In jedem Netz eine eigene NetScope-Instanz, die an eine Zentrale
   liefert; dort alle Netze gemeinsam oder je Standort, mit Standort-Auswahl, Filter und Regeln.
 - **Benutzer:** frei definierbare Rollen mit Rechten je Bereich, Zwei-Faktor-Anmeldung per
-  Authenticator-App oder Passkey (pro Rolle erzwingbar), Wiederherstellungscodes.
+  Authenticator-App oder Passkey (pro Rolle erzwingbar), Wiederherstellungscodes; zentrale
+  Anmeldung über OIDC (Authentik, Keycloak, Entra ID …) und LDAP / Active Directory mit
+  Rollen aus Gruppen.
 - **Auswertung:** Änderungserkennung mit Events, CVE-Abgleich gegen eine lokal gespiegelte
   NVD, Health-Checks mit Verfügbarkeit, Topologie-Graph, Berichte.
 - **Benachrichtigungen:** Regel-Engine (Bedingungen, Bündelung, Ruhezeiten, Drosselung,
@@ -530,6 +532,30 @@ Administrator den zweiten Faktor zurück – oder im Container:
 `docker exec netscope netscope 2fa-reset --user NAME` (Passwort:
 `docker exec -it netscope netscope passwd --user NAME`).
 
+### Zentrale Anmeldung: OIDC und LDAP
+
+Unter **System → Anmeldung** lassen sich zwei Verfahren einrichten, einzeln oder zusammen:
+
+- **OIDC (Single Sign-on):** Die Login-Seite zeigt „Anmelden mit …“ und leitet zum Identity
+  Provider (Authentik, Keycloak, Authelia, Entra ID, Google …). Dort eine Anwendung mit der
+  angezeigten Redirect-URI (`…/api/v1/auth/oidc/callback`) anlegen, Issuer-URL, Client-ID und
+  Client-Secret übernehmen. Gruppen kommen aus einem Claim (Standard `groups`, auch als Pfad
+  wie `realm_access.roles`), fehlt er im ID-Token, aus Userinfo. Über den zweiten Faktor
+  entscheidet der Identity Provider; die 2FA-Pflicht einer Rolle gilt für diese Konten nicht.
+- **LDAP / Active Directory:** Anmeldung über das normale Formular mit dem Konto aus dem
+  Verzeichnis. Vorlagen für Active Directory und OpenLDAP füllen Filter und Attribute; Gruppen
+  kommen aus `memberOf` oder einer Gruppensuche. Die 2FA-Pflicht der Rolle gilt wie bei lokalen
+  Konten. „Prüfen“ testet Verbindung, Dienstkonto und – mit Testbenutzer – Suche, Anmeldung,
+  Gruppen und die daraus folgende Rolle.
+
+Beim ersten Anmelden entsteht das Konto automatisch. Die Rolle folgt aus einer geordneten
+Liste Gruppe → Rolle (erster Treffer gewinnt), sonst aus einer Standardrolle, sonst gibt es
+keinen Zugriff; auf Wunsch wird sie bei jeder Anmeldung neu übernommen. Solche Konten haben
+kein NetScope-Passwort, lassen sich aber in NetScope deaktivieren. Ein lokales Konto mit
+gleichem Namen hat immer Vorrang und wird nie von einer externen Anmeldung übernommen; das gilt
+auch zwischen OIDC und LDAP. Mindestens ein aktiver lokaler Administrator bleibt immer bestehen
+– er ist der Notzugang, wenn Verzeichnis oder Identity Provider ausfallen.
+
 ## API
 
 - Dokumentation: `/api/docs`, Spezifikation: `/api/openapi.json`; bei jedem Endpunkt steht
@@ -597,6 +623,12 @@ Die Grafiken in diesem README (`docs/assets/*.svg`, hell und dunkel) erzeugt
   Faktor zusätzlich je Benutzer, das richtige Passwort setzt es nicht zurück).
 - Rechte prüft der Server bei jedem Aufruf; ein Test stellt sicher, dass kein ändernder
   Endpunkt ohne Recht bleibt. Deaktivierte Konten verlieren sofort Sitzungen und Tokens.
+- OIDC: Authorization Code Flow mit PKCE, State (an den Browser gebunden) und Nonce; das
+  ID-Token wird mit den Schlüsseln des Providers geprüft (nur asymmetrische Verfahren),
+  dazu Issuer, Audience, Ablauf und `azp`. LDAP: Benutzernamen werden im Filter maskiert,
+  leere Passwörter abgelehnt (sonst „anonymer Bind“), Verbindungen per LDAPS oder StartTLS mit
+  Zertifikatsprüfung (eigene CA möglich). Client-Secret und Bind-Passwort liegen verschlüsselt
+  im Vault und werden bei der Key-Rotation mit umgeschlüsselt.
 - TOTP-Geheimnisse liegen verschlüsselt im Vault, Wiederherstellungscodes nur gehasht;
   Passkeys speichern nur öffentliche Schlüssel.
 - API-Tokens werden nur gehasht gespeichert und genau einmal angezeigt.

@@ -2,8 +2,10 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import { api } from '$lib/api';
 	import { ApiError, errorMessage } from '$lib/api/client';
 	import Button from '$lib/components/ui/Button.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Alert from '$lib/components/ui/Alert.svelte';
 	import { auth, type MfaStep } from '$lib/stores/auth.svelte';
@@ -12,7 +14,12 @@
 
 	let username = $state('admin');
 	let password = $state('');
-	let error = $state('');
+	// errors of an OIDC sign-in come back as ?error=
+	let error = $state(page.url.searchParams.get('error') ?? '');
+	let providers = $state<{ oidc: boolean; oidcName?: string; ldap: boolean } | null>(null);
+	const ssoHref = $derived(
+		'/api/v1/auth/oidc/start' + (target() !== '/' ? `?next=${encodeURIComponent(target())}` : '')
+	);
 	let busy = $state(false);
 	let pwInput: HTMLInputElement | null = $state(null);
 	let userInput: HTMLInputElement | null = $state(null);
@@ -42,6 +49,13 @@
 			}
 		} catch {
 			// backend unreachable – the form shows the error on submit
+		}
+		try {
+			providers = await api.get('/api/v1/auth/providers');
+			// directory accounts sign in with their own name
+			if (providers?.ldap && username === 'admin') username = '';
+		} catch {
+			// without the list only the password form is offered
 		}
 		(username ? pwInput : userInput)?.focus();
 	});
@@ -231,6 +245,24 @@
 						required
 					/>
 					<Button type="submit" variant="primary" full loading={busy}>Anmelden</Button>
+					{#if providers?.oidc}
+						<div class="flex items-center gap-3 text-xs text-fg-subtle" aria-hidden="true">
+							<span class="h-px flex-1 bg-border"></span>oder<span class="h-px flex-1 bg-border"></span>
+						</div>
+						<!-- a full page load: the server redirects to the identity provider -->
+						<a
+							href={ssoHref}
+							data-sveltekit-reload
+							class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium text-fg shadow-sm transition-colors hover:border-border-strong hover:bg-surface-2"
+						>
+							<Icon name="key" size={15} />Anmelden mit {providers.oidcName || 'Single Sign-on'}
+						</a>
+					{/if}
+					{#if providers?.ldap}
+						<p class="text-center text-xs text-fg-subtle">
+							Auch mit dem Konto aus dem Verzeichnis (LDAP / Active Directory).
+						</p>
+					{/if}
 				</div>
 			</form>
 		{/if}

@@ -66,7 +66,8 @@ runZero stuft aktiv ausgenutzte Lücken hoch.
 
 ## FR-007: Zentrale Anmeldung per OIDC und LDAP
 
-**Status:** erfasst am 27.09.2026
+**Status:** umgesetzt am 27.09.2026 – README „Zentrale Anmeldung: OIDC und LDAP“,
+ARCHITECTURE „Benutzer und Rechte“
 
 ### Anlass
 
@@ -81,6 +82,24 @@ Ausschlusskriterium.
 | Konten | Anlage beim ersten Login; Rolle über Gruppen-Zuordnung (Gruppe → NetScope-Rolle), sonst Standardrolle. |
 | Lokale Konten | Bleiben; mindestens ein lokaler Administrator als Notzugang. |
 | 2FA | Bei OIDC Sache des Identity Providers; bei LDAP gilt die 2FA-Pflicht der Rolle wie bei lokalen Konten. |
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Kein Übernehmen fremder Konten:** Ein lokales Konto gleichen Namens hat immer Vorrang; eine
+  externe Anmeldung legt nie ein bestehendes Konto an eine neue Quelle. Das gilt auch zwischen
+  OIDC und LDAP – wer beides nutzt, meldet sich je Person über ein Verfahren an.
+- **Rollen:** geordnete Liste Gruppe → Rolle, dann Standardrolle, sonst kein Zugriff (403
+  `no_role`). „Rolle bei jeder Anmeldung übernehmen“ ist Standard; aus, zählt die Gruppe nur beim
+  ersten Mal. LDAP-Gruppen passen per DN oder CN.
+- **Notzugang:** Der letzte aktive lokale Administrator lässt sich nicht löschen, deaktivieren
+  oder herabstufen – auch wenn externe Administratoren existieren.
+- **Bibliotheken:** go-ldap (MIT) für LDAP; OIDC selbst implementiert auf golang-jwt (Discovery,
+  JWKS mit RSA/EC/Ed25519, PKCE) statt go-oidc + oauth2, um keine weiteren Abhängigkeiten
+  einzuführen.
+- **Getestet:** Unit-Tests mit einem eingebetteten LDAP-Server und einem Test-Provider (u. a.
+  fremde Audience, falsche Nonce, abgelaufen, HS256, `alg=none`, fremder Issuer, Replay); dazu
+  End-to-End auf dem LXC gegen OpenLDAP (memberOf und Gruppensuche, Filter-Injection) und Dex
+  als OIDC-Provider mit echter Browser-Anmeldung.
 
 ---
 

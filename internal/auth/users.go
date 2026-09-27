@@ -28,6 +28,9 @@ type User struct {
 	TOTP               bool   `json:"totp"`
 	Passkeys           int    `json:"passkeys"`
 	RecoveryCodes      int    `json:"recoveryCodes"` // unused
+	// AuthSource: local, ldap (directory) or oidc (identity provider); external accounts
+	// have no NetScope password.
+	AuthSource string `json:"authSource"`
 	// MFARequired: the role requires a second factor.
 	MFARequired bool       `json:"mfaRequired"`
 	CreatedAt   time.Time  `json:"createdAt"`
@@ -39,7 +42,7 @@ const userSelect = `SELECT u.id, u.username, u.display_name, u.email, u.role_id,
 	u.must_change_password, u.totp_enabled_at IS NOT NULL,
 	(SELECT COUNT(*) FROM user_passkeys k WHERE k.user_id = u.id),
 	(SELECT COUNT(*) FROM user_recovery_codes c WHERE c.user_id = u.id AND c.used_at IS NULL),
-	u.created_at, u.updated_at, u.last_login_at
+	u.created_at, u.updated_at, u.last_login_at, u.auth_source
 	FROM users u JOIN roles r ON r.id = u.role_id`
 
 func scanUser(sc interface{ Scan(...any) error }) (User, error) {
@@ -49,7 +52,7 @@ func scanUser(sc interface{ Scan(...any) error }) (User, error) {
 		lastLogin sql.NullInt64
 	)
 	err := sc.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Email, &u.RoleID, &u.RoleName, &u.MFARequired, &u.Disabled,
-		&u.MustChangePassword, &u.TOTP, &u.Passkeys, &u.RecoveryCodes, &c, &up, &lastLogin)
+		&u.MustChangePassword, &u.TOTP, &u.Passkeys, &u.RecoveryCodes, &c, &up, &lastLogin, &u.AuthSource)
 	u.CreatedAt, u.UpdatedAt, u.LastLoginAt = db.Time(c), db.Time(up), db.NullTime(lastLogin)
 	return u, err
 }
@@ -129,15 +132,27 @@ func checkUserConflicts(ctx context.Context, tx *sql.Tx, in UserInput, self int6
 	return nil
 }
 
-// adminsLeft counts the enabled administrators except one user.
+// adminsLeft counts the enabled administrators except one user. A local administrator
+// (the target is local) must be replaced by another local one: it is the way in when the
+// directory or identity provider is down.
 func adminsLeft(ctx context.Context, tx *sql.Tx, except int64) (int, error) {
-	var n int
-	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM users u JOIN roles r ON r.id = u.role_id
-		WHERE r.builtin = 'admin' AND u.disabled = 0 AND u.id <> ?`, except).Scan(&n)
-	return n, err
+	var local bool
+	if err := tx.QueryRowContext(ctx, "SELECT auth_source = 'local' FROM users WHERE id = ?", except).Scan(&local); err != nil {
+		return 0, err
+	}
+	var all, locals int
+	err := tx.QueryRowContext(ctx, `SELECT COUNT(*), COUNT(CASE WHEN u.auth_source = 'local' THEN 1 END) FROM users u
+		JOIN roles r ON r.id = u.role_id WHERE r.builtin = 'admin' AND u.disabled = 0 AND u.id <> ?`, except).Scan(&all, &locals)
+	if err == nil && local && all > 0 && locals == 0 {
+		return 0, errLastLocalAdmin
+	}
+	return all, err
 }
 
-var errLastAdmin = errors.New("Es muss mindestens ein aktiver Benutzer mit der Rolle Administrator bleiben")
+var (
+	errLastAdmin      = errors.New("Es muss mindestens ein aktiver Benutzer mit der Rolle Administrator bleiben")
+	errLastLocalAdmin = errors.New("Es muss mindestens ein aktiver lokaler Administrator bleiben – er ist der Notzugang, wenn LDAP oder der Identity Provider ausfällt")
+)
 
 // CreateUser creates a user. It returns the generated password when none was given.
 func (s *Service) CreateUser(ctx context.Context, in UserInput) (*User, string, error) {

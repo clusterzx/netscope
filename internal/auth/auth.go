@@ -140,6 +140,8 @@ type Service struct {
 	mu            sync.Mutex
 	challenges    map[string]*challenge
 	registrations map[int64]*registration
+
+	oidc oidcState
 }
 
 // New creates the service. The vault encrypts TOTP secrets; without it (command line
@@ -214,12 +216,13 @@ type account struct {
 	roleName              string
 	perms                 []string
 	admin, require2FA     bool
-	mfa                   bool // a second factor is set up
+	mfa                   bool   // a second factor is set up
+	source                string // local | ldap | oidc
 }
 
 const accountSelect = `SELECT u.id, u.username, u.display_name, u.disabled, u.must_change_password,
 	r.id, r.name, r.permissions, r.builtin = 'admin', r.require_2fa,
-	u.totp_enabled_at IS NOT NULL OR EXISTS (SELECT 1 FROM user_passkeys k WHERE k.user_id = u.id)
+	u.totp_enabled_at IS NOT NULL OR EXISTS (SELECT 1 FROM user_passkeys k WHERE k.user_id = u.id), u.auth_source
 	FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?`
 
 func (s *Service) account(ctx context.Context, userID int64) (*account, error) {
@@ -228,7 +231,7 @@ func (s *Service) account(ctx context.Context, userID int64) (*account, error) {
 		perms string
 	)
 	err := s.db.R.QueryRowContext(ctx, accountSelect, userID).Scan(&a.id, &a.username, &a.displayName, &a.disabled, &a.mustChange,
-		&a.roleID, &a.roleName, &perms, &a.admin, &a.require2FA, &a.mfa)
+		&a.roleID, &a.roleName, &perms, &a.admin, &a.require2FA, &a.mfa, &a.source)
 	if err != nil {
 		return nil, db.NotFound(err)
 	}
@@ -249,7 +252,8 @@ func (a *account) principal(kind, scope string) *Principal {
 	}
 	if kind == "session" {
 		p.PasswordChange = a.mustChange
-		p.MFASetup = a.require2FA && !a.mfa
+		// with OIDC the identity provider decides about the second factor
+		p.MFASetup = a.require2FA && !a.mfa && a.source != SourceOIDC
 	}
 	return p
 }
@@ -272,26 +276,47 @@ func (s *Service) Login(ctx context.Context, username, password, rpID, ip, userA
 	if !s.limiter.allow(ip) {
 		return nil, ErrRateLimited
 	}
+	username = strings.TrimSpace(username)
+	const lookup = "SELECT id, password_hash, disabled, totp_enabled_at IS NOT NULL, auth_source FROM users WHERE "
 	var (
 		id       int64
 		hash     string
 		disabled bool
 		totp     bool
+		source   string
 	)
-	err := s.db.R.QueryRowContext(ctx, "SELECT id, password_hash, disabled, totp_enabled_at IS NOT NULL FROM users WHERE username = ? COLLATE NOCASE",
-		strings.TrimSpace(username)).Scan(&id, &hash, &disabled, &totp)
-	if errors.Is(err, sql.ErrNoRows) {
-		// constant-ish time: still run bcrypt
-		_ = bcrypt.CompareHashAndPassword([]byte("$2a$12$C6UzMDM.H6dfI/f/IKxGhuE0wYt1yZ0dD6MdH4J8YGAC5xzOO7GvS"), []byte(password))
-		s.limiter.fail(ip)
-		return nil, ErrInvalidCredentials
-	}
-	if err != nil {
+	err := s.db.R.QueryRowContext(ctx, lookup+"username = ? COLLATE NOCASE", username).Scan(&id, &hash, &disabled, &totp, &source)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+	switch {
+	case err == nil && source == SourceLocal:
+		// local accounts always sign in locally, even if the directory knows the name
+		if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+			s.limiter.fail(ip)
+			return nil, ErrInvalidCredentials
+		}
+	case err == nil && source == SourceOIDC:
+		// no NetScope password; the login page offers the provider
 		s.limiter.fail(ip)
 		return nil, ErrInvalidCredentials
+	default:
+		// a directory account (known or not yet provisioned)
+		if errors.Is(err, sql.ErrNoRows) {
+			// constant-ish time when LDAP is off: still run bcrypt
+			_ = bcrypt.CompareHashAndPassword([]byte("$2a$12$C6UzMDM.H6dfI/f/IKxGhuE0wYt1yZ0dD6MdH4J8YGAC5xzOO7GvS"), []byte(password))
+		}
+		uid, lerr := s.loginLDAP(ctx, username, password)
+		switch {
+		case errors.Is(lerr, ErrInvalidCredentials):
+			s.limiter.fail(ip)
+			return nil, ErrInvalidCredentials
+		case lerr != nil:
+			return nil, lerr
+		}
+		if err := s.db.R.QueryRowContext(ctx, lookup+"id = ?", uid).Scan(&id, &hash, &disabled, &totp, &source); err != nil {
+			return nil, err
+		}
 	}
 	s.limiter.success(ip)
 	if disabled {
@@ -396,9 +421,31 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 
 // VerifyPassword checks the password of a user (re-authentication for sensitive changes).
 func (s *Service) VerifyPassword(ctx context.Context, userID int64, pw string) error {
-	var hash string
-	if err := s.db.R.QueryRowContext(ctx, "SELECT password_hash FROM users WHERE id = ?", userID).Scan(&hash); err != nil {
+	var hash, source, username, external string
+	if err := s.db.R.QueryRowContext(ctx, "SELECT password_hash, auth_source, username, external_id FROM users WHERE id = ?",
+		userID).Scan(&hash, &source, &username, &external); err != nil {
 		return db.NotFound(err)
+	}
+	switch source {
+	case SourceLDAP:
+		// the directory password; the account found must be this user
+		c, bindPW, err := s.ldapConfig(ctx)
+		if err != nil {
+			return err
+		}
+		if !c.Enabled {
+			return errors.New("Die Anmeldung per LDAP ist abgeschaltet")
+		}
+		id, err := s.ldapAuthenticate(ctx, c, bindPW, username, pw)
+		if err != nil {
+			return err
+		}
+		if id.ExternalID != external {
+			return ErrInvalidCredentials
+		}
+		return nil
+	case SourceOIDC:
+		return errExternal(source)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) != nil {
 		return ErrInvalidCredentials
@@ -408,6 +455,12 @@ func (s *Service) VerifyPassword(ctx context.Context, userID int64, pw string) e
 
 // ChangePassword verifies the old password, sets the new one and ends all other sessions.
 func (s *Service) ChangePassword(ctx context.Context, userID int64, keepSession, oldPw, newPw string) error {
+	if src, err := s.userSource(ctx, userID); err != nil || src != SourceLocal {
+		if err != nil {
+			return err
+		}
+		return errExternal(src)
+	}
 	if err := s.VerifyPassword(ctx, userID, oldPw); err != nil {
 		return err
 	}
@@ -427,6 +480,13 @@ func (s *Service) ResetPassword(ctx context.Context, username, newPw string) err
 }
 
 func (s *Service) setPassword(ctx context.Context, userID int64, keepSession, pw string, mustChange bool) error {
+	src, err := s.userSource(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if src != SourceLocal {
+		return errExternal(src)
+	}
 	if len(pw) < MinPasswordLength {
 		return plugin.FieldErr("new", fmt.Sprintf("das Passwort muss mindestens %d Zeichen haben", MinPasswordLength))
 	}

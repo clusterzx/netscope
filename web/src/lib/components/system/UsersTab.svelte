@@ -187,6 +187,13 @@
 				{#if col.key === 'user'}
 					<span class="font-medium {u.disabled ? 'text-fg-subtle line-through' : ''}">{u.username}</span>
 					{#if u.id === me}<span class="text-xs text-fg-subtle"> (du)</span>{/if}
+					{#if u.authSource === 'ldap'}<Badge
+							tone="info"
+							title="Meldet sich mit dem Konto aus dem Verzeichnis an">LDAP</Badge
+						>{:else if u.authSource === 'oidc'}<Badge
+							tone="info"
+							title="Meldet sich über den Identity Provider an">SSO</Badge
+						>{/if}
 					{#if u.displayName || u.email}
 						<span class="block text-xs text-fg-subtle"
 							>{[u.displayName, u.email].filter(Boolean).join(' · ')}</span
@@ -226,7 +233,13 @@
 						size="sm"
 						items={[
 							{ label: 'Bearbeiten', icon: 'edit', onclick: () => openEditor(u) },
-							{ label: 'Neues Start-Passwort', icon: 'key', onclick: () => resetPassword(u) },
+							{
+								label: 'Neues Start-Passwort',
+								icon: 'key',
+								disabled: u.authSource !== 'local',
+								hint: u.authSource !== 'local' ? 'Passwort liegt im Verzeichnis bzw. beim IdP' : undefined,
+								onclick: () => resetPassword(u)
+							},
 							{
 								label: 'Zweiten Faktor zurücksetzen',
 								icon: 'shield',

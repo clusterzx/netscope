@@ -68,7 +68,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 
 | Bereich | Tabellen |
 |---|---|
-| System | `settings`, `users` (Rolle, deaktiviert, Passwort-Änderung offen, TOTP verschlüsselt), `roles` (Rechte als JSON-Liste, 2FA-Pflicht), `user_passkeys`, `user_recovery_codes` (Hash), `sessions`, `api_tokens`, `audit_log` |
+| System | `settings`, `users` (Rolle, deaktiviert, Passwort-Änderung offen, TOTP verschlüsselt, Herkunft `auth_source`/`external_id` für LDAP und OIDC), `roles` (Rechte als JSON-Liste, 2FA-Pflicht), `user_passkeys`, `user_recovery_codes` (Hash), `sessions`, `api_tokens`, `audit_log` |
 | Verbund | `sites` (Zentrale: Standorte mit Token-Hash, Stream, letzter Meldung und Status), `site_devices` (Geräte-ID am Standort → Gerät hier), `federation_outbox` (Standort: Puffer) |
 | Agents | `agent_enrollments` (Installations-Tokens als Hash, Tags, Nutzungen, Ablauf), `agents` (Host, Version, Secret-Hash, Gerät, letzter Kontakt, Inventar/Messwerte, volle Dateisysteme) |
 | Vault | `vault_meta` (Key-Prüfwert), `credentials` (öffentliche Felder + AES-GCM-Blob + Geltungsbereich `scope`) |
@@ -309,6 +309,22 @@ für IP-Adressen.
 API-Tokens gehören einem Benutzer und haben die Rechte seiner Rolle, ein Token mit Scope
 `read` nur lesenden Zugriff. Tokens deaktivierter Benutzer werden abgewiesen.
 
+**Externe Anmeldung** (`internal/auth/ldap.go`, `oidc.go`, `external.go`): Konten tragen
+`auth_source` (`local`, `ldap`, `oidc`) und `external_id` (LDAP: DN in Kleinbuchstaben, OIDC:
+`issuer|sub`). `Login` prüft zuerst ein lokales Konto gleichen Namens (bcrypt), sonst LDAP:
+Dienstkonto-Bind, Suche mit maskiertem Namen (mehrere Treffer = Abbruch), Bind als Benutzer,
+Gruppen aus dem Attribut oder per Suche mit den Rechten des Dienstkontos. Danach
+„provisioniert“ `provision` das Konto (Anlage bzw. Name, E-Mail und – mit `SyncRole` – Rolle
+aktualisieren); ein LDAP-Konto mit neuem DN, aber gleichem Anmeldenamen bleibt dasselbe. Der
+zweite Faktor läuft wie bei lokalen Konten. OIDC: `GET /auth/oidc/start` legt State, Nonce
+und PKCE-Verifier für 10 Minuten im Speicher ab und bindet den State per Cookie an den
+Browser; `GET /auth/oidc/callback` löst den Code ein, prüft das ID-Token (Schlüssel aus JWKS,
+bei unbekannter `kid` einmal neu geladen), holt fehlende Gruppen aus Userinfo und startet die
+Sitzung. Discovery und Schlüssel werden eine Stunde gecacht. Die Konfiguration liegt in den
+Settings `auth.oidc` / `auth.ldap`, Client-Secret und Bind-Passwort in `auth.*.secret`
+(vault-verschlüsselt, von der Key-Rotation erfasst). `adminsLeft` verlangt beim Entfernen,
+Deaktivieren oder Herabstufen eines lokalen Administrators einen anderen aktiven lokalen.
+
 ## API
 
 JSON unter `/api/v1`, generierte OpenAPI-Spezifikation unter `/api/openapi.json`,
@@ -317,7 +333,7 @@ Prometheus-Metriken unter `/metrics`.
 
 | Bereich | Endpunkte |
 |---|---|
-| Auth | `POST /auth/login` (+ `/login/totp`, `/login/recovery`, `/login/passkey/options`, `/login/passkey`), `POST /auth/logout`, `GET /auth/me` (Benutzer, Rolle, Rechte), `PUT /auth/password`, `GET /auth/2fa`, `POST /auth/2fa/totp` (+ `/confirm`, `/disable`), `POST /auth/2fa/recovery`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `PATCH/DELETE /auth/passkeys/{id}`, `GET/POST /tokens` (eigene; mit `users.manage` alle), `DELETE /tokens/{id}` |
+| Auth | `POST /auth/login` (+ `/login/totp`, `/login/recovery`, `/login/passkey/options`, `/login/passkey`), `POST /auth/logout`, `GET /auth/me` (Benutzer, Rolle, Rechte), `PUT /auth/password`, `GET /auth/2fa`, `POST /auth/2fa/totp` (+ `/confirm`, `/disable`), `POST /auth/2fa/recovery`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `PATCH/DELETE /auth/passkeys/{id}`, `GET/POST /tokens` (eigene; mit `users.manage` alle), `DELETE /tokens/{id}`, `GET /auth/providers`, `GET /auth/oidc/start`, `GET /auth/oidc/callback`; mit `users.manage`: `GET /system/auth`, `PUT /system/auth/oidc`, `PUT /system/auth/ldap`, `POST /system/auth/oidc/test`, `POST /system/auth/ldap/test` |
 | Benutzer | `GET/POST /users`, `GET/PUT/DELETE /users/{id}`, `POST /users/{id}/password` (neues Start-Passwort), `POST /users/{id}/2fa/reset`, `GET/POST /roles`, `PUT/DELETE /roles/{id}`, `GET /permissions` |
 | Geräte | `GET/POST /devices`, `GET/PATCH/DELETE /devices/{id}`, `POST /devices/bulk`, `POST /devices/merge`, `POST /devices/{id}/split`, `POST /devices/{id}/ips` / `DELETE /devices/{id}/ips/{ip}` (IP von Hand vergeben/entfernen), `POST /devices/{id}/scan`, `POST /devices/{id}/actions/{plugin}/{action}`, Tabs: `…/ports`, `…/http`, `…/certificates`, `…/packages`, `…/containers`, `…/inventory`, `…/cves`, `…/health`, `…/events`, `…/timeline`, `…/relations`, `…/observations`, `…/timeseries`, `…/credentials` (passende Zugangsdaten mit Rang und Grund); `GET /tags`, `GET /certificates` |
 | Stammdaten | `/subnets` (mit Tunnel-Zustand), `/groups` (+ `/members`), `/custom-fields`, `/views` (CRUD) |
