@@ -121,6 +121,7 @@ const (
 	EvPackagesChanged       = "package.changed"
 	EvCVENew                = "cve.new"
 	EvCVEResolved           = "cve.resolved"
+	EvCVEExploited          = "cve.exploited"
 	EvHealthDown            = "health.down"
 	EvHealthDegraded        = "health.degraded"
 	EvHealthUp              = "health.up"
@@ -185,9 +186,11 @@ var catalog = []EventSpec{
 	{EvPackagesChanged, "software", "Paket-Änderungen", "Auf einem SSH-Host wurden Pakete installiert, entfernt oder aktualisiert.", SevInfo, "diff",
 		withDevice(PayloadField{"manager", "string", "dpkg | rpm | apk"}, PayloadField{"count", "number", "Anzahl"}, PayloadField{"added", "list", "Neu"}, PayloadField{"removed", "list", "Entfernt"}, PayloadField{"updated", "list", "Aktualisiert"})},
 	{EvCVENew, "vulnerability", "Neue Schwachstelle", "Für ein Gerät wurde eine neue CVE gefunden (heuristischer Versionsabgleich).", SevHigh, "cve",
-		withDevice(PayloadField{"cve", "string", "CVE-ID"}, PayloadField{"cvss", "number", "CVSS-Basiswert"}, PayloadField{"vector", "string", "CVSS-Vektor"}, PayloadField{"product", "string", "Produkt"}, PayloadField{"version", "string", "Version"}, PayloadField{"cpe", "string", "CPE"}, PayloadField{"match_type", "string", "exact | range | heuristic"})},
+		withDevice(PayloadField{"cve", "string", "CVE-ID"}, PayloadField{"cvss", "number", "CVSS-Basiswert"}, PayloadField{"vector", "string", "CVSS-Vektor"}, PayloadField{"product", "string", "Produkt"}, PayloadField{"version", "string", "Version"}, PayloadField{"cpe", "string", "CPE"}, PayloadField{"match_type", "string", "exact | range | heuristic"}, PayloadField{"kev", "bool", "Laut CISA aktiv ausgenutzt"}, PayloadField{"epss", "number", "EPSS (0–1)"})},
 	{EvCVEResolved, "vulnerability", "Schwachstelle behoben", "Eine CVE trifft nach Update/Änderung nicht mehr zu.", SevInfo, "cve",
 		withDevice(PayloadField{"cve", "string", "CVE-ID"}, PayloadField{"cvss", "number", "CVSS-Basiswert"})},
+	{EvCVEExploited, "vulnerability", "Schwachstelle wird ausgenutzt", "Eine CVE, die ein Gerät betrifft, steht neu im CISA-Katalog der aktiv ausgenutzten Schwachstellen (KEV).", SevCritical, "cve",
+		withDevice(PayloadField{"cve", "string", "CVE-ID"}, PayloadField{"cvss", "number", "CVSS-Basiswert"}, PayloadField{"epss", "number", "EPSS (0–1)"}, PayloadField{"product", "string", "Produkt"}, PayloadField{"version", "string", "Version"}, PayloadField{"date_added", "string", "In KEV seit"}, PayloadField{"due_date", "string", "Frist laut CISA"}, PayloadField{"ransomware", "bool", "Von Ransomware genutzt"})},
 	{EvHealthDown, "health", "Check ausgefallen", "Ein Health-Check ist nach Flap-Dämpfung im Zustand Down.", SevHigh, "healthcheck",
 		withDevice(PayloadField{"check_id", "number", "Check-ID"}, PayloadField{"check_name", "string", "Name"}, PayloadField{"check_type", "string", "tcp | http | tls | icmp"}, PayloadField{"error", "string", "Fehler"})},
 	{EvHealthDegraded, "health", "Check beeinträchtigt", "Ein Health-Check ist erreichbar, aber langsam oder fehlerhaft.", SevMedium, "healthcheck",

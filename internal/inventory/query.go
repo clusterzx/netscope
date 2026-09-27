@@ -42,10 +42,11 @@ func QueryFields() []QueryField {
 		{"mac", ":", "MAC-Adresse oder Präfix", "mac:dc:a6:32*"},
 		{"state", ":", "known | unknown | ignored", "state:unknown"},
 		{"crit", ": >=", "Kritikalität low | normal | high | critical", "crit>=high"},
-		{"is", ":", "online | offline | new | known | unknown | ignored | randomized", "is:online"},
+		{"is", ":", "online | offline | new | known | unknown | ignored | randomized | critical | exploited", "is:online is:exploited"},
 		{"online", ":", "yes | no", "online:no"},
 		{"has", ":", "notes | cve | cert | health | ports | containers | packages | parent | children | tags | http | hostname", "has:cve"},
 		{"cve", ": >= > <= <", "Höchster CVSS-Wert oder konkrete CVE", "cve>=7 cve:CVE-2024-6387"},
+		{"epss", ">= > <= <", "Höchster EPSS-Wert der CVEs (0–1, Wahrscheinlichkeit einer Ausnutzung in 30 Tagen)", "epss>=0.1"},
 		{"seen", "< >", "Letzte Sichtung vor weniger/mehr als (m, h, d, w)", "seen<24h"},
 		{"first", "< >", "Erstsichtung vor weniger/mehr als", "first<7d"},
 		{"cert", "< : ", "Zertifikat läuft in weniger als N Tagen ab, oder expired | selfsigned | weak", "cert<30d"},
@@ -83,7 +84,7 @@ var knownFields = map[string]bool{}
 
 func init() {
 	for _, f := range []string{"tag", "group", "port", "service", "product", "version", "os", "vendor", "model", "type", "name",
-		"hostname", "ip", "subnet", "mac", "state", "crit", "criticality", "is", "online", "has", "cve", "cvss", "seen", "first",
+		"hostname", "ip", "subnet", "mac", "state", "crit", "criticality", "is", "online", "has", "cve", "cvss", "epss", "seen", "first",
 		"cert", "app", "title", "container", "package", "pkg", "health", "source", "parent", "location", "owner", "notes", "id", "site"} {
 		knownFields[f] = true
 	}
@@ -530,8 +531,11 @@ func (c *compiler) term(t term, v string) (string, []any, error) {
 			return exists("SELECT 1 FROM device_macs m WHERE m.device_id = d.id AND m.randomized = 1")
 		case "critical":
 			return "d.criticality = 'critical'", nil, nil
+		case "exploited":
+			return exists(`SELECT 1 FROM device_cves c JOIN nvd_kev k ON k.cve_id = c.cve_id WHERE c.device_id = d.id AND c.gone_at IS NULL
+				AND NOT EXISTS (SELECT 1 FROM cve_ignores i WHERE i.device_id = c.device_id AND i.cve_id = c.cve_id)`)
 		}
-		return "", nil, fmt.Errorf("is: online, offline, new, known, unknown, ignored, randomized oder critical erwartet")
+		return "", nil, fmt.Errorf("is: online, offline, new, known, unknown, ignored, randomized, critical oder exploited erwartet")
 	case "has":
 		switch strings.ToLower(v) {
 		case "notes":
@@ -579,6 +583,24 @@ func (c *compiler) term(t term, v string) (string, []any, error) {
 			return "", nil, err
 		}
 		return "IFNULL((" + activeCVE + "), -1) " + o + " ?", []any{n}, nil
+	case "epss":
+		n, err := strconv.ParseFloat(strings.TrimSuffix(v, "%"), 64)
+		if err != nil {
+			return "", nil, fmt.Errorf("epss: Zahl zwischen 0 und 1 erwartet")
+		}
+		if strings.HasSuffix(v, "%") || n > 1 {
+			n /= 100 // epss>=10% or epss>=10
+		}
+		o := op
+		if o == ":" {
+			o = ">="
+		}
+		if o, err = numOp(o); err != nil {
+			return "", nil, err
+		}
+		return `IFNULL((SELECT MAX(e.score) FROM device_cves c JOIN nvd_epss e ON e.cve_id = c.cve_id WHERE c.device_id = d.id
+			AND c.gone_at IS NULL AND NOT EXISTS (SELECT 1 FROM cve_ignores i WHERE i.device_id = c.device_id AND i.cve_id = c.cve_id)), -1) ` +
+			o + " ?", []any{n}, nil
 	case "seen", "first":
 		col := "d.last_seen"
 		if f == "first" {

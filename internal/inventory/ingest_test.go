@@ -345,6 +345,8 @@ func TestQueryLanguage(t *testing.T) {
 	_, _ = store.db.W.Exec("UPDATE devices SET last_seen = ? WHERE id = ?", time.Now().Add(-48*time.Hour).UnixMilli(), srv)
 	_, _ = store.db.W.Exec(`INSERT INTO device_cves(device_id, cve_id, cpe, source, match_type, cvss_score, first_seen, last_seen)
 		VALUES (?, 'CVE-2024-6387', 'cpe:/a:openbsd:openssh:9.6', 'nmap', 'range', 8.1, 0, 0)`, srv)
+	_, _ = store.db.W.Exec(`INSERT INTO nvd_kev(cve_id, date_added) VALUES ('CVE-2024-6387', '2026-09-25')`)
+	_, _ = store.db.W.Exec(`INSERT INTO nvd_epss(cve_id, score, percentile) VALUES ('CVE-2024-6387', 0.93, 0.99)`)
 	cases := []struct {
 		q    string
 		want []int64
@@ -359,6 +361,11 @@ func TestQueryLanguage(t *testing.T) {
 		{"cve>=7", []int64{srv}},
 		{"cve>=9", nil},
 		{"cve:CVE-2024-6387", []int64{srv}},
+		{"is:exploited", []int64{srv}},
+		{"-is:exploited", []int64{cam}},
+		{"epss>=0.5", []int64{srv}},
+		{"epss>=95%", nil},
+		{"epss<0.1", []int64{cam}},
 		{"seen<24h", []int64{cam}},
 		{"seen>24h", []int64{srv}},
 		{"crit>=high", []int64{srv}},

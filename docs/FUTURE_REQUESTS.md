@@ -32,7 +32,7 @@ Produkt.
 
 ## FR-006: CVEs nach tatsächlicher Ausnutzung priorisieren
 
-**Status:** erfasst am 27.09.2026
+**Status:** umgesetzt am 27.09.2026 – README „Schwachstellen“, ARCHITECTURE „NVD-Spiegel“
 
 ### Anlass
 
@@ -45,6 +45,22 @@ runZero stuft aktiv ausgenutzte Lücken hoch.
   einer Ausnutzung in 30 Tagen) täglich laden, lokal wie der NVD-Spiegel.
 - Treffer tragen „bekannt ausgenutzt“ (mit Datum und Frist aus KEV, Ransomware-Hinweis) und den
   EPSS-Wert; Sortierung, Filter (`kev:yes`, `epss>=0.1`) und Regeln können darauf aufbauen.
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Speicherort:** `nvd_kev` und `nvd_epss` in der Spiegel-Datei; sie entstehen beim nächsten
+  Start ohne erneuten NVD-Download. Beide Dateien werden bei jedem Sync geladen (zusammen
+  ~5 MB), die Tabelle aber nur bei geändertem Inhalt ersetzt; der Import der ~380.000 EPSS-Werte
+  dauert rund eine Sekunde.
+- **Suche:** `is:exploited` statt `kev:yes` (passt zu den übrigen `is:`-Werten), dazu `epss>=0.1`
+  bzw. `epss>=10%`.
+- **Sortierung** überall „Dringlichkeit“: ausgenutzt, dann EPSS, dann CVSS – Liste, Gerätereiter,
+  Top-CVEs im Dashboard.
+- **Events:** Ausgenutzte CVEs lösen `cve.new` unabhängig von der CVSS-Schwelle und als kritisch
+  aus; neu: `cve.exploited`, wenn CISA eine bereits gefundene CVE aufnimmt (nicht beim ersten
+  Laden des Katalogs). Beides lässt sich im Plugin abschalten.
+- **Quellen:** KEV steht unter CC0; EPSS ist frei nutzbar, FIRST bittet um Namensnennung
+  (Detailseite und `THIRD_PARTY_NOTICES.md`).
 
 ---
 

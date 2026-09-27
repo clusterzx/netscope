@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -46,18 +47,20 @@ type pluginStatus struct {
 }
 
 type dashboard struct {
-	Devices         deviceCounts          `json:"devices"`
-	OpenEvents      map[string]int        `json:"openEvents"`
-	CriticalEvents  []events.Event        `json:"criticalEvents"`
-	Plugins         []pluginStatus        `json:"plugins"`
-	PluginsFailed   int                   `json:"pluginsFailed"`
-	Health          map[string]int        `json:"health"`
-	Availability24h *float64              `json:"availability24h,omitempty"`
-	CVEs            map[string]int        `json:"cves"`
-	TopCVEs         []topCVE              `json:"topCves"`
-	Certificates    []inventory.CertView  `json:"certificates"`
-	ActiveRuns      []*pluginhost.RunView `json:"activeRuns"`
-	Subnets         []inventory.Subnet    `json:"subnets"`
+	Devices         deviceCounts   `json:"devices"`
+	OpenEvents      map[string]int `json:"openEvents"`
+	CriticalEvents  []events.Event `json:"criticalEvents"`
+	Plugins         []pluginStatus `json:"plugins"`
+	PluginsFailed   int            `json:"pluginsFailed"`
+	Health          map[string]int `json:"health"`
+	Availability24h *float64       `json:"availability24h,omitempty"`
+	CVEs            map[string]int `json:"cves"`
+	TopCVEs         []topCVE       `json:"topCves"`
+	// ExploitedCVEs counts device×CVE pairs of CVEs in the CISA KEV catalog.
+	ExploitedCVEs int                   `json:"exploitedCves"`
+	Certificates  []inventory.CertView  `json:"certificates"`
+	ActiveRuns    []*pluginhost.RunView `json:"activeRuns"`
+	Subnets       []inventory.Subnet    `json:"subnets"`
 	// Sites are the connected NetScope sites (central instance).
 	Sites       []federation.Site `json:"sites"`
 	GeneratedAt time.Time         `json:"generatedAt"`
@@ -67,6 +70,9 @@ type topCVE struct {
 	CVE     string  `json:"cve"`
 	CVSS    float64 `json:"cvss"`
 	Devices int     `json:"devices"`
+	// Exploited: listed in the CISA KEV catalog; EPSS: FIRST estimate (0..1).
+	Exploited bool     `json:"exploited"`
+	EPSS      *float64 `json:"epss"`
 }
 
 func (s *Server) registerReports() {
@@ -315,20 +321,32 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			d.Availability24h = &v
 		}
 	}
-	rows, err := s.DB.R.QueryContext(ctx, `SELECT c.cve_id, MAX(IFNULL(c.cvss_score, 0)), COUNT(DISTINCT c.device_id) FROM device_cves c
+	// most urgent first: exploited (CISA KEV), then EPSS, then CVSS
+	rows, err := s.DB.R.QueryContext(ctx, `SELECT c.cve_id, MAX(IFNULL(c.cvss_score, 0)), COUNT(DISTINCT c.device_id),
+		MAX(k.cve_id IS NOT NULL), MAX(e.score) FROM device_cves c
+		LEFT JOIN nvd_kev k ON k.cve_id = c.cve_id LEFT JOIN nvd_epss e ON e.cve_id = c.cve_id
 		WHERE c.gone_at IS NULL AND NOT EXISTS (SELECT 1 FROM cve_ignores i WHERE i.device_id = c.device_id AND i.cve_id = c.cve_id)
 		AND c.device_id IN (SELECT id FROM devices WHERE `+devWhere+`)
-		GROUP BY c.cve_id ORDER BY 2 DESC, 3 DESC`, devArgs...)
+		GROUP BY c.cve_id ORDER BY 4 DESC, IFNULL(MAX(e.score), -1) DESC, 2 DESC, 3 DESC`, devArgs...)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	for rows.Next() {
-		var t topCVE
-		if err := rows.Scan(&t.CVE, &t.CVSS, &t.Devices); err != nil {
+		var (
+			t    topCVE
+			epss sql.NullFloat64
+		)
+		if err := rows.Scan(&t.CVE, &t.CVSS, &t.Devices, &t.Exploited, &epss); err != nil {
 			rows.Close()
 			s.fail(w, r, err)
 			return
+		}
+		if epss.Valid {
+			t.EPSS = &epss.Float64
+		}
+		if t.Exploited {
+			d.ExploitedCVEs += t.Devices
 		}
 		d.CVEs[string(plugin.SeverityFromCVSS(t.CVSS))] += t.Devices
 		if len(d.TopCVEs) < 10 {

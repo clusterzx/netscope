@@ -39,7 +39,7 @@ func TestNVDInOwnFile(t *testing.T) {
 	if got := tablesIn(t, d.W, "main"); len(got) != 0 {
 		t.Fatalf("mirror tables in the main database: %v", got)
 	}
-	if got := tablesIn(t, d.W, "nvd"); strings.Join(got, ",") != "nvd_cpe_matches,nvd_cves,nvd_feeds" {
+	if got := tablesIn(t, d.W, "nvd"); strings.Join(got, ",") != "nvd_cpe_matches,nvd_cves,nvd_epss,nvd_feeds,nvd_kev" {
 		t.Fatalf("mirror tables: %v", got)
 	}
 	// unqualified names reach the mirror, from the write and the read pool

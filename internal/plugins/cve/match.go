@@ -762,6 +762,10 @@ type cveInfo struct {
 	vector      string
 	severity    string
 	description string
+	// KEV: date the CVE was added to the catalog ("" = not listed), deadline, ransomware
+	kevAdded, kevDue string
+	ransomware       bool
+	epss             *float64
 }
 
 func loadCVEInfo(ctx context.Context, d *db.DB, ids []string, into map[string]*cveInfo) error {
@@ -775,20 +779,24 @@ func loadCVEInfo(ctx context.Context, d *db.DB, ids []string, into map[string]*c
 		k := min(500, len(need))
 		ch := need[:k]
 		need = need[k:]
-		err := queryEach(ctx, d.R, `SELECT id, cvss_score, cvss_vector, severity, description FROM nvd_cves WHERE id IN (`+db.Placeholders(len(ch))+`)`,
+		err := queryEach(ctx, d.R, `SELECT n.id, n.cvss_score, n.cvss_vector, n.severity, n.description,
+			COALESCE(k.date_added, ''), COALESCE(k.due_date, ''), COALESCE(k.ransomware, 0), e.score
+			FROM nvd_cves n LEFT JOIN nvd_kev k ON k.cve_id = n.id LEFT JOIN nvd_epss e ON e.cve_id = n.id
+			WHERE n.id IN (`+db.Placeholders(len(ch))+`)`,
 			db.StringArgs(ch), func(r *sql.Rows) error {
 				var (
-					id    string
-					score sql.NullFloat64
-					ci    cveInfo
+					id          string
+					score, epss sql.NullFloat64
+					ci          cveInfo
 				)
-				if err := r.Scan(&id, &score, &ci.vector, &ci.severity, &ci.description); err != nil {
+				if err := r.Scan(&id, &score, &ci.vector, &ci.severity, &ci.description, &ci.kevAdded, &ci.kevDue, &ci.ransomware, &epss); err != nil {
 					return err
 				}
 				if score.Valid {
 					v := score.Float64
 					ci.score = &v
 				}
+				ci.epss = floatPtr(epss)
 				into[id] = &ci
 				return nil
 			})
@@ -806,8 +814,15 @@ func (ci *cveInfo) scoreValue() float64 {
 	return *ci.score
 }
 
-// eventSeverity maps the NVD severity (or the score) to an event severity.
+// exploited reports whether the CVE is listed in the KEV catalog.
+func (ci *cveInfo) exploited() bool { return ci != nil && ci.kevAdded != "" }
+
+// eventSeverity maps the NVD severity (or the score) to an event severity; CVEs known to
+// be exploited are always critical.
 func eventSeverity(ci *cveInfo) plugin.Severity {
+	if ci.exploited() {
+		return plugin.SevCritical
+	}
 	if ci != nil {
 		switch plugin.Severity(ci.severity) {
 		case plugin.SevCritical, plugin.SevHigh, plugin.SevMedium, plugin.SevLow:
@@ -844,6 +859,8 @@ type matchStats struct {
 	Resolved int
 	Active   int
 	Events   int
+	// Exploited counts cve.exploited events for matches newly listed in the KEV catalog.
+	Exploited int
 }
 
 // matchRun holds the state of one match pass.
@@ -1095,7 +1112,8 @@ func (mr *matchRun) wantNew(dv *device, h *hit, ignored bool) bool {
 	if ignored || dv.state == "ignored" || dv.prev == 0 {
 		return false
 	}
-	if mr.info[h.cve].scoreValue() < mr.cfg.minScore {
+	ci := mr.info[h.cve]
+	if ci.scoreValue() < mr.cfg.minScore && !(mr.cfg.kevAlways && ci.exploited()) {
 		return false
 	}
 	if h.typ == MatchHeuristic && !mr.cfg.heuristicEvents {
@@ -1164,8 +1182,18 @@ func (mr *matchRun) newEvent(dv *device, h *hit) plugin.Event {
 		msg.WriteString(" Die Distribution hat die Lücke möglicherweise bereits per Backport geschlossen.")
 	}
 	vector := ""
+	var epss any
 	if ci != nil {
 		vector = ci.vector
+		if ci.exploited() {
+			fmt.Fprintf(&msg, " Laut CISA wird die Lücke aktiv ausgenutzt (im KEV-Katalog seit %s).", ci.kevAdded)
+			if ci.ransomware {
+				msg.WriteString(" Auch Ransomware nutzt sie.")
+			}
+		}
+		if ci.epss != nil {
+			epss = *ci.epss
+		}
 		if desc := truncate(ci.description, 400); desc != "" {
 			msg.WriteString("\n")
 			msg.WriteString(desc)
@@ -1175,7 +1203,7 @@ func (mr *matchRun) newEvent(dv *device, h *hit) plugin.Event {
 		Type: plugin.EvCVENew, Severity: eventSeverity(ci), DeviceID: dv.id, RunID: mr.rc.RunID,
 		Title: title, Message: msg.String(),
 		Payload: map[string]any{"cve": h.cve, "cvss": cvss, "vector": vector, "product": h.e.product,
-			"version": h.e.version, "cpe": h.e.key, "match_type": h.typ},
+			"version": h.e.version, "cpe": h.e.key, "match_type": h.typ, "kev": ci.exploited(), "epss": epss},
 		DedupKey: fmt.Sprintf("cve:%d:%s", dv.id, h.cve),
 	}
 }

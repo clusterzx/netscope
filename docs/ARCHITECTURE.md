@@ -80,7 +80,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 | Events & Regeln | `events` (`site_id` bei Events eines Standorts), `rules`, `notifications`, `rule_throttle`, `escalations` |
 | Health | `health_checks`, `health_outages` |
 | Zeitreihen | `ts_series`, `ts_raw`, `ts_5m`, `ts_1h` |
-| Schwachstellen | `device_cves`*, `cve_ignores`; NVD-Spiegel: `nvd_cves`, `nvd_cpe_matches`, `nvd_feeds` (eigene Datei, s. u.) |
+| Schwachstellen | `device_cves`*, `cve_ignores`; NVD-Spiegel: `nvd_cves`, `nvd_cpe_matches`, `nvd_feeds`, `nvd_kev` (CISA KEV), `nvd_epss` (FIRST EPSS) (eigene Datei, s. u.) |
 
 **NVD-Spiegel:** Die öffentlichen NVD-Daten (mehrere hundert MB) liegen in einer eigenen
 Datei neben der Datenbank (`netscope.db` → `netscope-nvd.db`), die jede Verbindung als
@@ -91,6 +91,14 @@ unverändert. Die Tabellen legt `ensureNVD` an (nicht die Migrationen); eine abw
 in der Hauptdatenbank (ältere Installation oder eingespieltes altes Backup), wird er beim
 Start einmalig verschoben und die Hauptdatenbank mit `VACUUM` verkleinert. Backups
 (`VACUUM main INTO`, gzip) enthalten den Spiegel nicht.
+
+KEV und EPSS liegen ebenfalls im Spiegel (`nvd_kev`, `nvd_epss`). Beide Dateien sind klein
+(rund 2 bzw. 3 MB) und werden bei jedem Sync geladen; ihre Tabelle wird nur bei geändertem
+Inhalt (SHA-256 in `nvd_feeds`, Zeilen `kev` und `epss`) und dann als Ganzes ersetzt. Eine leere
+oder unlesbare Datei ersetzt nie vorhandene Daten. Neu im KEV-Katalog aufgenommene CVEs
+(nicht beim ersten Laden) lösen nach dem Abgleich `cve.exploited` für betroffene Geräte aus.
+Listen verbinden `device_cves` zur Abfragezeit mit beiden Tabellen; Sortierung „priority“ =
+ausgenutzt, EPSS, CVSS.
 
 \* temporal. Manuelle Daten (Anzeigename, Aufstellort, Besitzer, Notizen, Tags, Custom Fields,
 Kritikalität, Zustand, manuelle Overrides mit Quelle `manual`) schreibt kein Scan und kein
@@ -252,8 +260,9 @@ aktiv, Cron-Zeitplan, Timeout, Wiederholungen + Backoff, Parallelität, Scope
 | `container.removed` | Container weg | info | diff |
 | `container.image_changed` | Container-Image geändert | info | diff |
 | `package.changed` | Paket-Änderungen | info | diff |
-| `cve.new` | Neue Schwachstelle | high (aus CVSS) | cve |
+| `cve.new` | Neue Schwachstelle | aus CVSS; critical, wenn laut CISA ausgenutzt | cve |
 | `cve.resolved` | Schwachstelle behoben | info | cve |
+| `cve.exploited` | Schwachstelle wird ausgenutzt (neu im CISA-KEV-Katalog) | critical | cve |
 | `health.down` | Check ausgefallen | high | healthcheck |
 | `health.degraded` | Check beeinträchtigt | medium | healthcheck |
 | `health.up` | Check wieder OK | info | healthcheck |

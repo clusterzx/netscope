@@ -26,7 +26,7 @@ const nvdVersion = 1
 const walLimit = 64 << 20
 
 // nvdTables in the order they are moved and dropped.
-var nvdTables = []string{"nvd_cves", "nvd_cpe_matches", "nvd_feeds"}
+var nvdTables = []string{"nvd_cves", "nvd_cpe_matches", "nvd_feeds", "nvd_kev", "nvd_epss"}
 
 const nvdTablesSQL = `
 CREATE TABLE IF NOT EXISTS nvd.nvd_cves (
@@ -64,7 +64,26 @@ CREATE TABLE IF NOT EXISTS nvd.nvd_feeds (
     synced_at     INTEGER,
     status        TEXT NOT NULL DEFAULT '',
     error         TEXT NOT NULL DEFAULT ''
-);`
+);
+-- CISA Known Exploited Vulnerabilities; dates as YYYY-MM-DD like the catalog
+CREATE TABLE IF NOT EXISTS nvd.nvd_kev (
+    cve_id      TEXT PRIMARY KEY,
+    vendor      TEXT NOT NULL DEFAULT '',
+    product     TEXT NOT NULL DEFAULT '',
+    name        TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    action      TEXT NOT NULL DEFAULT '',
+    date_added  TEXT NOT NULL DEFAULT '',
+    due_date    TEXT NOT NULL DEFAULT '',
+    ransomware  INTEGER NOT NULL DEFAULT 0,
+    notes       TEXT NOT NULL DEFAULT ''
+);
+-- FIRST EPSS: probability of exploitation within 30 days (0..1) and its percentile
+CREATE TABLE IF NOT EXISTS nvd.nvd_epss (
+    cve_id     TEXT PRIMARY KEY,
+    score      REAL NOT NULL,
+    percentile REAL NOT NULL
+) WITHOUT ROWID;`
 
 // indexes are created after a move (faster than maintaining them while copying)
 const nvdIndexSQL = `

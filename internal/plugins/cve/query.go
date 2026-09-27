@@ -37,8 +37,12 @@ type Filter struct {
 	Product        string  `json:"product,omitempty"` // substring of product name or CPE
 	DeviceID       int64   `json:"deviceId,omitempty"`
 	IncludeIgnored bool    `json:"includeIgnored,omitempty"`
-	// Sort: score | published | devices | cve | first_seen; prefix "-" sorts descending.
-	// Default "-score".
+	// Exploited keeps only CVEs of the CISA KEV catalog; MinEPSS those with at least this
+	// EPSS score (0..1).
+	Exploited bool    `json:"exploited,omitempty"`
+	MinEPSS   float64 `json:"minEpss,omitempty"`
+	// Sort: priority | score | epss | published | devices | cve | first_seen; prefix "-"
+	// sorts descending. Default "-priority": exploited first, then EPSS, then CVSS.
 	Sort   string `json:"sort,omitempty"`
 	Limit  int    `json:"limit,omitempty"` // default 100, max 1000
 	Offset int    `json:"offset,omitempty"`
@@ -62,6 +66,39 @@ type VulnRow struct {
 	Products       []string   `json:"products"`
 	MatchTypes     []string   `json:"matchTypes"`
 	FirstSeen      time.Time  `json:"firstSeen"`
+	Exploitation
+}
+
+// Exploitation tells how urgent a CVE is beyond its CVSS score.
+type Exploitation struct {
+	// Exploited: listed in the CISA catalog of Known Exploited Vulnerabilities since
+	// KEVAdded (YYYY-MM-DD); Ransomware: known use in ransomware campaigns.
+	Exploited  bool   `json:"exploited"`
+	KEVAdded   string `json:"kevAdded,omitempty"`
+	Ransomware bool   `json:"ransomware"`
+	// EPSS is the FIRST estimate (0..1) that the CVE is exploited within 30 days;
+	// EPSSPercentile ranks it among all scored CVEs.
+	EPSS           *float64 `json:"epss"`
+	EPSSPercentile *float64 `json:"epssPercentile"`
+}
+
+func (x *Exploitation) set(kev sql.NullString, ransom bool, epss, pct sql.NullFloat64) {
+	x.Exploited, x.KEVAdded, x.Ransomware = kev.Valid && kev.String != "", kev.String, ransom
+	x.EPSS, x.EPSSPercentile = floatPtr(epss), floatPtr(pct)
+}
+
+// KEVInfo is the CISA KEV catalog entry of a CVE.
+type KEVInfo struct {
+	Vendor      string `json:"vendor"`
+	Product     string `json:"product"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Action      string `json:"action"`    // required action according to CISA
+	DateAdded   string `json:"dateAdded"` // YYYY-MM-DD
+	DueDate     string `json:"dueDate"`   // deadline for US federal agencies
+	Ransomware  bool   `json:"ransomware"`
+	Notes       string `json:"notes"`
+	URL         string `json:"url"`
 }
 
 // DeviceCVE is an active CVE match of a device.
@@ -89,6 +126,7 @@ type DeviceCVE struct {
 	IgnoreNote  string      `json:"ignoreNote,omitempty"`
 	IgnoredBy   string      `json:"ignoredBy,omitempty"`
 	IgnoredAt   *time.Time  `json:"ignoredAt,omitempty"`
+	Exploitation
 }
 
 // CPEMatch is a vulnerable configuration entry of a CVE.
@@ -123,6 +161,10 @@ type CVEInfo struct {
 	CPEMatchesTotal int    `json:"cpeMatchesTotal"`
 	InMirror        bool   `json:"inMirror"` // false: only known from device matches (e.g. rejected since)
 	URL             string `json:"url"`      // NVD detail page
+	// KEV is the CISA catalog entry (nil: not known to be exploited).
+	KEV            *KEVInfo `json:"kev"`
+	EPSS           *float64 `json:"epss"`
+	EPSSPercentile *float64 `json:"epssPercentile"`
 }
 
 // FeedStatus is the sync state of one NVD feed.
@@ -222,12 +264,17 @@ func jsonList(s sql.NullString) []string {
 
 // ---------------------------------------------------------------- list
 
-var sortColumns = map[string]string{
-	"score":      "COALESCE(MAX(n.cvss_score), MAX(c.cvss_score), -1)",
-	"published":  "MAX(n.published)",
-	"devices":    "COUNT(DISTINCT c.device_id)",
-	"cve":        "c.cve_id",
-	"first_seen": "MIN(c.first_seen)",
+const scoreSort = "COALESCE(MAX(n.cvss_score), MAX(c.cvss_score), -1)"
+
+// sortColumns are the ORDER BY terms of a sort key (each gets the sort direction).
+var sortColumns = map[string][]string{
+	"priority":   {"MAX(k.cve_id IS NOT NULL)", "COALESCE(MAX(e.score), -1)", scoreSort},
+	"score":      {scoreSort},
+	"epss":       {"COALESCE(MAX(e.score), -1)", scoreSort},
+	"published":  {"MAX(n.published)"},
+	"devices":    {"COUNT(DISTINCT c.device_id)"},
+	"cve":        {"c.cve_id"},
+	"first_seen": {"MIN(c.first_seen)"},
 }
 
 // ListVulnerabilities returns the active CVEs across all devices, grouped per CVE, and
@@ -254,6 +301,13 @@ func ListVulnerabilities(ctx context.Context, d *db.DB, f Filter) ([]VulnRow, in
 		conds = append(conds, "c.device_id = ?")
 		args = append(args, f.DeviceID)
 	}
+	if f.Exploited {
+		conds = append(conds, "k.cve_id IS NOT NULL")
+	}
+	if f.MinEPSS > 0 {
+		conds = append(conds, "e.score >= ?")
+		args = append(args, f.MinEPSS)
+	}
 	if f.Site != nil {
 		if *f.Site == 0 {
 			conds = append(conds, "c.device_id IN (SELECT id FROM devices WHERE site_id IS NULL)")
@@ -264,6 +318,8 @@ func ListVulnerabilities(ctx context.Context, d *db.DB, f Filter) ([]VulnRow, in
 	}
 	from := ` FROM device_cves c
 		LEFT JOIN nvd_cves n ON n.id = c.cve_id
+		LEFT JOIN nvd_kev k ON k.cve_id = c.cve_id
+		LEFT JOIN nvd_epss e ON e.cve_id = c.cve_id
 		LEFT JOIN cve_ignores i ON i.device_id = c.device_id AND i.cve_id = c.cve_id
 		WHERE ` + strings.Join(conds, " AND ")
 	var total int
@@ -272,15 +328,19 @@ func ListVulnerabilities(ctx context.Context, d *db.DB, f Filter) ([]VulnRow, in
 	}
 	key, desc := strings.TrimPrefix(f.Sort, "-"), strings.HasPrefix(f.Sort, "-")
 	if f.Sort == "" {
-		key, desc = "score", true
+		key, desc = "priority", true
 	}
-	col, ok := sortColumns[key]
+	cols, ok := sortColumns[key]
 	if !ok {
 		return nil, 0, fmt.Errorf("unbekannte Sortierung %q", f.Sort)
 	}
 	dir := "ASC"
 	if desc {
 		dir = "DESC"
+	}
+	order := make([]string, len(cols))
+	for i, c := range cols {
+		order[i] = c + " " + dir
 	}
 	limit := f.Limit
 	if limit <= 0 {
@@ -290,8 +350,9 @@ func ListVulnerabilities(ctx context.Context, d *db.DB, f Filter) ([]VulnRow, in
 	q := `SELECT c.cve_id, MAX(n.cvss_score), MAX(c.cvss_score), MAX(n.severity), MAX(n.cvss_vector), MAX(n.cvss_version),
 		MAX(n.description), MAX(n.published), MAX(n.last_modified),
 		COUNT(DISTINCT c.device_id), COUNT(DISTINCT CASE WHEN i.device_id IS NOT NULL THEN c.device_id END),
-		json_group_array(DISTINCT c.product), json_group_array(DISTINCT c.match_type), MIN(c.first_seen)` + from +
-		` GROUP BY c.cve_id ORDER BY ` + col + ` ` + dir + `, c.cve_id DESC LIMIT ? OFFSET ?`
+		json_group_array(DISTINCT c.product), json_group_array(DISTINCT c.match_type), MIN(c.first_seen),
+		MAX(k.date_added), COALESCE(MAX(k.ransomware), 0), MAX(e.score), MAX(e.percentile)` + from +
+		` GROUP BY c.cve_id ORDER BY ` + strings.Join(order, ", ") + `, c.cve_id DESC LIMIT ? OFFSET ?`
 	rows, err := d.R.QueryContext(ctx, q, append(args, limit, max(f.Offset, 0))...)
 	if err != nil {
 		return nil, 0, err
@@ -306,11 +367,15 @@ func ListVulnerabilities(ctx context.Context, d *db.DB, f Filter) ([]VulnRow, in
 			published, modified    sql.NullInt64
 			products, types        sql.NullString
 			first                  int64
+			kev                    sql.NullString
+			ransom                 bool
+			epss, pct              sql.NullFloat64
 		)
 		if err := rows.Scan(&r.CVE, &nScore, &cScore, &sev, &vector, &ver, &desc, &published, &modified,
-			&r.Devices, &r.IgnoredDevices, &products, &types, &first); err != nil {
+			&r.Devices, &r.IgnoredDevices, &products, &types, &first, &kev, &ransom, &epss, &pct); err != nil {
 			return nil, 0, err
 		}
+		r.Exploitation.set(kev, ransom, epss, pct)
 		r.CVSS = floatPtr(nScore)
 		if r.CVSS == nil {
 			r.CVSS = floatPtr(cScore)
@@ -331,15 +396,21 @@ func ListVulnerabilities(ctx context.Context, d *db.DB, f Filter) ([]VulnRow, in
 const deviceCVESelect = `SELECT c.id, c.device_id, d.display_name, d.hostname, d.primary_ip, d.primary_mac, c.cve_id,
 	n.cvss_score, c.cvss_score, n.severity, n.cvss_vector, n.cvss_version, n.description, n.published, n.refs, n.cwes,
 	c.product, c.version, c.cpe, c.source, c.match_type, c.first_seen, c.last_seen,
-	i.device_id IS NOT NULL, i.note, i.created_by, i.created_at
+	i.device_id IS NOT NULL, i.note, i.created_by, i.created_at,
+	k.date_added, COALESCE(k.ransomware, 0), e.score, e.percentile
 	FROM device_cves c
 	JOIN devices d ON d.id = c.device_id
 	LEFT JOIN nvd_cves n ON n.id = c.cve_id
+	LEFT JOIN nvd_kev k ON k.cve_id = c.cve_id
+	LEFT JOIN nvd_epss e ON e.cve_id = c.cve_id
 	LEFT JOIN cve_ignores i ON i.device_id = c.device_id AND i.cve_id = c.cve_id
 	WHERE c.gone_at IS NULL`
 
+// queryDeviceCVEs returns device matches by priority: exploited first, then by EPSS,
+// then by CVSS.
 func queryDeviceCVEs(ctx context.Context, d *db.DB, where string, args ...any) ([]DeviceCVE, error) {
-	rows, err := d.R.QueryContext(ctx, deviceCVESelect+where+` ORDER BY COALESCE(n.cvss_score, c.cvss_score, -1) DESC, c.cve_id DESC, c.device_id`, args...)
+	rows, err := d.R.QueryContext(ctx, deviceCVESelect+where+` ORDER BY k.cve_id IS NOT NULL DESC, COALESCE(e.score, -1) DESC,
+		COALESCE(n.cvss_score, c.cvss_score, -1) DESC, c.cve_id DESC, c.device_id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -354,12 +425,16 @@ func queryDeviceCVEs(ctx context.Context, d *db.DB, where string, args ...any) (
 			published, ignoredAt               sql.NullInt64
 			note, by                           sql.NullString
 			first, last                        int64
+			kev                                sql.NullString
+			ransom                             bool
+			epss, pct                          sql.NullFloat64
 		)
 		if err := rows.Scan(&r.ID, &r.DeviceID, &disp, &host, &ip, &mac, &r.CVE, &nScore, &cScore, &sev, &vector, &ver, &desc,
 			&published, &refs, &cwes, &r.Product, &r.Version, &r.CPE, &r.Source, &r.MatchType, &first, &last,
-			&r.Ignored, &note, &by, &ignoredAt); err != nil {
+			&r.Ignored, &note, &by, &ignoredAt, &kev, &ransom, &epss, &pct); err != nil {
 			return nil, err
 		}
+		r.Exploitation.set(kev, ransom, epss, pct)
 		r.DeviceName = deviceName(disp, host, ip, mac, r.DeviceID)
 		r.CVSS = floatPtr(nScore)
 		if r.CVSS == nil {
@@ -430,6 +505,22 @@ func CVEDetail(ctx context.Context, d *db.DB, id string) (*CVEInfo, []DeviceCVE,
 	if !info.InMirror && len(devs) == 0 {
 		return nil, nil, db.ErrNotFound
 	}
+	k := &KEVInfo{URL: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search_api_fulltext=" + id}
+	err = d.R.QueryRowContext(ctx, `SELECT vendor, product, name, description, action, date_added, due_date, ransomware, notes
+		FROM nvd_kev WHERE cve_id = ?`, id).Scan(&k.Vendor, &k.Product, &k.Name, &k.Description, &k.Action, &k.DateAdded,
+		&k.DueDate, &k.Ransomware, &k.Notes)
+	switch {
+	case err == nil:
+		info.KEV = k
+	case !errors.Is(err, sql.ErrNoRows):
+		return nil, nil, err
+	}
+	var epss, pct sql.NullFloat64
+	err = d.R.QueryRowContext(ctx, "SELECT score, percentile FROM nvd_epss WHERE cve_id = ?", id).Scan(&epss, &pct)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, nil, err
+	}
+	info.EPSS, info.EPSSPercentile = floatPtr(epss), floatPtr(pct)
 	if info.InMirror {
 		if err := d.R.QueryRowContext(ctx, "SELECT COUNT(*) FROM nvd_cpe_matches WHERE cve_id = ?", id).Scan(&info.CPEMatchesTotal); err != nil {
 			return nil, nil, err
@@ -494,19 +585,26 @@ func SyncStatus(ctx context.Context, d *db.DB) (*Status, error) {
 		st.Feeds = append(st.Feeds, FeedStatus{Name: name, LastModified: s.LastModified, SHA256: s.SHA256, Size: s.Size,
 			CVECount: s.CVECount, SyncedAt: msPtr(s.SyncedAt), Status: s.Status, Error: s.Error})
 	}
-	sort.Slice(st.Feeds, func(i, j int) bool {
-		a, b := st.Feeds[i].Name, st.Feeds[j].Name
-		ya, errA := strconv.Atoi(a)
-		yb, errB := strconv.Atoi(b)
-		switch {
-		case errA != nil && errB != nil:
-			return a < b
-		case errA != nil:
-			return true // "modified" first
-		case errB != nil:
-			return false
+	// "modified" first, then the years (newest first), then KEV and EPSS
+	rank := func(name string) (int, int) {
+		if y, err := strconv.Atoi(name); err == nil {
+			return 1, -y
 		}
-		return ya > yb
+		if name == feedModified {
+			return 0, 0
+		}
+		return 2, 0
+	}
+	sort.Slice(st.Feeds, func(i, j int) bool {
+		ri, yi := rank(st.Feeds[i].Name)
+		rj, yj := rank(st.Feeds[j].Name)
+		if ri != rj {
+			return ri < rj
+		}
+		if yi != yj {
+			return yi < yj
+		}
+		return st.Feeds[i].Name < st.Feeds[j].Name
 	})
 	if s, ok := states[stateSync]; ok {
 		st.CVECount, st.CPEMatchCount = int64(s.CVECount), s.Size
@@ -541,27 +639,35 @@ func msPtr(ms int64) *time.Time {
 }
 
 // Summary counts the active, non-ignored device CVEs (device × CVE) by severity for the
-// dashboard. Keys: critical, high, medium, low, none, unknown, total, devices.
+// dashboard. Keys: critical, high, medium, low, none, unknown, total, devices, and
+// exploited / exploitedDevices for matches listed in the KEV catalog.
 func Summary(ctx context.Context, d *db.DB) (map[string]int, error) {
-	out := map[string]int{"critical": 0, "high": 0, "medium": 0, "low": 0, "none": 0, "unknown": 0, "total": 0, "devices": 0}
-	devices := map[int64]bool{}
-	err := queryEach(ctx, d.R, `SELECT c.device_id, MAX(n.severity), COALESCE(MAX(n.cvss_score), MAX(c.cvss_score))
-		FROM device_cves c LEFT JOIN nvd_cves n ON n.id = c.cve_id
+	out := map[string]int{"critical": 0, "high": 0, "medium": 0, "low": 0, "none": 0, "unknown": 0, "total": 0, "devices": 0,
+		"exploited": 0, "exploitedDevices": 0}
+	devices, exploited := map[int64]bool{}, map[int64]bool{}
+	err := queryEach(ctx, d.R, `SELECT c.device_id, MAX(n.severity), COALESCE(MAX(n.cvss_score), MAX(c.cvss_score)), MAX(k.cve_id IS NOT NULL)
+		FROM device_cves c LEFT JOIN nvd_cves n ON n.id = c.cve_id LEFT JOIN nvd_kev k ON k.cve_id = c.cve_id
 		WHERE c.gone_at IS NULL AND NOT EXISTS (SELECT 1 FROM cve_ignores i WHERE i.device_id = c.device_id AND i.cve_id = c.cve_id)
 		GROUP BY c.device_id, c.cve_id`, nil, func(r *sql.Rows) error {
 		var (
 			dev   int64
 			sev   sql.NullString
 			score sql.NullFloat64
+			kev   bool
 		)
-		if err := r.Scan(&dev, &sev, &score); err != nil {
+		if err := r.Scan(&dev, &sev, &score, &kev); err != nil {
 			return err
 		}
 		out[severityOf(sev.String, floatPtr(score))]++
 		out["total"]++
 		devices[dev] = true
+		if kev {
+			out["exploited"]++
+			exploited[dev] = true
+		}
 		return nil
 	})
 	out["devices"] = len(devices)
+	out["exploitedDevices"] = len(exploited)
 	return out, err
 }

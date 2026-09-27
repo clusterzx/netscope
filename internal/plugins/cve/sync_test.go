@@ -28,6 +28,8 @@ type feedServer struct {
 	feeds   map[string][]byte // name -> uncompressed JSON
 	fail    map[string]int    // name -> HTTP status for the .json.gz
 	badMeta map[string]bool   // name -> announce a wrong checksum
+	kev     []byte            // KEV catalog JSON (/kev.json)
+	epss    []byte            // EPSS CSV, uncompressed (/epss.csv.gz)
 	hits    map[string]int    // request path -> count
 	srv     *httptest.Server
 }
@@ -35,7 +37,8 @@ type feedServer struct {
 const emptyFeed = `{"resultsPerPage":0,"startIndex":0,"totalResults":0,"format":"NVD_CVE","version":"2.0","timestamp":"2026-09-01T03:00:00.000","vulnerabilities":[]}`
 
 func newFeedServer(t *testing.T) *feedServer {
-	s := &feedServer{feeds: map[string][]byte{}, fail: map[string]int{}, badMeta: map[string]bool{}, hits: map[string]int{}}
+	s := &feedServer{feeds: map[string][]byte{}, fail: map[string]int{}, badMeta: map[string]bool{}, hits: map[string]int{},
+		kev: kevDoc("CVE-2000-0001", "2021-11-03"), epss: []byte(epssDoc("CVE-2000-0001,0.01,0.5"))}
 	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
 	t.Cleanup(s.srv.Close)
 	return s
@@ -53,10 +56,40 @@ func (s *feedServer) count(path string) int {
 	return s.hits[path]
 }
 
+// settings adds the URLs of this server to plugin settings.
+func (s *feedServer) settings(m map[string]any) map[string]any {
+	out := map[string]any{"feed_base_url": s.srv.URL, "kev_url": s.srv.URL + "/kev.json", "epss_url": s.srv.URL + "/epss.csv.gz"}
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+func (s *feedServer) setPrio(kev []byte, epss string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if kev != nil {
+		s.kev = kev
+	}
+	if epss != "" {
+		s.epss = []byte(epss)
+	}
+}
+
 func (s *feedServer) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.hits[r.URL.Path]++
+	switch r.URL.Path {
+	case "/kev.json":
+		w.Write(s.kev)
+		return
+	case "/epss.csv.gz":
+		zw := gzip.NewWriter(w)
+		zw.Write(s.epss)
+		zw.Close()
+		return
+	}
 	file := strings.TrimPrefix(r.URL.Path, "/"+feedFilePrefix)
 	name, ext, _ := strings.Cut(file, ".")
 	doc, ok := s.feeds[name]
@@ -165,7 +198,7 @@ func TestSyncEndToEnd(t *testing.T) {
 	addPort(t, d, nginx, 80, "nginx", "1.18.0", []string{"cpe:/a:igor_sysoev:nginx:1.18.0"}, t0)
 
 	p := newTestPlugin(c)
-	settings := map[string]any{"feed_base_url": fs.srv.URL, "start_year": 2021}
+	settings := fs.settings(map[string]any{"start_year": 2021})
 	rc, evs := testRC(t, p, d, settings)
 
 	// 1. initial load: every yearly feed plus modified, then a full match without events
@@ -209,7 +242,8 @@ func TestSyncEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Empty || len(status.Feeds) != 7 || status.Feeds[0].Name != "modified" || status.Feeds[1].Name != "2026" ||
+	if status.Empty || len(status.Feeds) != 9 || status.Feeds[0].Name != "modified" || status.Feeds[1].Name != "2026" ||
+		status.Feeds[7].Name != feedEPSS || status.Feeds[8].Name != feedKEV ||
 		status.SyncMode != "initial" || status.CVECount == 0 || status.CPEMatchCount == 0 || status.LastMatch == nil ||
 		status.LastMatch.Status != "ok" || status.LastMatch.Devices != 3 || status.Disclaimer == "" {
 		t.Fatalf("status %+v", status)
@@ -290,7 +324,7 @@ func TestSyncEndToEnd(t *testing.T) {
 	fs.mu.Unlock()
 
 	// 6. raising the start year removes older CVEs, their feeds and matches (silently)
-	rc2, evs2 := testRC(t, p, d, map[string]any{"feed_base_url": fs.srv.URL, "start_year": 2024})
+	rc2, evs2 := testRC(t, p, d, fs.settings(map[string]any{"start_year": 2024}))
 	c.Advance(time.Hour)
 	if err := p.Run(ctx, rc2); err != nil {
 		t.Fatal(err)
@@ -315,7 +349,7 @@ func TestSyncKeepDownloadsAndActions(t *testing.T) {
 	fs.set("2024", fixtureDoc(t, "nvdcve-2.0-2024.json.gz", only("CVE-2024-6387"), nil))
 	c := newClock()
 	p := newTestPlugin(c)
-	rc, _ := testRC(t, p, d, map[string]any{"feed_base_url": fs.srv.URL + "/", "start_year": 2024, "keep_downloads": true})
+	rc, _ := testRC(t, p, d, fs.settings(map[string]any{"feed_base_url": fs.srv.URL + "/", "start_year": 2024, "keep_downloads": true}))
 	actions := p.Actions()
 	if len(actions) != 2 || actions[0].Name != "sync" || actions[1].Name != "match" || actions[0].Scope != plugin.ActionPlugin {
 		t.Fatalf("actions %+v", actions)
@@ -362,7 +396,7 @@ func TestSyncCancel(t *testing.T) {
 	fs := newFeedServer(t)
 	c := newClock()
 	p := newTestPlugin(c)
-	rc, _ := testRC(t, p, d, map[string]any{"feed_base_url": fs.srv.URL, "start_year": 2002})
+	rc, _ := testRC(t, p, d, fs.settings(map[string]any{"start_year": 2002}))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if err := p.Run(ctx, rc); err == nil {

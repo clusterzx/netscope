@@ -19,6 +19,7 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
+	import ExploitBadges from '$lib/components/vulnerabilities/ExploitBadges.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDate, formatDateTime, formatNumber } from '$lib/utils/format';
@@ -40,7 +41,7 @@
 	let showIgnored = $state(false);
 	let minSev = $state('');
 	let text = $state('');
-	let sort = $state('-cvss');
+	let sort = $state('-priority');
 	let offset = $state(0);
 	let limit = $state(100);
 
@@ -76,6 +77,13 @@
 		const f = desc ? sort.slice(1) : sort;
 		const val = (c: Item): number | string => {
 			switch (f) {
+				case 'priority':
+					// exploited first, then EPSS, then CVSS
+					return (
+						(c.exploited ? 1e7 : 0) + Math.round((c.epss ?? 0) * 1e4) * 100 + Math.round((c.cvss ?? 0) * 10)
+					);
+				case 'epss':
+					return c.epss ?? -1;
 				case 'cvss':
 					return c.cvss ?? -1;
 				case 'published':
@@ -174,6 +182,8 @@
 		{ value: 'critical', label: 'nur Kritisch' }
 	];
 	const sortOptions = [
+		{ value: '-priority', label: 'Dringlichkeit' },
+		{ value: '-epss', label: 'EPSS absteigend' },
 		{ value: '-cvss', label: 'CVSS absteigend' },
 		{ value: 'cvss', label: 'CVSS aufsteigend' },
 		{ value: '-published', label: 'Neueste CVEs zuerst' },
@@ -194,9 +204,12 @@
 	/>
 {/snippet}
 {#snippet cveCell(c: Item)}
-	<a href="/vulnerabilities/{c.cve}" class="link mono whitespace-nowrap {c.ignored ? 'line-through' : ''}"
-		>{c.cve}</a
-	>
+	<span class="flex flex-wrap items-center gap-1.5">
+		<a href="/vulnerabilities/{c.cve}" class="link mono whitespace-nowrap {c.ignored ? 'line-through' : ''}"
+			>{c.cve}</a
+		>
+		<ExploitBadges x={c} />
+	</span>
 	{#if c.published}<span class="hidden text-xs text-fg-subtle sm:block"
 			>veröffentlicht {formatDate(c.published)}</span
 		>{/if}

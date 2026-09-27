@@ -4,6 +4,8 @@
 	import type { ApiCveDetail, CveDeviceCVE } from '$lib/api/generated';
 	import CvssCard from '$lib/components/vulnerabilities/CvssCard.svelte';
 	import Disclaimer from '$lib/components/vulnerabilities/Disclaimer.svelte';
+	import ExploitBadges from '$lib/components/vulnerabilities/ExploitBadges.svelte';
+	import ExploitCard from '$lib/components/vulnerabilities/ExploitCard.svelte';
 	import IgnoreDialog, { type IgnoreTarget } from '$lib/components/vulnerabilities/IgnoreDialog.svelte';
 	import {
 		cweUrl,
@@ -90,6 +92,17 @@
 	{/snippet}
 	{#snippet meta()}
 		{#if data.data}
+			{#if info}
+				<ExploitBadges
+					x={{
+						exploited: !!info.kev,
+						kevAdded: info.kev?.dateAdded,
+						ransomware: info.kev?.ransomware,
+						epss: info.epss,
+						epssPercentile: info.epssPercentile
+					}}
+				/>
+			{/if}
 			{#if info?.status}
 				<Badge tone={info.status === 'Rejected' ? 'danger' : 'neutral'} title="NVD-Status"
 					>{nvdStatusLabel[info.status] ?? info.status}</Badge
@@ -287,6 +300,7 @@
 			</div>
 
 			<div class="flex min-w-0 flex-col gap-4">
+				<ExploitCard kev={info?.kev} epss={info?.epss} percentile={info?.epssPercentile} />
 				<CvssCard {cvss} {vector} {version} {severity} />
 
 				<Card title="Schwachstellentyp (CWE)" icon="bug">

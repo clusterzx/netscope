@@ -6,12 +6,18 @@
 	import type { ApiVulnList, ApiVulnStatus, CveVulnRow } from '$lib/api/generated';
 	import DevicePicker from '$lib/components/health/DevicePicker.svelte';
 	import Disclaimer from '$lib/components/vulnerabilities/Disclaimer.svelte';
+	import ExploitBadges from '$lib/components/vulnerabilities/ExploitBadges.svelte';
 	import SeveritySummary from '$lib/components/vulnerabilities/SeveritySummary.svelte';
 	import SyncStatusCard from '$lib/components/vulnerabilities/SyncStatusCard.svelte';
 	import {
+		DEFAULT_SORT,
+		EPSS_OPTIONS,
 		MIN_OPTIONS,
 		SORT_OPTIONS,
 		cveSeverityLabel,
+		epssLabel,
+		epssTitle,
+		epssTone,
 		matchTypeHint,
 		matchTypeLabel,
 		matchTypeTone
@@ -40,7 +46,6 @@
 	import { debounce, intParam, setParams } from '$lib/utils/url';
 
 	const PAGE_SIZES = [25, 50, 100, 250];
-	const DEFAULT_SORT = '-score';
 
 	// ---------------------------------------------------------------- URL state
 	const sp = $derived(page.url.searchParams);
@@ -49,6 +54,8 @@
 	const min = $derived(sp.get('min') ?? '');
 	const device = $derived(intParam(sp, 'device', 0));
 	const ignored = $derived(sp.get('ignored') === '1');
+	const exploited = $derived(sp.get('exploited') === '1');
+	const minEpss = $derived(sp.get('minEpss') ?? '');
 	const sort = $derived(sp.get('sort') || DEFAULT_SORT);
 	const offset = $derived(Math.max(0, intParam(sp, 'offset', 0)));
 	const limit = $derived(PAGE_SIZES.includes(intParam(sp, 'limit', 50)) ? intParam(sp, 'limit', 50) : 50);
@@ -103,6 +110,8 @@
 			min: min ? Number(min) : null,
 			device: device || null,
 			ignored: ignored || null,
+			exploited: exploited || null,
+			minEpss: minEpss ? Number(minEpss) : null,
 			sort,
 			limit,
 			offset,
@@ -127,16 +136,26 @@
 		applyProduct.cancel();
 	});
 
-	const hasFilter = $derived(!!(q || product || min || device || ignored));
+	const hasFilter = $derived(!!(q || product || min || device || ignored || exploited || minEpss));
 	function resetFilters() {
 		qText = '';
 		productText = '';
-		setParams({ q: null, product: null, min: null, device: null, ignored: null, offset: null });
+		setParams({
+			q: null,
+			product: null,
+			min: null,
+			device: null,
+			ignored: null,
+			exploited: null,
+			minEpss: null,
+			offset: null
+		});
 	}
 
 	// ---------------------------------------------------------------- table
 	const columns: Column<CveVulnRow>[] = [
 		{ key: 'score', label: 'CVSS', sortable: 'score', sortDesc: true, width: '5.5rem' },
+		{ key: 'epss', label: 'EPSS', sortable: 'epss', sortDesc: true, width: '5.5rem', hideBelow: 'sm' },
 		{ key: 'cve', label: 'CVE', sortable: 'cve', class: 'min-w-64' },
 		{ key: 'devices', label: 'Geräte', sortable: 'devices', sortDesc: true, align: 'right', width: '6rem' },
 		{ key: 'products', label: 'Produkte', hideBelow: 'lg', class: 'max-w-72' },
@@ -159,6 +178,8 @@
 			summary={status.data?.summary}
 			activeMin={min}
 			onpick={(m) => setParams({ min: m, offset: null })}
+			exploitedActive={exploited}
+			onexploited={() => setParams({ exploited: exploited ? null : '1', offset: null })}
 		/>
 		<SyncStatusCard status={status.data} error={status.error} onretry={() => status.reload()} />
 	</div>
@@ -199,10 +220,26 @@
 		</div>
 		<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
 			<Checkbox
+				checked={exploited}
+				label="Nur aktiv ausgenutzte (CISA KEV)"
+				onchange={(e) =>
+					setParams({ exploited: (e.currentTarget as HTMLInputElement).checked ? '1' : null, offset: null })}
+			/>
+			<Checkbox
 				checked={ignored}
 				label="Auch als irrelevant markierte"
 				onchange={(e) =>
 					setParams({ ignored: (e.currentTarget as HTMLInputElement).checked ? '1' : null, offset: null })}
+			/>
+			<Select
+				label="EPSS"
+				value={minEpss}
+				options={EPSS_OPTIONS}
+				placeholder="Alle EPSS-Werte"
+				size="sm"
+				class="w-44"
+				onchange={(e) =>
+					setParams({ minEpss: (e.currentTarget as HTMLSelectElement).value || null, offset: null })}
 			/>
 			<Select
 				label="Sortierung"
@@ -248,10 +285,19 @@
 					{:else}
 						<Badge tone="neutral" title="Keine CVSS-Bewertung">{cveSeverityLabel[r.severity] ?? '–'}</Badge>
 					{/if}
+				{:else if col.key === 'epss'}
+					{#if r.epss !== undefined && r.epss !== null}
+						<Badge tone={epssTone(r.epss)} title={epssTitle(r.epss, r.epssPercentile)}
+							>{epssLabel(r.epss)}</Badge
+						>
+					{:else}
+						<span class="text-fg-subtle" title="Kein EPSS-Wert">–</span>
+					{/if}
 				{:else if col.key === 'cve'}
 					<div class="flex min-w-0 flex-col gap-0.5">
 						<span class="flex flex-wrap items-center gap-1.5">
 							<a href="/vulnerabilities/{r.cve}" class="link mono font-medium">{r.cve}</a>
+							<ExploitBadges x={r} epss={false} />
 							{#if r.allIgnored}<Badge
 									tone="neutral"
 									title="Für alle betroffenen Geräte als irrelevant markiert">alle ignoriert</Badge

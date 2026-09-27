@@ -169,6 +169,7 @@ export interface ApiDashboard {
 	criticalEvents: EventsEvent[];
 	cves: Record<string, number>;
 	devices: ApiDeviceCounts;
+	exploitedCves: number;
 	generatedAt: string;
 	health: Record<string, number>;
 	openEvents: Record<string, number>;
@@ -558,6 +559,8 @@ export interface ApiTopCVE {
 	cve: string;
 	cvss: number;
 	devices: number;
+	epss?: number;
+	exploited: boolean;
 }
 
 export interface ApiTotpConfirmRequest {
@@ -742,8 +745,11 @@ export interface CveCVEInfo {
 	cvssVersion: string;
 	cwes: string[];
 	description: string;
+	epss?: number;
+	epssPercentile?: number;
 	id: string;
 	inMirror: boolean;
+	kev?: CveKEVInfo;
 	lastModified?: string;
 	published?: string;
 	refs: CveReference[];
@@ -762,16 +768,21 @@ export interface CveDeviceCVE {
 	description: string;
 	deviceId: number;
 	deviceName: string;
+	epss?: number;
+	epssPercentile?: number;
+	exploited: boolean;
 	firstSeen: string;
 	id: number;
 	ignoreNote?: string;
 	ignored: boolean;
 	ignoredAt?: string;
 	ignoredBy?: string;
+	kevAdded?: string;
 	lastSeen: string;
 	matchType: string;
 	product: string;
 	published?: string;
+	ransomware: boolean;
 	refs: CveReference[];
 	severity: string;
 	source: string;
@@ -788,6 +799,19 @@ export interface CveFeedStatus {
 	size: number;
 	status: string;
 	syncedAt?: string;
+}
+
+export interface CveKEVInfo {
+	action: string;
+	dateAdded: string;
+	description: string;
+	dueDate: string;
+	name: string;
+	notes: string;
+	product: string;
+	ransomware: boolean;
+	url: string;
+	vendor: string;
 }
 
 export interface CveMatchStatus {
@@ -811,12 +835,17 @@ export interface CveVulnRow {
 	cvssVersion: string;
 	description: string;
 	devices: number;
+	epss?: number;
+	epssPercentile?: number;
+	exploited: boolean;
 	firstSeen: string;
 	ignoredDevices: number;
+	kevAdded?: string;
 	lastModified?: string;
 	matchTypes: string[];
 	products: string[];
 	published?: string;
+	ransomware: boolean;
 	severity: string;
 	vector: string;
 }
@@ -2768,6 +2797,8 @@ export interface ApiPaths {
 				product?: string | null;
 				device?: number | null;
 				ignored?: boolean | null;
+				exploited?: boolean | null;
+				minEpss?: number | null;
 				sort?: string | null;
 				limit?: number | null;
 				offset?: number | null;

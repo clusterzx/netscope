@@ -96,6 +96,7 @@ var minScoreOptions = []plugin.Option{
 func (p *Plugin) Schema() plugin.Schema {
 	const (
 		gMirror = "NVD-Spiegel"
+		gPrio   = "Priorisierung"
 		gMatch  = "Abgleich"
 		gEvents = "Events"
 	)
@@ -111,6 +112,18 @@ func (p *Plugin) Schema() plugin.Schema {
 			Validation:  &plugin.Validation{Min: plugin.Int64(10), Max: plugin.Int64(3600)}},
 		{Key: "keep_downloads", Type: plugin.FieldBool, Label: "Downloads behalten", Group: gMirror, Default: false, Advanced: true,
 			Description: "Heruntergeladene Feed-Dateien im Plugin-Verzeichnis aufbewahren statt sie nach dem Import zu löschen."},
+		{Key: "kev_enabled", Type: plugin.FieldBool, Label: "Aktiv ausgenutzte Schwachstellen (CISA KEV)", Group: gPrio, Default: true,
+			Description: "Lädt täglich den Katalog der US-Behörde CISA mit Schwachstellen, die nachweislich angegriffen werden. Solche CVEs stehen in allen Listen oben und sind markiert."},
+		{Key: "kev_url", Type: plugin.FieldString, Label: "KEV-URL", Group: gPrio, Default: DefaultKEVURL, Advanced: true,
+			VisibleIf:   &plugin.Condition{Field: "kev_enabled", Equals: []any{true}},
+			Description: "JSON-Feed des KEV-Katalogs. Nur für eigene Spiegel ändern.",
+			Validation:  &plugin.Validation{Format: "url"}},
+		{Key: "epss_enabled", Type: plugin.FieldBool, Label: "Ausnutzungs-Wahrscheinlichkeit (FIRST EPSS)", Group: gPrio, Default: true,
+			Description: "Lädt täglich die EPSS-Werte: die geschätzte Wahrscheinlichkeit, dass eine CVE in den nächsten 30 Tagen ausgenutzt wird. Damit sortiert NetScope Treffer gleicher Kategorie nach Dringlichkeit."},
+		{Key: "epss_url", Type: plugin.FieldString, Label: "EPSS-URL", Group: gPrio, Default: DefaultEPSSURL, Advanced: true,
+			VisibleIf:   &plugin.Condition{Field: "epss_enabled", Equals: []any{true}},
+			Description: "Gzip-komprimierte CSV-Datei mit allen EPSS-Werten. Nur für eigene Spiegel ändern.",
+			Validation:  &plugin.Validation{Format: "url"}},
 		{Key: "include_packages", Type: plugin.FieldBool, Label: "Installierte Pakete abgleichen", Group: gMatch, Default: true,
 			Description: "Paketlisten von SSH-Hosts (dpkg, rpm, apk) über eine kuratierte Zuordnung abgleichen. Distributionen spielen Sicherheitskorrekturen zurück, ohne die Version zu erhöhen – diese Treffer sind immer heuristisch."},
 		{Key: "include_os", Type: plugin.FieldBool, Label: "Betriebssystem abgleichen", Group: gMatch, Default: true,
@@ -124,6 +137,12 @@ func (p *Plugin) Schema() plugin.Schema {
 			Description: "Für neue bzw. behobene CVEs unterhalb dieses CVSS-Basiswerts werden keine Events erzeugt; sie erscheinen trotzdem in der Liste."},
 		{Key: "heuristic_events", Type: plugin.FieldBool, Label: "Events auch für heuristische Treffer", Group: gEvents, Default: true,
 			Description: "Auch für Treffer aus Paketversionen, Distributions-Bannern und OS-Vermutungen Events erzeugen. Ausschalten, wenn Backports zu vielen Fehlalarmen führen."},
+		{Key: "kev_always", Type: plugin.FieldBool, Label: "Ausgenutzte CVEs immer melden", Group: gEvents, Default: true,
+			VisibleIf:   &plugin.Condition{Field: "kev_enabled", Equals: []any{true}},
+			Description: "Neue Treffer aus dem KEV-Katalog erzeugen ein Event, auch wenn ihr CVSS-Wert unter der Schwelle liegt."},
+		{Key: "kev_events", Type: plugin.FieldBool, Label: "Melden, wenn eine gefundene CVE ausgenutzt wird", Group: gEvents, Default: true,
+			VisibleIf:   &plugin.Condition{Field: "kev_enabled", Equals: []any{true}},
+			Description: "Kritisches Event (cve.exploited), sobald CISA eine CVE, die bereits ein Gerät betrifft, neu in den Katalog aufnimmt."},
 	}}
 }
 
@@ -155,6 +174,12 @@ type config struct {
 	includeOSGuesses bool
 	minScore         float64
 	heuristicEvents  bool
+
+	kevEnabled, epssEnabled bool
+	kevURL, epssURL         string
+	// kevAlways raises cve.new for KEV CVEs below minScore; kevEvents raises
+	// cve.exploited when a matched CVE is added to the catalog.
+	kevAlways, kevEvents bool
 }
 
 func loadConfig(s plugin.Settings) config {
@@ -168,9 +193,21 @@ func loadConfig(s plugin.Settings) config {
 		includeOSGuesses: s.Bool("include_os_guesses"),
 		includeHTTP:      s.Bool("include_http_apps"),
 		heuristicEvents:  s.Bool("heuristic_events"),
+		kevEnabled:       s.Bool("kev_enabled"),
+		epssEnabled:      s.Bool("epss_enabled"),
+		kevURL:           strings.TrimSpace(s.String("kev_url")),
+		epssURL:          strings.TrimSpace(s.String("epss_url")),
+		kevAlways:        s.Bool("kev_always"),
+		kevEvents:        s.Bool("kev_events"),
 	}
 	if c.baseURL == "" {
 		c.baseURL = DefaultFeedURL
+	}
+	if c.kevURL == "" {
+		c.kevURL = DefaultKEVURL
+	}
+	if c.epssURL == "" {
+		c.epssURL = DefaultEPSSURL
 	}
 	if c.startYear < firstFeedYear {
 		c.startYear = firstFeedYear
@@ -221,15 +258,35 @@ func (p *Plugin) syncAndMatch(ctx context.Context, rc *plugin.RunContext, force 
 	if ctx.Err() != nil {
 		return st, nil, ctx.Err()
 	}
+	ps, prioErr := p.syncPriority(ctx, rc, cfg, force)
+	if ctx.Err() != nil {
+		return st, nil, ctx.Err()
+	}
+	if st != nil && ps != nil {
+		st.Prio = ps
+		rc.SetStat("kev_cves", ps.KEV)
+		rc.SetStat("kev_added", len(ps.KEVAdded))
+		rc.SetStat("epss_cves", ps.EPSS)
+	}
 	var changed map[string]struct{}
 	if st != nil {
 		changed = st.Changed
 	}
 	ms, matchErr := p.fullMatch(ctx, rc, cfg, changed)
+	if matchErr == nil && ps != nil && cfg.kevEvents {
+		n, err := p.exploitedEvents(ctx, rc, ps.KEVAdded)
+		if err != nil {
+			rc.Log.Warn("Events zu ausgenutzten CVEs fehlgeschlagen", "error", err)
+		}
+		if ms != nil {
+			ms.Events += n
+			ms.Exploited = n
+		}
+	}
 	if syncErr != nil {
 		syncErr = fmt.Errorf("NVD-Synchronisation: %w", syncErr)
 	}
-	return st, ms, errors.Join(syncErr, matchErr)
+	return st, ms, errors.Join(syncErr, prioErr, matchErr)
 }
 
 // fullMatch matches all devices (skipped while the mirror is empty).
@@ -321,9 +378,23 @@ func summary(st *syncStats, ms *matchStats) string {
 		default:
 			parts = append(parts, fmt.Sprintf("NVD: %d Feed(s) geladen, %d CVEs aktualisiert", st.Downloaded, st.Written))
 		}
+		if ps := st.Prio; ps != nil && (ps.KEV > 0 || ps.EPSS > 0) {
+			s := fmt.Sprintf("KEV: %d ausgenutzte CVEs", ps.KEV)
+			if len(ps.KEVAdded) > 0 {
+				s += fmt.Sprintf(" (%d neu)", len(ps.KEVAdded))
+			}
+			if ps.EPSS > 0 {
+				s += fmt.Sprintf(", EPSS für %d CVEs", ps.EPSS)
+			}
+			parts = append(parts, s)
+		}
 	}
 	if ms != nil {
-		parts = append(parts, fmt.Sprintf("Abgleich: %d Geräte, %d aktive Treffer, %d neu, %d behoben", ms.Devices, ms.Active, ms.New, ms.Resolved))
+		s := fmt.Sprintf("Abgleich: %d Geräte, %d aktive Treffer, %d neu, %d behoben", ms.Devices, ms.Active, ms.New, ms.Resolved)
+		if ms.Exploited > 0 {
+			s += fmt.Sprintf(", %d jetzt ausgenutzt", ms.Exploited)
+		}
+		parts = append(parts, s)
 	}
 	return strings.Join(parts, " · ")
 }
@@ -336,6 +407,11 @@ func actionData(st *syncStats, ms *matchStats) map[string]any {
 		out["feedsDownloaded"] = st.Downloaded
 		out["cvesWritten"] = st.Written
 		out["feedsFailed"] = st.Failed
+		if ps := st.Prio; ps != nil {
+			out["kevCves"] = ps.KEV
+			out["kevAdded"] = len(ps.KEVAdded)
+			out["epssCves"] = ps.EPSS
+		}
 	}
 	if ms != nil {
 		out["devices"] = ms.Devices

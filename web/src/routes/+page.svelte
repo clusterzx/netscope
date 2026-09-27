@@ -353,6 +353,18 @@
 						</li>
 					{/each}
 				</ul>
+				{#if (d.exploitedCves ?? 0) > 0}
+					<a
+						href="/vulnerabilities?exploited=1"
+						class="mt-3 flex items-center gap-2 rounded-md border border-danger/40 px-2.5 py-2 text-sm hover:bg-danger-soft"
+						title="Schwachstellen, die laut CISA aktiv ausgenutzt werden"
+					>
+						<Icon name="zap" size={15} class="shrink-0 text-danger" />
+						<span class="font-medium text-danger tabular">{formatNumber(d.exploitedCves)}</span>
+						<span class="text-fg-muted">aktiv ausgenutzt</span>
+						<Icon name="arrow-right" size={14} class="ml-auto text-fg-subtle" />
+					</a>
+				{/if}
 				{#if (d.topCves ?? []).length}
 					<h3 class="mt-5 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">Top-CVEs</h3>
 					<ul class="-mx-2">
@@ -364,6 +376,12 @@
 								>
 									<SeverityBadge cvss={c.cvss} />
 									<span class="mono flex-1 truncate text-sm">{c.cve}</span>
+									{#if c.exploited}<Icon
+											name="zap"
+											size={14}
+											class="shrink-0 text-danger"
+											label="Laut CISA aktiv ausgenutzt"
+										/>{/if}
 									<span class="text-xs text-fg-subtle"
 										>{c.devices} {c.devices === 1 ? 'Gerät' : 'Geräte'}</span
 									>

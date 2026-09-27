@@ -206,7 +206,7 @@ sofort, ohne Neustart.
 | `netalertx` | Importer | manuell | Einmaliger Import einer NetAlertX-Datenbank oder -CSV |
 | `csv` | Importer | manuell | Generischer Inventar-Import (Export: Reports) |
 | `diff` | Processor | stündlich | Änderungen → Events; stündliche Prüfung ablaufender Zertifikate; Flap-Dämpfung für Online/Offline (keine Events für Handys/Tablets, max. 4 Wechsel pro Gerät in 24 h – einstellbar) |
-| `cve` | Processor | täglich 04:30 | NVD-Spiegel (JSON-2.0-Feeds) und CVE-Abgleich der CPEs |
+| `cve` | Processor | täglich 04:30 | NVD-Spiegel (JSON-2.0-Feeds), CISA KEV und FIRST EPSS, CVE-Abgleich der CPEs |
 | `healthcheck` | Processor | alle 30 s | TCP/HTTP/TLS/ICMP-Checks mit Flap-Dämpfung und Verfügbarkeit |
 | `topology` | Processor | alle 15 min | Graph aus FDB, LLDP, ARP, Proxmox und Docker |
 | `cleanup` | Processor | alle 15 min | Downsampling der Zeitreihen, Aufbewahrungsfristen je Datenart (Rohdaten 30 Tage, Anwesenheits-Scans 2 Tage, Historie 1 Jahr; Events bleiben immer) |
@@ -432,9 +432,10 @@ port:22|80 ip:192.168.8.0/24 app:grafana cert<30d
 | `ip`, `subnet`, `mac` | Adressen (CIDR und Platzhalter `*` erlaubt) |
 | `port` (`:`, `>`, `<` …; `port:161/udp`), `service`, `product`, `version` | offene Ports und Dienste |
 | `state` (known/unknown/ignored), `crit` (low…critical, auch `crit>=high`) | Zustand, Kritikalität |
-| `is` (online, offline, new, known, unknown, ignored, randomized, critical), `online:yes` | Status |
+| `is` (online, offline, new, known, unknown, ignored, randomized, critical, exploited), `online:yes` | Status; `is:exploited` = mindestens eine laut CISA aktiv ausgenutzte CVE |
 | `has` (notes, cve, cert, health, ports, http, containers, packages, parent, children, tags, mac, hostname) | vorhanden |
 | `cve>=7`, `cve:CVE-2024-6387` | höchster CVSS-Wert oder konkrete CVE |
+| `epss>=0.1` (auch `epss>=10%`) | höchster EPSS-Wert der CVEs eines Geräts |
 | `seen<24h`, `first<7d` (m, h, d, w, y) | Letzt-/Erstsichtung |
 | `cert<30d`, `cert:expired`, `cert:selfsigned`, `cert:weak` | Zertifikate |
 | `app`, `title`, `container`, `package`, `health`, `source`, `parent`, `id` | weitere Merkmale |
@@ -470,6 +471,16 @@ ist nicht Teil der Backups.
 Der Versionsabgleich ist **heuristisch** – insbesondere Distributionspakete enthalten oft
 zurückportierte Sicherheitskorrekturen. Einzelne CVEs lassen sich pro Gerät als irrelevant
 markieren; die Markierung übersteht jeden Abgleich.
+
+**Was zuerst?** Mit dem NVD-Spiegel lädt das Plugin täglich den Katalog der US-Behörde CISA
+mit nachweislich angegriffenen Schwachstellen (Known Exploited Vulnerabilities, KEV) und die
+EPSS-Werte von FIRST (geschätzte Wahrscheinlichkeit einer Ausnutzung in den nächsten
+30 Tagen). Listen, Gerätereiter und Dashboard sortieren danach: aktiv ausgenutzte CVEs zuerst
+(markiert mit „Ausgenutzt“, ggf. „Ransomware“), dann nach EPSS, dann nach CVSS. Filter „Nur
+aktiv ausgenutzte“ und „EPSS ab“, in der Gerätesuche `is:exploited` und `epss>=0.1`.
+Ausgenutzte CVEs erzeugen `cve.new` unabhängig von der CVSS-Schwelle und als kritisch; nimmt
+CISA eine CVE neu auf, die bereits ein Gerät betrifft, meldet NetScope `cve.exploited`
+(beides abschaltbar im Plugin).
 
 OS-Vermutungen aus der nmap-Fingerabdruck-Erkennung werden nur abgeglichen, wenn sie
 eindeutig sind und ein konkretes Produkt nennen (z. B. eine Geräte-Firmware). Kandidatenlisten

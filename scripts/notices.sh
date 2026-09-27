@@ -78,6 +78,8 @@ Paketquellen von Alpine Linux installiert.
 | Quelle | Hinweis |
 |---|---|
 | NIST National Vulnerability Database (NVD) | This product uses data from the NVD API but is not endorsed or certified by the NVD. |
+| CISA Known Exploited Vulnerabilities (KEV) | Katalog der US-Behörde CISA, CC0 1.0 (https://github.com/cisagov/kev-data) |
+| FIRST Exploit Prediction Scoring System (EPSS) | EPSS-Werte von FIRST.org, bereitgestellt von Empirical Security; frei nutzbar, Namensnennung erbeten (https://www.first.org/epss/) |
 | IEEE Registration Authority (OUI-Listen) | Öffentliche Herstellerkennungen der MAC-Adressen, von https://standards-oui.ieee.org |
 | SQLite | Public Domain; als Go-Übersetzung über modernc.org/sqlite eingebaut. |
 

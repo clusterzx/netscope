@@ -39,7 +39,12 @@ export const MIN_OPTIONS = [
 	{ value: '0.1', label: 'Niedrig und höher (> 0)' }
 ];
 
+/** Default order: exploited (CISA KEV) first, then EPSS, then CVSS. */
+export const DEFAULT_SORT = '-priority';
+
 export const SORT_OPTIONS = [
+	{ value: '-priority', label: 'Dringlichkeit (ausgenutzt, EPSS, CVSS)' },
+	{ value: '-epss', label: 'EPSS (höchster zuerst)' },
 	{ value: '-score', label: 'CVSS (höchster zuerst)' },
 	{ value: 'score', label: 'CVSS (niedrigster zuerst)' },
 	{ value: '-published', label: 'Veröffentlicht (neueste zuerst)' },
@@ -50,6 +55,38 @@ export const SORT_OPTIONS = [
 	{ value: 'cve', label: 'CVE-ID (aufsteigend)' },
 	{ value: '-cve', label: 'CVE-ID (absteigend)' }
 ];
+
+/** EPSS filter thresholds (probability of exploitation within 30 days). */
+export const EPSS_OPTIONS = [
+	{ value: '0.5', label: 'ab 50 %' },
+	{ value: '0.1', label: 'ab 10 %' },
+	{ value: '0.01', label: 'ab 1 %' }
+];
+
+/** EPSS as a percentage: 0.93 → "93 %", 0.0004 → "< 0,1 %". */
+export function epssLabel(v: number): string {
+	const p = v * 100;
+	if (p > 0 && p < 0.1) return '< 0,1 %';
+	return `${p.toLocaleString('de-DE', { maximumFractionDigits: p < 10 ? 1 : 0 })} %`;
+}
+
+export function epssTone(v: number): Tone {
+	return v >= 0.5 ? 'danger' : v >= 0.1 ? 'warn' : 'neutral';
+}
+
+export function epssTitle(v: number, percentile?: number | null): string {
+	let s = `Wahrscheinlichkeit einer Ausnutzung in den nächsten 30 Tagen: ${epssLabel(v)}`;
+	if (percentile !== undefined && percentile !== null)
+		s += ` – höher als bei ${epssLabel(percentile)} aller bewerteten CVEs`;
+	return s + ' (Quelle: FIRST EPSS)';
+}
+
+/** Names of the extra rows in the feed list. */
+export const feedName: Record<string, string> = {
+	modified: 'Geänderte CVEs',
+	kev: 'CISA KEV (ausgenutzte CVEs)',
+	epss: 'FIRST EPSS'
+};
 
 /** NVD vulnStatus labels. */
 export const nvdStatusLabel: Record<string, string> = {

@@ -24,7 +24,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatBytes, formatDateTime, formatNumber } from '$lib/utils/format';
 	import { runStatusLabel } from '$lib/utils/labels';
-	import { feedStatusLabel, feedStatusTone, syncModeLabel } from './cve';
+	import { feedName, feedStatusLabel, feedStatusTone, syncModeLabel } from './cve';
 
 	interface Props {
 		status: ApiVulnStatus | undefined;
@@ -246,14 +246,14 @@
 						<tbody>
 							{#each status.feeds ?? [] as f (f.name)}
 								<tr class="border-t border-border align-top">
-									<td class="px-2 py-1 font-medium">{f.name === 'modified' ? 'Änderungen' : f.name}</td>
+									<td class="px-2 py-1 font-medium">{feedName[f.name] ?? f.name}</td>
 									<td class="px-2 py-1">
 										<Badge tone={feedStatusTone(f.status)}>{feedStatusLabel[f.status] ?? f.status}</Badge>
 										{#if f.error}<p class="mt-0.5 break-words text-danger">{f.error}</p>{/if}
 									</td>
 									<td class="px-2 py-1 text-right tabular">{formatNumber(f.cveCount)}</td>
 									<td class="hidden px-2 py-1 text-right tabular sm:table-cell">{formatBytes(f.size)}</td>
-									<td class="px-2 py-1 whitespace-nowrap" title="Stand NVD: {f.lastModified || '–'}"
+									<td class="px-2 py-1 whitespace-nowrap" title="Stand: {f.lastModified || '–'}"
 										>{formatDateTime(f.syncedAt)}</td
 									>
 								</tr>

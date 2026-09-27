@@ -92,6 +92,8 @@ type syncStats struct {
 	// Changed holds CVEs that are new or were modified by the NVD since they were first
 	// loaded. Initial loads of a feed are not recorded (no events for history).
 	Changed map[string]struct{}
+	// Prio is the outcome of the KEV/EPSS sync that follows.
+	Prio *prioStats
 }
 
 // minCVEYear returns the lowest CVE ID year kept for a start_year setting (0 = all).

@@ -3,7 +3,7 @@
 	<SeveritySummary summary={status.summary} activeMin={min} onpick={(min) => …} />
 -->
 <script lang="ts">
-	import { Card, Skeleton } from '$lib/components/ui';
+	import { Card, Icon, Skeleton } from '$lib/components/ui';
 	import { formatNumber } from '$lib/utils/format';
 	import { cveSeverityLabel, severityMin } from './cve';
 
@@ -11,10 +11,20 @@
 		summary: Record<string, number> | null | undefined;
 		activeMin?: string;
 		onpick: (min: string | null) => void;
+		/** exploited (CISA KEV) row: filter toggle */
+		exploitedActive?: boolean;
+		onexploited?: () => void;
 		class?: string;
 	}
 
-	let { summary, activeMin = '', onpick, class: klass = '' }: Props = $props();
+	let {
+		summary,
+		activeMin = '',
+		onpick,
+		exploitedActive = false,
+		onexploited,
+		class: klass = ''
+	}: Props = $props();
 
 	const order = ['critical', 'high', 'medium', 'low'] as const;
 	const bar: Record<string, string> = {
@@ -68,6 +78,23 @@
 				</li>
 			{/each}
 		</ul>
+		{#if onexploited && (summary.exploited ?? 0) > 0}
+			<button
+				type="button"
+				aria-pressed={exploitedActive}
+				title="Nur Schwachstellen zeigen, die laut CISA aktiv ausgenutzt werden"
+				onclick={onexploited}
+				class="mt-3 flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors
+					{exploitedActive ? 'border-danger bg-danger-soft' : 'border-danger/40 hover:bg-danger-soft'}"
+			>
+				<Icon name="zap" size={15} class="shrink-0 text-danger" />
+				<span class="font-medium text-danger tabular">{formatNumber(summary.exploited)}</span>
+				<span class="text-fg-muted">
+					aktiv ausgenutzt auf {formatNumber(summary.exploitedDevices ?? 0)}
+					{(summary.exploitedDevices ?? 0) === 1 ? 'Gerät' : 'Geräten'}
+				</span>
+			</button>
+		{/if}
 		{#if (summary.unknown ?? 0) + (summary.none ?? 0) > 0}
 			<p class="mt-2 text-xs text-fg-subtle">
 				{formatNumber((summary.unknown ?? 0) + (summary.none ?? 0))} ohne CVSS-Bewertung
