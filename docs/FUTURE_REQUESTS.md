@@ -4,6 +4,147 @@ Wünsche für spätere Versionen, die noch nicht umgesetzt sind. Jeder Eintrag b
 Anlass, Problem und einen Lösungsvorschlag, damit die Umsetzung ohne Vorgeschichte starten
 kann.
 
+FR-005 bis FR-012 stammen aus dem Marktvergleich vom 27.09.2026 (17 Produkte aus Discovery,
+Monitoring und Security); sie schließen die Lücken, in denen NetScope dort zurücklag.
+
+---
+
+## FR-005: Kommerzielle Lizenz und Hinweise auf Fremdsoftware
+
+**Status:** erfasst am 27.09.2026
+
+### Anlass
+
+Im Repo lag keine Lizenzdatei. NetScope soll kein Open Source sein, sondern ein kommerzielles
+Produkt.
+
+### Festgelegt
+
+| Frage | Entscheidung |
+|---|---|
+| Lizenz | **Proprietär**, alle Rechte vorbehalten. |
+| Fremdsoftware | Go- und npm-Abhängigkeiten sind permissiv (MIT, BSD, Apache) und brauchen nur Namensnennung: `THIRD_PARTY_NOTICES`. |
+| nmap | Bleibt. nmap steht unter der Nmap Public Source License 0.95; sie wertet Software, die nmap gezielt ausführt und die Ausgabe auswertet, als abgeleitetes Werk. Wer NetScope mit nmap vertreibt, braucht eine **Nmap-OEM-Lizenz** (nmap.org/oem). Lizenzfreie Alternative: FR-011. |
+| arp-scan | GPL-3.0, als eigenständiges Programm aufgerufen (Aggregation). Unkritischer als nmap, wird aber ebenfalls durch den eigenen Scanner ersetzbar. |
+
+---
+
+## FR-006: CVEs nach tatsächlicher Ausnutzung priorisieren
+
+**Status:** erfasst am 27.09.2026
+
+### Anlass
+
+Der CVE-Abgleich ist heuristisch und liefert viele Treffer; sortiert wird nur nach CVSS.
+runZero stuft aktiv ausgenutzte Lücken hoch.
+
+### Festgelegt
+
+- CISA-Katalog „Known Exploited Vulnerabilities“ (KEV) und FIRST EPSS (Wahrscheinlichkeit
+  einer Ausnutzung in 30 Tagen) täglich laden, lokal wie der NVD-Spiegel.
+- Treffer tragen „bekannt ausgenutzt“ (mit Datum und Frist aus KEV, Ransomware-Hinweis) und den
+  EPSS-Wert; Sortierung, Filter (`kev:yes`, `epss>=0.1`) und Regeln können darauf aufbauen.
+
+---
+
+## FR-007: Zentrale Anmeldung per OIDC und LDAP
+
+**Status:** erfasst am 27.09.2026
+
+### Anlass
+
+13 der 17 verglichenen Produkte bieten LDAP oder SSO; in Firmen ist das ein
+Ausschlusskriterium.
+
+### Festgelegt
+
+| Frage | Entscheidung |
+|---|---|
+| Verfahren | **OIDC** (Authentik, Keycloak, Authelia, Entra ID, Google …) **und LDAP** (Active Directory, OpenLDAP). |
+| Konten | Anlage beim ersten Login; Rolle über Gruppen-Zuordnung (Gruppe → NetScope-Rolle), sonst Standardrolle. |
+| Lokale Konten | Bleiben; mindestens ein lokaler Administrator als Notzugang. |
+| 2FA | Bei OIDC Sache des Identity Providers; bei LDAP gilt die 2FA-Pflicht der Rolle wie bei lokalen Konten. |
+
+---
+
+## FR-008: Firewalls, Router und DHCP-Server als Quellen
+
+**Status:** erfasst am 27.09.2026
+
+### Anlass
+
+NetAlertX gewinnt im Homelab mit vielen Router-Importern; in Firmen stehen Firewalls und
+DHCP-Server, deren Leases und ARP-Tabellen Namen, MACs und Anwesenheit liefern – auch aus
+Netzen, die NetScope nicht selbst scannt.
+
+### Festgelegt
+
+Importer für **OPNsense, pfSense, UniFi, MikroTik RouterOS, Fortinet FortiGate, Sophos
+Firewall, Cisco Meraki, Fritz!Box, Pi-hole und Windows-DHCP-Server** (über den Windows-Agent,
+FR-010). Echte Geräte zum Testen: OPNsense und UniFi; die übrigen gegen Beispieldaten aus der
+Hersteller-Dokumentation.
+
+---
+
+## FR-009: SNMP-Interface-Metriken
+
+**Status:** erfasst am 27.09.2026
+
+### Anlass
+
+SNMP liefert bisher nur Inventar und Topologie. Traffic und Fehler je Switch-Port sind der Kern
+von LibreNMS, PRTG und Domotz.
+
+### Festgelegt
+
+Zähler je Interface (ifHCIn/OutOctets, Fehler, Discards, Status, Geschwindigkeit) als
+Zeitreihen mit Raten und Auslastung; Anzeige am Gerät, Events bei Port down und hoher
+Auslastung.
+
+---
+
+## FR-010: NetScope-Agent für Windows
+
+**Status:** erfasst am 27.09.2026
+
+### Festgelegt
+
+| Frage | Entscheidung |
+|---|---|
+| Weg | **Der vorhandene Agent als Windows-Dienst**, installiert mit einem PowerShell-Befehl; nur ausgehend wie unter Linux. Kein WinRM. |
+| Umfang | Inventar (OS, Hardware, installierte Software, Updates, Dienste, offene Ports) und Auslastung; auf DHCP-Servern zusätzlich die Leases (FR-008). |
+
+---
+
+## FR-011: Eigener Scanner als Alternative zu nmap
+
+**Status:** erfasst am 27.09.2026
+
+### Anlass
+
+nmap lässt sich in einem proprietären Produkt nur mit OEM-Lizenz nutzen (FR-005).
+
+### Festgelegt
+
+- nmap bleibt wie es ist; dazu kommt ein eigener, lizenzfreier Scanner in Go mit dem Anspruch,
+  nmap gleichwertig zu sein: TCP-SYN- und Connect-Scan, UDP, Dienst- und Versionserkennung,
+  CPEs für den CVE-Abgleich, OS-Erkennung.
+- nmaps Signaturdatenbanken (`nmap-service-probes`, `nmap-os-db`) stehen selbst unter der NPSL
+  und dürfen nicht übernommen werden; die Erkennung beruht auf eigenen Proben und Signaturen.
+- Die Erkennungsleistung wird im echten Netz gegen nmap gemessen und dokumentiert.
+
+---
+
+## FR-012: Englische Oberfläche
+
+**Status:** erfasst am 27.09.2026
+
+### Festgelegt
+
+Oberfläche auf Deutsch und Englisch, umschaltbar je Benutzer (Standard: Browsersprache);
+dazu die Texte, die der Server liefert (Plugin-Einstellungen, Events, Fehlermeldungen,
+Berichte).
+
 ---
 
 ## FR-004: NetScope-Agent für überwachte Systeme
