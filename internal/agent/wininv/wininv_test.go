@@ -166,3 +166,25 @@ func netsrcMerge(res *Result) []string {
 	slices.Sort(out)
 	return out
 }
+
+// A restricted agent may not ask Windows Update for pending updates: that is expected,
+// not a collection error.
+func TestPendingUpdatesDenied(t *testing.T) {
+	res, err := Parse([]byte(`{"errors":{"updates.pending":"Zugriff verweigert (Ausnahme von HRESULT: 0x80070005 (E_ACCESSDENIED))"},
+		"updates":{"rebootRequired":false,"lastInstall":"2026-09-26T19:12:45.0000000Z"}}`), false, lan, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv := res.Observation.Inventory.(*Inventory)
+	if _, ok := inv.Errors["updates.pending"]; ok {
+		t.Errorf("errors %v", inv.Errors)
+	}
+	if u := inv.Updates; u.Known || !u.PendingDenied || u.LastInstall == nil {
+		t.Errorf("updates %+v", u)
+	}
+	// other errors stay errors
+	res, _ = Parse([]byte(`{"errors":{"updates.pending":"timeout"},"updates":{}}`), false, lan, now)
+	if inv := res.Observation.Inventory.(*Inventory); inv.Updates.PendingDenied || inv.Errors["updates.pending"] == "" {
+		t.Errorf("timeout: %+v %v", inv.Updates, inv.Errors)
+	}
+}

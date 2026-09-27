@@ -199,7 +199,10 @@ Auslastung.
   „DHCP Users“; auf Domänencontrollern (keine lokalen Gruppen) mit `-RunAsSystem`.
 - **Updates:** ausstehende Updates aus der Offline-Suche von Windows Update (was der Rechner schon
   kennt, keine eigene Suche im Internet, mit Zeitlimit), dazu Hotfixes, letzte Installation und
-  „Neustart erforderlich“.
+  „Neustart erforderlich“. Die Liste ausstehender Updates gibt Windows Update nur Administratoren und
+  SYSTEM heraus: Unter dem eingeschränkten Dienstkonto zeigt die Geräteseite das als Hinweis statt
+  als Fehler (mit `-RunAsSystem` erscheint die Liste; entschieden am 27.09.2026 nach dem ersten
+  echten Einsatz).
 - **CVE-Abgleich** (über den Umfang hinaus): Aus Build und Update-Revision entsteht die CPE der
   Windows-Version; der vorhandene Abgleich zeigt damit fehlende Windows-Patches. Programme der
   Softwareliste werden (noch) nicht auf CPEs abgebildet.

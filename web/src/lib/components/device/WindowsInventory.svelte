@@ -76,6 +76,8 @@
 			hotfixes?: { id: string; description?: string; installedOn?: string }[];
 			lastHotfix?: { id: string; installedOn?: string };
 			known: boolean;
+			/** Windows Update refused the list: the agent runs without administrator rights */
+			pendingDenied?: boolean;
 		};
 		services?: { name: string; displayName?: string; state: string; startMode: string; account?: string }[];
 		listening?: { proto: string; address: string; port: number; pid?: number; process?: string }[];
@@ -305,6 +307,14 @@
 								{#if u.pendingSecurity}<span class="text-danger"
 										>({t('{n} Sicherheit', { n: u.pendingSecurity })})</span
 									>{/if}
+							{:else if u.pendingDenied}<span class="text-fg-subtle"
+									>{t('nur für Administratoren abrufbar')}</span
+								>
+								<span class="block text-xs text-fg-subtle"
+									>{t(
+										'Windows Update nennt ausstehende Updates nur Administratoren; der Agent läuft ohne Administratorrechte.'
+									)}</span
+								>
 							{:else}<span class="text-fg-subtle">{t('nicht ermittelt')}</span>{/if}
 						</dd>
 					</div>

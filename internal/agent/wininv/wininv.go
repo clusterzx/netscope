@@ -234,6 +234,9 @@ type Updates struct {
 	Hotfixes        []Hotfix `json:"hotfixes,omitempty"`
 	LastHotfix      *Hotfix  `json:"lastHotfix,omitempty"`
 	Known           bool     `json:"known"` // the pending list could be read
+	// PendingDenied: Windows Update refused the pending list because the agent runs without
+	// administrator rights (virtual service account); not a collection error.
+	PendingDenied bool `json:"pendingDenied,omitempty"`
 }
 
 // PendingUpdate is an update Windows Update knows but has not installed.
@@ -338,6 +341,12 @@ func Parse(stdout []byte, truncated bool, subnets []netip.Prefix, now time.Time)
 		}
 		return nil, fmt.Errorf("Ausgabe ist kein gültiges JSON: %w", err)
 	}
+	// Windows Update gives the pending list only to administrators and SYSTEM: a restricted
+	// agent gets "access denied", which is expected rather than an error
+	denied := accessDenied(r.Errors["updates.pending"])
+	if denied {
+		delete(r.Errors, "updates.pending")
+	}
 	inv := Inventory{Platform: "windows", Errors: translateErrors(r.Errors), Unavailable: r.Unavailable}
 	obs := &plugin.Observation{Present: true, Inventory: &inv, Attrs: map[string]string{}, Raw: text}
 	res := &Result{Observation: obs}
@@ -435,6 +444,9 @@ func Parse(stdout []byte, truncated bool, subnets []netip.Prefix, now time.Time)
 	if r.Updates != nil || r.Hotfixes != nil {
 		count(true)
 		inv.Updates = updateState(r.Updates, r.Hotfixes, r.Errors)
+		if denied {
+			inv.Updates.Known, inv.Updates.PendingDenied = false, true
+		}
 	}
 
 	inv.Services = r.Services
@@ -663,6 +675,12 @@ func updateState(u *updates, hotfixes []Hotfix, errs map[string]string) *Updates
 		out.LastHotfix = &h
 	}
 	return out
+}
+
+// accessDenied recognises E_ACCESSDENIED in a (localised) error message by its code.
+func accessDenied(msg string) bool {
+	m := strings.ToUpper(msg)
+	return strings.Contains(m, "0X80070005") || strings.Contains(m, "E_ACCESSDENIED")
 }
 
 // avState decodes the Security Center productState: byte 2 = scanner state (0x10 on),

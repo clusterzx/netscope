@@ -353,7 +353,8 @@ PowerShell-Module – nie `Win32_Product`):
 - Windows-Version mit Build und Update-Revision, Hardware (Hersteller, Modell, Seriennummer,
   BIOS), CPU, RAM, Laufwerke, Netzwerkadapter, Domäne oder Arbeitsgruppe,
 - installierte Programme (Liste **Installierte Pakete**), Hotfixes, **ausstehende Updates**
-  (was Windows Update bereits kennt – ohne eigene Suche im Internet), „Neustart erforderlich“,
+  (was Windows Update bereits kennt – ohne eigene Suche im Internet; Windows nennt sie nur
+  Administratoren, also nur bei `-RunAsSystem`), „Neustart erforderlich“,
 - Dienste, offene Ports mit Prozess, Firewall-Profile, Microsoft Defender und die im
   Sicherheitscenter registrierten Virenschutzprodukte.
 
