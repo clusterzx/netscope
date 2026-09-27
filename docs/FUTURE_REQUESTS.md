@@ -32,7 +32,7 @@ Produkt.
 
 ## FR-006: CVEs nach tatsächlicher Ausnutzung priorisieren
 
-**Status:** umgesetzt am 27.09.2026 – README „Schwachstellen“, ARCHITECTURE „NVD-Spiegel“
+**Status:** umgesetzt am 27.09.2026 – Handbuch „Schwachstellen“, ARCHITECTURE „NVD-Spiegel“
 
 ### Anlass
 
@@ -66,7 +66,7 @@ runZero stuft aktiv ausgenutzte Lücken hoch.
 
 ## FR-007: Zentrale Anmeldung per OIDC und LDAP
 
-**Status:** umgesetzt am 27.09.2026 – README „Zentrale Anmeldung: OIDC und LDAP“,
+**Status:** umgesetzt am 27.09.2026 – Handbuch „Zentrale Anmeldung: OIDC und LDAP“,
 ARCHITECTURE „Benutzer und Rechte“
 
 ### Anlass
@@ -105,7 +105,7 @@ Ausschlusskriterium.
 
 ## FR-008: Firewalls, Router und DHCP-Server als Quellen
 
-**Status:** umgesetzt am 27.09.2026 (Windows-DHCP über den Windows-Agent, FR-010) – README
+**Status:** umgesetzt am 27.09.2026 (Windows-DHCP über den Windows-Agent, FR-010) – Handbuch
 „Plugins“, ARCHITECTURE `internal/plugins/netsrc`
 
 ### Anlass
@@ -143,7 +143,7 @@ Hersteller-Dokumentation.
 
 ## FR-009: SNMP-Interface-Metriken
 
-**Status:** umgesetzt am 27.09.2026 – README „Plugins“ (`snmp_traffic`), ARCHITECTURE
+**Status:** umgesetzt am 27.09.2026 – Handbuch „Plugins“ (`snmp_traffic`), ARCHITECTURE
 „SNMP-Traffic“
 
 ### Anlass
@@ -178,7 +178,7 @@ Auslastung.
 
 ## FR-010: NetScope-Agent für Windows
 
-**Status:** umgesetzt am 27.09.2026 – README „NetScope-Agent → Windows“, ARCHITECTURE
+**Status:** umgesetzt am 27.09.2026 – Handbuch „NetScope-Agent → Windows“, ARCHITECTURE
 „NetScope-Agent“
 
 ### Festgelegt
@@ -235,7 +235,7 @@ nmap lässt sich in einem proprietären Produkt nur mit OEM-Lizenz nutzen (FR-00
 
 ## FR-012: Englische Oberfläche
 
-**Status:** umgesetzt am 27.09.2026 – README „Sprache: Deutsch und Englisch“, ARCHITECTURE
+**Status:** umgesetzt am 27.09.2026 – Handbuch „Sprache: Deutsch und Englisch“, ARCHITECTURE
 „Sprachen“, FRONTEND.md Abschnitt 9, PLUGINS.md „Übersetzungen“
 
 ### Festgelegt
@@ -310,7 +310,7 @@ Berichte).
 
 ## FR-004: NetScope-Agent für überwachte Systeme
 
-**Status:** umgesetzt am 26.09.2026 · erfasst am 25.09.2026 – Bedienung im README
+**Status:** umgesetzt am 26.09.2026 · erfasst am 25.09.2026 – Bedienung im Handbuch
 („NetScope-Agent“), Technik in ARCHITECTURE („NetScope-Agent“)
 
 ### Anlass
@@ -337,7 +337,7 @@ System, danach meldet es sich von selbst bei NetScope und lässt sich darüber a
   Prozessnamen fremder Benutzer an offenen Ports. Docker nur mit `--docker` (Gruppe docker).
 - **Updates vs. „nur lesen“:** Automatische Updates geben der Instanz die Möglichkeit, neuen
   Code auf die Systeme zu bringen – begrenzt auf die Rechte von `netscope-agent`. Das ist im
-  README unter Sicherheit beschrieben.
+  Handbuch unter Sicherheit beschrieben.
 - **Verbindung:** Long Poll statt dauerhafter WebSocket-Verbindung – funktioniert durch
   Proxys, „Inventar jetzt“ kommt trotzdem sofort an.
 - **Installations-Tokens** mit Ablauf, Nutzungszahl und Tags; bereits installierte Agents
@@ -349,7 +349,7 @@ System, danach meldet es sich von selbst bei NetScope und lässt sich darüber a
 
 ## FR-003: Mehrere Benutzer mit Rollen und Zwei-Faktor-Anmeldung
 
-**Status:** umgesetzt am 25.09.2026 · erfasst am 25.09.2026 – Bedienung im README
+**Status:** umgesetzt am 25.09.2026 · erfasst am 25.09.2026 – Bedienung im Handbuch
 („Benutzer, Rollen und Zwei-Faktor-Anmeldung“), Technik in ARCHITECTURE („Benutzer und Rechte“)
 
 ### Anlass
@@ -390,7 +390,7 @@ unterschiedlichen Rechten (RBAC) und eine Zwei-Faktor-Anmeldung.
 
 ## FR-002: Mehrere NetScope-Instanzen bündeln (Zentrale und Standorte)
 
-**Status:** umgesetzt am 24.09.2026 · erfasst am 24.09.2026 – Bedienung im README
+**Status:** umgesetzt am 24.09.2026 · erfasst am 24.09.2026 – Bedienung im Handbuch
 („Mehrere Standorte“), Technik in ARCHITECTURE („Verbund“)
 
 ### Anlass
@@ -519,4 +519,4 @@ dient dann als reiner Sammler.
   Verbindungsabbruch; keine doppelten Events.
 - Ende-zu-Ende: zwei Instanzen (Zuhause als Zentrale, Colo als Standort) mit einem
   gemeinsamen Inventar in der Zentrale.
-- Doku: README (Abschnitt „Mehrere Standorte“), ARCHITECTURE (Rollen, Protokoll).
+- Doku: Handbuch (Abschnitt „Mehrere Standorte“), ARCHITECTURE (Rollen, Protokoll).

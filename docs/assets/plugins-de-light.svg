@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="334" viewBox="0 0 1100 334" role="img" aria-labelledby="t d">
-<title id="t">The 41 plugins of NetScope</title>
-<desc id="d">Scanners: arpscan, icmp, oui, dns, mdns, netbios, upnp, nmap, nmap_udp, http, tls, snmp, snmp_traffic, ssh, wol. Importers: agent, proxmox, openwrt, opnsense, pfsense, unifi, mikrotik, fortigate, sophos, meraki, fritzbox, pihole, docker, netalertx, csv. Processors: diff, cve, healthcheck, topology, cleanup, report. Publishers: telegram, webhook, ntfy, email, n8n</desc>
+<title id="t">Die 41 Plugins von NetScope</title>
+<desc id="d">Scanner: arpscan, icmp, oui, dns, mdns, netbios, upnp, nmap, nmap_udp, http, tls, snmp, snmp_traffic, ssh, wol. Importer: agent, proxmox, openwrt, opnsense, pfsense, unifi, mikrotik, fortigate, sophos, meraki, fritzbox, pihole, docker, netalertx, csv. Processor: diff, cve, healthcheck, topology, cleanup, report. Publisher: telegram, webhook, ntfy, email, n8n</desc>
 <style>
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
@@ -8,7 +8,7 @@
 <rect x="0.75" y="0.75" width="1098.5" height="92.5" rx="14" fill="#ffffff" stroke="#dbe2ec" stroke-width="1.5"/>
 <rect x="0.75" y="0.75" width="5" height="92.5" rx="2.5" fill="#0673b0"/>
 <g transform="translate(22 18) scale(0.9166666666666666)" fill="none" stroke="#0673b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0"/><path d="M12 12l6-6"/><path d="M12 12h.01"/></g>
-<text x="54" y="35" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Scanners</text>
+<text x="54" y="35" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Scanner</text>
 <text x="172" y="35" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" text-anchor="end" fill="#7b8596">15</text>
 <rect x="192" y="15" width="76" height="28" rx="8" fill="#f4f7fb" stroke="#dbe2ec"/>
 <text x="230" y="34" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle" fill="#141922">arpscan</text>
@@ -43,7 +43,7 @@
 <rect x="0.75" y="104.75" width="1098.5" height="92.5" rx="14" fill="#ffffff" stroke="#dbe2ec" stroke-width="1.5"/>
 <rect x="0.75" y="104.75" width="5" height="92.5" rx="2.5" fill="#7c3aed"/>
 <g transform="translate(22 122) scale(0.9166666666666666)" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/></g>
-<text x="54" y="139" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Importers</text>
+<text x="54" y="139" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Importer</text>
 <text x="172" y="139" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" text-anchor="end" fill="#7b8596">15</text>
 <rect x="192" y="119" width="60" height="28" rx="8" fill="#f4f7fb" stroke="#dbe2ec"/>
 <text x="222" y="138" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle" fill="#141922">agent</text>
@@ -78,7 +78,7 @@
 <rect x="0.75" y="208.75" width="1098.5" height="56.5" rx="14" fill="#ffffff" stroke="#dbe2ec" stroke-width="1.5"/>
 <rect x="0.75" y="208.75" width="5" height="56.5" rx="2.5" fill="#15803d"/>
 <g transform="translate(22 226) scale(0.9166666666666666)" fill="none" stroke="#15803d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10H7z"/><path d="M10 10h4v4h-4z"/><path d="M9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4"/></g>
-<text x="54" y="243" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Processors</text>
+<text x="54" y="243" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Processor</text>
 <text x="172" y="243" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" text-anchor="end" fill="#7b8596">6</text>
 <rect x="192" y="223" width="52" height="28" rx="8" fill="#f4f7fb" stroke="#dbe2ec"/>
 <text x="218" y="242" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle" fill="#141922">diff</text>
@@ -95,7 +95,7 @@
 <rect x="0.75" y="276.75" width="1098.5" height="56.5" rx="14" fill="#ffffff" stroke="#dbe2ec" stroke-width="1.5"/>
 <rect x="0.75" y="276.75" width="5" height="56.5" rx="2.5" fill="#c26a04"/>
 <g transform="translate(22 294) scale(0.9166666666666666)" fill="none" stroke="#c26a04" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/></g>
-<text x="54" y="311" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Publishers</text>
+<text x="54" y="311" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="650" fill="#141922">Publisher</text>
 <text x="172" y="311" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" text-anchor="end" fill="#7b8596">5</text>
 <rect x="192" y="291" width="83" height="28" rx="8" fill="#f4f7fb" stroke="#dbe2ec"/>
 <text x="233.5" y="310" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle" fill="#141922">telegram</text>

@@ -87,7 +87,7 @@ Betroffene Geräte im Heimnetz (Hersteller laut OUI: Espressif):
 - Tests: Der Host filtert schonende Geräte nur für belastende Plugins; nmap erhält die
   Ausschlüsse; der Gerätemodus bleibt korrekt.
 - Oberfläche: Schalter und Hinweis auf der Geräteseite, Massenaktion in der Geräteliste.
-- Doku: README (Scanner-Tabelle), PLUGINS.md (`Intrusive`).
+- Doku: Handbuch docs/GUIDE.md (Plugin-Tabelle), PLUGINS.md (`Intrusive`).
 
 ### Übergangslösung bis dahin
 
