@@ -105,7 +105,8 @@ Ausschlusskriterium.
 
 ## FR-008: Firewalls, Router und DHCP-Server als Quellen
 
-**Status:** erfasst am 27.09.2026
+**Status:** umgesetzt am 27.09.2026 (bis auf Windows-DHCP, das mit FR-010 kommt) – README
+„Plugins“, ARCHITECTURE `internal/plugins/netsrc`
 
 ### Anlass
 
@@ -119,6 +120,24 @@ Importer für **OPNsense, pfSense, UniFi, MikroTik RouterOS, Fortinet FortiGate,
 Firewall, Cisco Meraki, Fritz!Box, Pi-hole und Windows-DHCP-Server** (über den Windows-Agent,
 FR-010). Echte Geräte zum Testen: OPNsense und UniFi; die übrigen gegen Beispieldaten aus der
 Hersteller-Dokumentation.
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Gemeinsamer Unterbau** `internal/plugins/netsrc`: Jeder Importer liefert nur Einträge
+  (Lease, Reservierung, ARP, Controller-Client); zusammengeführt wird je MAC, Namen von
+  Administratoren (Reservierung, Alias) gehen vor gemeldeten Hostnamen. Keine Anwesenheit –
+  Importer haben keinen Scan-Bereich, aus dem sich „offline“ ableiten ließe; der
+  Verbindungsstatus steht im Inventar der Quelle.
+- **Topologie:** UniFi, Meraki (Access Point bzw. Switch-Port) und MikroTik (Bridge-Port)
+  liefern Beziehungen; die Netzwerkgeräte selbst werden vor den Clients übernommen.
+- **Versionen:** OPNsense in beiden URL-Schreibweisen (camelCase bis 25.1, snake_case ab 25.7)
+  und allen drei DHCP-Diensten; pfSense mit ISC oder Kea (Socket-Pfade vor und nach 2025).
+- **UniFi:** Benutzer/Passwort (volle Daten) oder API-Schlüssel (offizielle Integration-API,
+  nur verbundene Clients ohne VLAN/Port/Hersteller).
+- **Sophos:** Die XML-API liefert keine aktuellen Leases und keine ARP-Tabelle, nur die
+  Reservierungen – das Plugin übernimmt diese. Leases gäbe es nur über Syslog (DHCP-Events).
+- **Getestet** gegen nachgebaute Geräte-APIs aus Hersteller-Dokumentation, Quellcode und
+  Beispielantworten (Recherche 27.09.2026); an echten Geräten noch zu prüfen: OPNsense, UniFi.
 
 ---
 

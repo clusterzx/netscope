@@ -103,7 +103,16 @@
 
 	// live: device changes (online/offline, new devices, manual edges) and finished topology runs
 	const refresh = debounce(() => data.reload(), 2500);
-	const GRAPH_PLUGINS = new Set(['topology', 'docker', 'proxmox', 'snmp', 'openwrt']);
+	const GRAPH_PLUGINS = new Set([
+		'topology',
+		'docker',
+		'proxmox',
+		'snmp',
+		'openwrt',
+		'unifi',
+		'meraki',
+		'mikrotik'
+	]);
 	$effect(() =>
 		live.on<{ id: number; mergedInto?: number }>('device', (m) => {
 			// a merged device lives on under another id – keep it selected

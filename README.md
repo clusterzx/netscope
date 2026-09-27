@@ -204,6 +204,15 @@ sofort, ohne Neustart.
 | `agent` | Importer | laufend | Einstellungen der NetScope-Agents: Inventar- und Messintervall, Pakete/Docker, Schwelle „Dateisystem fast voll“, Zeit bis „Agent meldet sich nicht“; manueller Lauf fordert bei allen Agents ein Inventar an |
 | `proxmox` | Importer | aus | VMs/CTs mit VMID, Status, MACs, Ressourcen, Node; verknüpft VM ↔ Gerät („läuft auf Node X“); Online-Status aus Proxmox für Gäste, die kein Scanner erreicht (Event nur bei Autostart); mehrere Hosts/Cluster; optional Docker-Container in LXCs |
 | `openwrt` | Importer | aus | DHCP-Leases und statische Leases (SSH oder LuCI-RPC), mehrere Router |
+| `opnsense` | Importer | aus | OPNsense über die REST-API: Leases (Kea, Dnsmasq, ISC), Reservierungen, ARP-Tabelle; alte (camelCase) und neue URLs ab 25.7 |
+| `pfsense` | Importer | aus | pfSense per SSH: Leases (ISC oder Kea, bevorzugt über den Kea-Steuer-Socket), statische Zuordnungen aus config.xml, `arp -an` |
+| `unifi` | Importer | aus | UniFi-Controller (UniFi OS oder selbst gehostet): Clients mit Switch-Port bzw. Access Point, SSID, VLAN, feste IPs, bekannte Offline-Clients, die UniFi-Geräte selbst; mit API-Schlüssel nur verbundene Clients |
+| `mikrotik` | Importer | aus | RouterOS 7 über die REST-API: DHCP-Leases, ARP, Bridge-Hosttabelle (Port je Gerät) |
+| `fortigate` | Importer | aus | FortiOS-REST-API: DHCP-Leases, ARP, erkannte Geräte (Name, OS, FortiSwitch-Port, FortiAP), VDOMs |
+| `sophos` | Importer | aus | Sophos Firewall über die XML-API: nur DHCP-Reservierungen (aktuelle Leases bietet SFOS dort nicht an) |
+| `meraki` | Importer | aus | Meraki-Dashboard-API: Clients (VLAN, SSID, Port bzw. AP, OS), Meraki-Geräte, feste IPs der MX |
+| `fritzbox` | Importer | aus | FRITZ!Box über TR-064: Geräteliste mit LAN/WLAN, Port und Verbindungsstatus |
+| `pihole` | Importer | aus | Pi-hole v6: DHCP-Leases, Reservierungen und die Netzwerk-Tabelle (Namen aus DNS-Anfragen) |
 | `docker` | Importer | aus | Container, Images, Ports, Compose-Projekte (lokaler Socket, TCP oder SSH-Tunnel) |
 | `netalertx` | Importer | manuell | Einmaliger Import einer NetAlertX-Datenbank oder -CSV |
 | `csv` | Importer | manuell | Generischer Inventar-Import (Export: Reports) |

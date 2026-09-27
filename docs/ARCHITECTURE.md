@@ -49,6 +49,7 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `internal/api` | HTTP-API, OpenAPI-Generator, SSE, Prometheus-Endpoint |
 | `internal/webui` | eingebettete SPA (`dist/` wird vom Frontend-Build befüllt) |
 | `internal/plugins/<id>` | alle Plugins; `internal/plugins/all` importiert sie |
+| `internal/plugins/netsrc` | Gemeinsamer Teil der Router-, Firewall- und Controller-Importer: Client-Modell, Zusammenführen von Leases, Reservierungen, ARP- und Controller-Einträgen je MAC, Beobachtungen mit Uplink-Beziehung (Switch-Port, Access Point), Lauf über mehrere Quellen, HTTP- und Digest-Hilfen, Parser für ISC-/Kea-Lease-Dateien und `arp -an` |
 | `internal/tunnel` | eigene WireGuard-Tunnel in entfernte Subnetze (Netlink, Handshake-Überwachung, Events) |
 | `internal/wgconf` | Parser für WireGuard-Client-Konfigurationen (wg-quick-Format) |
 | `internal/federation` | Verbund: Rolle, Pufferung und Zustellung am Standort, Annahme und Standort-Verwaltung in der Zentrale; `federation/wire` = Protokoll |

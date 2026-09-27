@@ -37,8 +37,9 @@ type System struct {
 // DefaultSystem returns the defaults.
 func DefaultSystem() System {
 	return System{
-		PublicURL:          "",
-		HostnamePriority:   []string{"manual", "openwrt", "ssh", "snmp", "proxmox", "dns", "mdns", "netbios", "upnp", "docker", "nmap"},
+		PublicURL: "",
+		HostnamePriority: []string{"manual", "openwrt", "opnsense", "pfsense", "unifi", "mikrotik", "fortigate", "sophos", "meraki", "fritzbox",
+			"pihole", "ssh", "snmp", "proxmox", "dns", "mdns", "netbios", "upnp", "docker", "nmap"},
 		OfflineAfterMissed: 2,
 		MaxParallelRuns:    4,
 		DeviceTypes: []string{"router", "switch", "access-point", "firewall", "server", "hypervisor", "vm", "container",
