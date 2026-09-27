@@ -83,13 +83,24 @@
 		{ id: 'windows', label: 'Windows' }
 	] as const;
 
-	/** install command for the edited address (the same one-liners the API returns) */
+	/** address the served install scripts contain (public URL or the address of this request) */
+	const serverBase = $derived((data.data?.baseUrl ?? '').replace(/\/+$/, ''));
+	/** addresses to offer: the scripts' address and this instance in its local networks */
+	const baseChoices = $derived([...new Set([serverBase, ...(data.data?.directUrls ?? [])].filter(Boolean))]);
+
+	/**
+	 * Install command for the edited address. The scripts contain serverBase; for another
+	 * address the command passes it on (--url / -Url), so the download of the agent and the
+	 * agent itself use it too, not only the download of the script.
+	 */
 	function installCommand(token: string): string {
-		const b = base.replace(/\/+$/, '');
+		const b = base.trim().replace(/\/+$/, '');
+		const other = b !== serverBase;
 		if (platform === 'linux')
-			return `curl -fsSL ${b}/agent/install.sh | sudo sh -s -- --token ${token}${docker ? ' --docker' : ''}`;
+			return `curl -fsSL ${b}/agent/install.sh | sudo sh -s -- --token ${token}${other ? ` --url ${b}` : ''}${docker ? ' --docker' : ''}`;
+		const q = b.replace(/'/g, "''");
 		const tls = b.startsWith('https:') ? "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; " : '';
-		return `${tls}& ([scriptblock]::Create((irm '${b.replace(/'/g, "''")}/agent/install.ps1'))) -Token ${token}`;
+		return `${tls}& ([scriptblock]::Create((irm '${q}/agent/install.ps1'))) -Token ${token}${other ? ` -Url '${q}'` : ''}`;
 	}
 
 	const VALIDITY = [
@@ -457,9 +468,28 @@
 				bind:value={base}
 				mono
 				hint={t(
-					'Vorbelegt mit der Adresse, über die du gerade zugreifst – anpassen, wenn die Systeme NetScope anders erreichen (Proxy, VPN, anderes Netz).'
+					'Die Systeme müssen NetScope unter dieser Adresse ohne Anmeldung erreichen. Liegt die öffentliche Adresse hinter einem Login (z. B. Pangolin, Authentik), die interne Adresse wählen oder dort /agent/* und /api/v1/agent/* freigeben.'
 				)}
 			/>
+			{#if baseChoices.length > 1}
+				<div
+					class="-mt-1 flex flex-wrap items-center gap-1.5 text-xs"
+					role="group"
+					aria-label={t('Adressen')}
+				>
+					<span class="text-fg-subtle">{t('Adressen dieser Instanz:')}</span>
+					{#each baseChoices as u (u)}
+						<button
+							type="button"
+							class="mono rounded border px-1.5 py-0.5 {base.trim().replace(/\/+$/, '') === u
+								? 'border-accent bg-accent-soft text-accent'
+								: 'border-border text-fg-muted hover:text-fg'}"
+							aria-pressed={base.trim().replace(/\/+$/, '') === u}
+							onclick={() => (base = u)}>{u}</button
+						>
+					{/each}
+				</div>
+			{/if}
 			<div class="flex items-start gap-2 rounded-md border border-border bg-surface-2 py-1.5 pr-1.5 pl-3">
 				<code
 					class="mono min-w-0 flex-1 py-1 text-[0.8rem] break-all select-all"

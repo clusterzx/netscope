@@ -72,6 +72,7 @@ export interface ApiAgentsResponse {
 	agents: AgentAgent[];
 	baseUrl: string;
 	binaries: AgentBinary[];
+	directUrls: string[];
 	version: string;
 }
 
@@ -2914,7 +2915,7 @@ export interface ApiPaths {
 		post: { query: never; body: AuthUserInput; response: ApiUserCreated };
 	};
 	'/api/v1/users/{id}': {
-		/** Benutzer */
+		/** Ein Benutzer */
 		get: { query: never; body: never; response: AuthUser };
 		/** Benutzer ändern (Name, Rolle, deaktiviert) */
 		put: { query: never; body: AuthUserInput; response: AuthUser };

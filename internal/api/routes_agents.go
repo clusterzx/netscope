@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	"netscope/internal/agent/proto"
 	"netscope/internal/auth"
 	"netscope/internal/i18n"
+	"netscope/internal/netutil"
 )
 
 type agentsResponse struct {
@@ -25,6 +28,10 @@ type agentsResponse struct {
 	Version  string         `json:"version"`
 	// BaseURL is the address agents are installed against (public URL or this request).
 	BaseURL string `json:"baseUrl"`
+	// DirectURLs are the plain-http addresses of this instance in its local networks. The
+	// install dialog offers them when the public URL is not reachable for agents (e.g. a
+	// reverse proxy that requires a login).
+	DirectURLs []string `json:"directUrls"`
 }
 
 type enrollmentCreated struct {
@@ -221,7 +228,8 @@ func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
 	for i := range list {
 		list[i].LastError = i18n.Err(loc, list[i].LastError)
 	}
-	writeJSON(w, http.StatusOK, agentsResponse{Agents: list, Binaries: s.Agents.Binaries(), Version: s.Version, BaseURL: s.agentBase(r)})
+	writeJSON(w, http.StatusOK, agentsResponse{Agents: list, Binaries: s.Agents.Binaries(), Version: s.Version, BaseURL: s.agentBase(r),
+		DirectURLs: s.directURLs()})
 }
 
 func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
@@ -392,4 +400,40 @@ func (s *Server) handleAgentBinary(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `attachment; filename="netscope-agent-`+platform+`"`)
 	http.ServeContent(w, r, "", fi.ModTime(), f)
+}
+
+// directURLs lists http://<address>:<port> for this instance in its local networks: the
+// listen address when it is a specific one, otherwise the addresses of the local
+// interfaces (no container bridges or tunnels).
+func (s *Server) directURLs() []string {
+	out := []string{}
+	if s.Config == nil {
+		return out
+	}
+	host, port, err := net.SplitHostPort(s.Config.Listen)
+	if err != nil || port == "" {
+		return out
+	}
+	if host != "" {
+		ip, err := netip.ParseAddr(host)
+		if err == nil && !ip.IsUnspecified() {
+			if !ip.IsLoopback() {
+				out = append(out, "http://"+net.JoinHostPort(ip.String(), port))
+			}
+			return out
+		}
+	}
+	subs, err := netutil.LocalSubnets()
+	if err != nil {
+		return out
+	}
+	seen := map[string]bool{}
+	for _, sn := range subs {
+		u := "http://" + net.JoinHostPort(sn.Addr.String(), port)
+		if !seen[u] {
+			seen[u] = true
+			out = append(out, u)
+		}
+	}
+	return out
 }
