@@ -105,7 +105,9 @@ if ($RunAsSystem) {
     $runAs = 'LocalSystem'
 } else {
     & sc.exe sidtype $Name unrestricted | Out-Null
-    & sc.exe --% config NetScopeAgent obj= "NT SERVICE\NetScopeAgent" password= "" | Out-Null
+    # a virtual account has no password: it must be NULL (no password= at all), an empty
+    # string is rejected with 1057 (ChangeServiceConfig)
+    & sc.exe config $Name obj= $Account | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Dienstkonto $Account konnte nicht gesetzt werden (sc.exe $LASTEXITCODE)." }
     $runAs = $Account
 }
