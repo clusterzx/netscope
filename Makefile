@@ -31,10 +31,10 @@ else
 NPM = npm --prefix web
 endif
 
-.PHONY: help web build dev test lint docker-build docker-up docker-down smoke clean
+.PHONY: help web build dev test lint docker-build docker-up docker-down smoke notices clean
 
 help:
-	@echo "make build | dev | test | lint | docker-build | docker-up | docker-down | smoke"
+	@echo "make build | dev | test | lint | docker-build | docker-up | docker-down | smoke | notices"
 
 ## web: build the SvelteKit UI into internal/webui/dist
 web:
@@ -89,6 +89,10 @@ docker-down:
 ## smoke: end-to-end checks against a running instance (incl. real scans)
 smoke:
 	BASE_URL=$(BASE_URL) ./scripts/smoke.sh
+
+## notices: regenerate THIRD_PARTY_NOTICES.md from the shipped Go and npm dependencies
+notices:
+	./scripts/notices.sh
 
 clean:
 	rm -rf bin .devdata web/.svelte-kit

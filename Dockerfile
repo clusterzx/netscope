@@ -37,6 +37,7 @@ RUN apk add --no-cache nmap nmap-scripts arp-scan ca-certificates tzdata \
  && mkdir -p /data
 COPY --from=build /out/netscope /usr/local/bin/netscope
 COPY --from=build /out/agent /usr/share/netscope/agent
+COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/doc/netscope/
 ENV NETSCOPE_DATA_DIR=/data TZ=Europe/Berlin
 VOLUME ["/data"]
 EXPOSE 8080

@@ -568,6 +568,7 @@ CLI im Container: `netscope passwd [--user NAME]` (Passwort zurücksetzen),
 | `make lint` | gofmt, go vet, golangci-lint, Prettier, svelte-check |
 | `make docker-build` / `docker-up` / `docker-down` | Image bauen, starten (wartet auf Health), stoppen |
 | `make smoke` | End-to-End-Test gegen eine laufende Instanz inkl. echter Scans |
+| `make notices` | `THIRD_PARTY_NOTICES.md` aus den eingebauten Go- und npm-Abhängigkeiten neu erzeugen (nach jeder Änderung an `go.mod` oder den Frontend-Abhängigkeiten) |
 
 Ohne lokales Go/Node laufen `make build/test/lint` automatisch in Docker-Containern.
 Entwickelt man auf einem anderen Rechner als dem Zielhost, überträgt
@@ -616,3 +617,15 @@ Die Grafiken in diesem README (`docs/assets/*.svg`, hell und dunkel) erzeugt
 | [docs/FRONTEND.md](docs/FRONTEND.md) | Weboberfläche: Komponenten, API-Client, Stores, Konventionen |
 | [docs/FUTURE_REQUESTS.md](docs/FUTURE_REQUESTS.md) | Erfasste Wünsche für spätere Versionen |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | Zurückgestellte Wünsche |
+| [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | Software und Daten Dritter mit Lizenztexten |
+
+## Lizenz
+
+NetScope ist proprietäre Software, © 2026 Clusterzx, alle Rechte vorbehalten – siehe
+[LICENSE](LICENSE). Nutzung nur mit einer gesonderten schriftlichen Lizenzvereinbarung.
+
+Enthaltene Komponenten Dritter stehen unter ihren eigenen Lizenzen
+([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); im Image unter `/usr/share/doc/netscope/`).
+Wichtig für den Vertrieb: Das Image enthält **nmap**, dessen Lizenz (NPSL) eine
+**Nmap-OEM-Lizenz** verlangt, wenn nmap zusammen mit einem proprietären Produkt weitergegeben
+wird.

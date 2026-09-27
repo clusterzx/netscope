@@ -11,7 +11,8 @@ Monitoring und Security); sie schließen die Lücken, in denen NetScope dort zur
 
 ## FR-005: Kommerzielle Lizenz und Hinweise auf Fremdsoftware
 
-**Status:** erfasst am 27.09.2026
+**Status:** umgesetzt am 27.09.2026 – `LICENSE`, `THIRD_PARTY_NOTICES.md` (erzeugt mit
+`make notices`), README „Lizenz“
 
 ### Anlass
 
