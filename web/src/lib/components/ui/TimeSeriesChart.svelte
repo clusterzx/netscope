@@ -48,7 +48,6 @@
 	let showTable = $state(false);
 	const uid = $props.id();
 
-	const m = { top: 10, right: 12, bottom: 22, left: 48 };
 	const pts = $derived(
 		(points ?? [])
 			.map((p) => ({ ...p, ms: new Date(p.t).getTime() }))
@@ -64,6 +63,13 @@
 		if (yMin !== null && yMin !== undefined) lo = Math.min(yMin, lo);
 		if (yMax !== null && yMax !== undefined) hi = Math.max(yMax, hi);
 		return niceTicks(lo, hi, height < 120 ? 2 : 4);
+	});
+	// the y labels need room: ~5.6 px per character of the 10 px font
+	const m = $derived({
+		top: 10,
+		right: 12,
+		bottom: 22,
+		left: Math.min(96, Math.max(48, Math.max(...yTicks.map((v) => format(v).length)) * 5.6 + 10))
 	});
 	const y0 = $derived(yTicks[0]);
 	const y1 = $derived(yTicks[yTicks.length - 1]);

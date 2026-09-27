@@ -698,6 +698,7 @@ func (s *Store) Get(ctx context.Context, id int64) (*DeviceDetail, error) {
 		"relations":    "SELECT COUNT(*) FROM relations WHERE parent_id = ?1 OR child_id = ?1",
 		"inventory":    "SELECT COUNT(*) FROM device_inventory WHERE device_id = ?",
 		"observations": "SELECT COUNT(*) FROM observations WHERE device_id = ?",
+		"interfaces":   "SELECT COUNT(*) FROM ts_series WHERE device_id = ? AND metric = 'if.in_bps'",
 	}
 	for k, q := range counts {
 		var n int

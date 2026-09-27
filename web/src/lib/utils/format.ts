@@ -120,6 +120,19 @@ export function formatBytes(n: number | null | undefined): string {
 	return `${formatNumber(v, i === 0 ? 0 : v < 10 ? 1 : 0)} ${units[i]}`;
 }
 
+/** Bits per second → "950 Mbit/s" (decimal units, as port speeds are given). */
+export function formatBps(n: number | null | undefined): string {
+	if (n === null || n === undefined || !isFinite(n)) return '–';
+	const units = ['bit/s', 'kbit/s', 'Mbit/s', 'Gbit/s', 'Tbit/s'];
+	let i = 0;
+	let v = n;
+	while (Math.abs(v) >= 1000 && i < units.length - 1) {
+		v /= 1000;
+		i++;
+	}
+	return `${formatNumber(v, i === 0 ? 0 : v < 10 ? 1 : 0)} ${units[i]}`;
+}
+
 /** Latency in ms → "0,42 ms" / "12 ms". */
 export function formatMs(n: number | null | undefined): string {
 	if (n === null || n === undefined || !isFinite(n)) return '–';

@@ -122,6 +122,9 @@ const (
 	EvCVENew                = "cve.new"
 	EvCVEResolved           = "cve.resolved"
 	EvCVEExploited          = "cve.exploited"
+	EvInterfaceDown         = "interface.down"
+	EvInterfaceUp           = "interface.up"
+	EvInterfaceSaturated    = "interface.saturated"
 	EvHealthDown            = "health.down"
 	EvHealthDegraded        = "health.degraded"
 	EvHealthUp              = "health.up"
@@ -191,6 +194,12 @@ var catalog = []EventSpec{
 		withDevice(PayloadField{"cve", "string", "CVE-ID"}, PayloadField{"cvss", "number", "CVSS-Basiswert"})},
 	{EvCVEExploited, "vulnerability", "Schwachstelle wird ausgenutzt", "Eine CVE, die ein Gerät betrifft, steht neu im CISA-Katalog der aktiv ausgenutzten Schwachstellen (KEV).", SevCritical, "cve",
 		withDevice(PayloadField{"cve", "string", "CVE-ID"}, PayloadField{"cvss", "number", "CVSS-Basiswert"}, PayloadField{"epss", "number", "EPSS (0–1)"}, PayloadField{"product", "string", "Produkt"}, PayloadField{"version", "string", "Version"}, PayloadField{"date_added", "string", "In KEV seit"}, PayloadField{"due_date", "string", "Frist laut CISA"}, PayloadField{"ransomware", "bool", "Von Ransomware genutzt"})},
+	{EvInterfaceDown, "network", "Port ohne Verbindung", "Ein eingeschalteter Switch- oder Router-Port hat die Verbindung verloren (SNMP).", SevMedium, "snmp_traffic",
+		withDevice(PayloadField{"interface", "string", "Interface"}, PayloadField{"alias", "string", "Beschreibung"}, PayloadField{"status", "string", "Neuer Status"}, PayloadField{"previous", "string", "Vorher"}, PayloadField{"speed_mbps", "number", "Geschwindigkeit (Mbit/s)"})},
+	{EvInterfaceUp, "network", "Port wieder verbunden", "Ein Port hat wieder Verbindung (SNMP).", SevInfo, "snmp_traffic",
+		withDevice(PayloadField{"interface", "string", "Interface"}, PayloadField{"alias", "string", "Beschreibung"}, PayloadField{"previous", "string", "Vorher"}, PayloadField{"speed_mbps", "number", "Geschwindigkeit (Mbit/s)"})},
+	{EvInterfaceSaturated, "network", "Port überlastet", "Ein Port ist in eine Richtung über der eingestellten Schwelle ausgelastet (SNMP).", SevMedium, "snmp_traffic",
+		withDevice(PayloadField{"interface", "string", "Interface"}, PayloadField{"alias", "string", "Beschreibung"}, PayloadField{"util_pct", "number", "Auslastung (%)"}, PayloadField{"direction", "string", "eingehend | ausgehend"}, PayloadField{"speed_mbps", "number", "Geschwindigkeit (Mbit/s)"}, PayloadField{"in_bps", "number", "Eingehend (bit/s)"}, PayloadField{"out_bps", "number", "Ausgehend (bit/s)"})},
 	{EvHealthDown, "health", "Check ausgefallen", "Ein Health-Check ist nach Flap-Dämpfung im Zustand Down.", SevHigh, "healthcheck",
 		withDevice(PayloadField{"check_id", "number", "Check-ID"}, PayloadField{"check_name", "string", "Name"}, PayloadField{"check_type", "string", "tcp | http | tls | icmp"}, PayloadField{"error", "string", "Fehler"})},
 	{EvHealthDegraded, "health", "Check beeinträchtigt", "Ein Health-Check ist erreichbar, aber langsam oder fehlerhaft.", SevMedium, "healthcheck",

@@ -143,7 +143,8 @@ Hersteller-Dokumentation.
 
 ## FR-009: SNMP-Interface-Metriken
 
-**Status:** erfasst am 27.09.2026
+**Status:** umgesetzt am 27.09.2026 – README „Plugins“ (`snmp_traffic`), ARCHITECTURE
+„SNMP-Traffic“
 
 ### Anlass
 
@@ -155,6 +156,23 @@ von LibreNMS, PRTG und Domotz.
 Zähler je Interface (ifHCIn/OutOctets, Fehler, Discards, Status, Geschwindigkeit) als
 Zeitreihen mit Raten und Auslastung; Anzeige am Gerät, Events bei Port down und hoher
 Auslastung.
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Eigenes Plugin** `snmp_traffic` neben `snmp`: Inventar und Topologie brauchen keinen
+  5-Minuten-Takt, Traffic schon. Es nutzt dieselben SNMP-Credentials und merkt sich je Gerät,
+  welches passt.
+- **Welche Ports:** standardmäßig physische Ports, WLAN und Link-Aggregationen; VLAN- und
+  virtuelle Interfaces wahlweise, abgeschaltete (admin down) nie. Namen lassen sich mit
+  Platzhaltern ausschließen.
+- **Port-Ausfall** meldet standardmäßig nur Ports mit Beschreibung (ifAlias) – Uplinks und
+  Server sind in der Regel beschriftet, Arbeitsplätze, die abends ausgehen, nicht.
+- **Überlast** je Richtung gegen die Portgeschwindigkeit (Schwelle Standard 90 %, ein Event
+  je Port und Stunde).
+- **Geräte ohne SNMP** werden nach einem Fehlversuch nur noch stündlich gefragt, damit nicht
+  alle 5 Minuten jedes Handy angesprochen wird.
+- **Getestet** mit einem nachgebauten SNMP-Agenten (Zählerüberlauf, Neustart, Port-Ausfall,
+  Überlast); an echten Switches noch zu prüfen.
 
 ---
 

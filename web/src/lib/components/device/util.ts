@@ -14,6 +14,7 @@ export const DEVICE_TABS = [
 	'cves',
 	'health',
 	'usage',
+	'traffic',
 	'history',
 	'relations',
 	'raw'

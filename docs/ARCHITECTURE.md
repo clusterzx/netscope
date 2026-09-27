@@ -221,6 +221,21 @@ Kontakt auf offline und das Gerät per `Power` offline, wenn keine andere Präse
 kennt. Beim Beenden weckt der Dienst alle wartenden Polls, damit der HTTP-Server sofort
 herunterfährt.
 
+## SNMP-Traffic
+
+Das Plugin `snmp_traffic` (`internal/plugins/snmp/traffic.go`, alle 5 min) liest je Gerät
+`sysUpTime`, die Interface-Tabelle und die Zähler aus IF-MIB (64-bit `ifHC*Octets`, sonst
+32-bit `ifIn/OutOctets`; Fehler und Discards). Die Zählerstände liegen in
+`traffic-state.json` im Datenverzeichnis des Plugins; Raten entstehen aus der Differenz zur
+vorigen Abfrage und werden Zeitreihen `if.in_bps`, `if.out_bps`, `if.util_pct` (stärkere
+Richtung, nur mit bekannter Geschwindigkeit), `if.errors`, `if.discards` (je Minute, beide
+Richtungen) mit Key = Interface-Name (`name#ifIndex`, wenn der Name fehlt oder doppelt ist).
+Keine Rate bei Neustart des Geräts (`sysUpTime` kleiner), Abständen unter 20 s oder über 2 h
+und zurückgesetzten 64-bit-Zählern; 32-bit-Zähler dürfen einmal überlaufen. Geräte ohne
+Antwort werden höchstens stündlich erneut gefragt, solange keine frischen Zähler vorliegen.
+`GET /devices/{id}/timeseries` liefert je Reihe den letzten Rohwert (`last`), daraus baut
+der Tab „Traffic“ die Portliste.
+
 ## Plugin-Interfaces
 
 Siehe `internal/plugin/plugin.go` und die Anleitung [PLUGINS.md](PLUGINS.md).
@@ -277,6 +292,9 @@ aktiv, Cron-Zeitplan, Timeout, Wiederholungen + Backoff, Parallelität, Scope
 | `agent.online` | Agent meldet sich wieder | info | agent |
 | `disk.full` | Dateisystem fast voll | high | agent |
 | `disk.ok` | Dateisystem wieder unter der Schwelle | info | agent |
+| `interface.down` | Port ohne Verbindung (eingeschaltet, standardmäßig nur Ports mit Beschreibung) | medium | snmp_traffic |
+| `interface.up` | Port wieder verbunden | info | snmp_traffic |
+| `interface.saturated` | Port überlastet (Schwelle einstellbar, Standard 90 %) | medium | snmp_traffic |
 
 Payload-Felder je Typ: `GET /api/v1/events/types` bzw. `internal/plugin/events.go`.
 

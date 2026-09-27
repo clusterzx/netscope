@@ -33,6 +33,8 @@ type Series struct {
 	DeviceID int64  `json:"deviceId,omitempty"`
 	Key      string `json:"key,omitempty"`
 	Unit     string `json:"unit,omitempty"`
+	// Last is the newest raw sample (absent once raw samples are pruned).
+	Last *Point `json:"last,omitempty"`
 }
 
 // Point is one (possibly aggregated) sample.
@@ -76,7 +78,10 @@ func Append(ctx context.Context, q db.Querier, seriesID int64, t time.Time, min,
 
 // ListSeries returns the series of a device (deviceID 0 = global series).
 func ListSeries(ctx context.Context, q db.Querier, deviceID int64) ([]Series, error) {
-	rows, err := q.QueryContext(ctx, "SELECT id, metric, IFNULL(device_id, 0), key, unit FROM ts_series WHERE IFNULL(device_id, 0) = ? ORDER BY metric, key", deviceID)
+	rows, err := q.QueryContext(ctx, `SELECT s.id, s.metric, IFNULL(s.device_id, 0), s.key, s.unit, r.ts, r.min, r.avg, r.max
+		FROM ts_series s
+		LEFT JOIN ts_raw r ON r.series_id = s.id AND r.ts = (SELECT MAX(ts) FROM ts_raw WHERE series_id = s.id)
+		WHERE IFNULL(s.device_id, 0) = ? ORDER BY s.metric, s.key`, deviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +89,13 @@ func ListSeries(ctx context.Context, q db.Querier, deviceID int64) ([]Series, er
 	out := []Series{}
 	for rows.Next() {
 		var s Series
-		if err := rows.Scan(&s.ID, &s.Metric, &s.DeviceID, &s.Key, &s.Unit); err != nil {
+		var ts sql.NullInt64
+		var mn, avg, mx sql.NullFloat64
+		if err := rows.Scan(&s.ID, &s.Metric, &s.DeviceID, &s.Key, &s.Unit, &ts, &mn, &avg, &mx); err != nil {
 			return nil, err
+		}
+		if ts.Valid {
+			s.Last = &Point{T: time.UnixMilli(ts.Int64), Min: mn.Float64, Avg: avg.Float64, Max: mx.Float64, Count: 1}
 		}
 		out = append(out, s)
 	}

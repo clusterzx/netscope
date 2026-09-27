@@ -74,3 +74,31 @@ func TestAppendQueryDownsample(t *testing.T) {
 		t.Fatalf("raw not pruned: %d", cnt)
 	}
 }
+
+func TestListSeriesLast(t *testing.T) {
+	ctx := context.Background()
+	d, err := db.Open(ctx, filepath.Join(t.TempDir(), "ts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	if _, err := d.W.Exec("INSERT INTO devices(id, created_at, updated_at) VALUES (1, 0, 0)"); err != nil {
+		t.Fatal(err)
+	}
+	busy, _ := SeriesID(ctx, d.W, "if.in_bps", 1, "eth0", "bps")
+	_, _ = SeriesID(ctx, d.W, "if.in_bps", 1, "eth1", "bps")
+	now := time.Now().Truncate(time.Second)
+	for i, v := range []float64{10, 30, 20} {
+		_ = Append(ctx, d.W, busy, now.Add(time.Duration(i-3)*time.Minute), v, v, v)
+	}
+	list, err := ListSeries(ctx, d.R, 1)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("%v %+v", err, list)
+	}
+	if l := list[0].Last; l == nil || l.Avg != 20 || !l.T.Equal(now.Add(-time.Minute)) {
+		t.Errorf("last of eth0: %+v", l)
+	}
+	if list[1].Last != nil {
+		t.Errorf("empty series has a last sample: %+v", list[1].Last)
+	}
+}

@@ -182,6 +182,7 @@ export const eventCategoryLabel: Record<string, string> = {
 	software: 'Software',
 	vulnerability: 'Schwachstellen',
 	health: 'Health',
+	network: 'Netzwerk',
 	system: 'System'
 };
 

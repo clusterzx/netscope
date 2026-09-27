@@ -46,9 +46,10 @@
   VMs ohne Gast-Agent), vollständiges Audit-Log.
 - **Scanner:** ARP, ICMP (Latenz/Verlust als Zeitreihe), nmap TCP/UDP (Dienste, Versionen, OS,
   CPE), DNS, mDNS, NetBIOS, UPnP, OUI, HTTP (Titel, Server, Favicon-Hash, Web-App-Erkennung),
-  TLS (Zertifikate, schwache Protokolle/Cipher), SNMP (inkl. FDB/LLDP), SSH-Inventar
+  TLS (Zertifikate, schwache Protokolle/Cipher), SNMP (inkl. FDB/LLDP, Traffic und Fehler je Port), SSH-Inventar
   (Pakete, Dienste, Sockets, Docker), Wake-on-LAN.
-- **Importer:** Proxmox VE, OpenWrt/GL.iNet (DHCP), Docker, NetAlertX, CSV.
+- **Importer:** Proxmox VE, OpenWrt/GL.iNet (DHCP), OPNsense, pfSense, UniFi, MikroTik,
+  FortiGate, Sophos Firewall, Cisco Meraki, FRITZ!Box, Pi-hole, Docker, NetAlertX, CSV.
 - **NetScope-Agent:** ein Befehl auf einem Linux-System, und es liefert Inventar (wie per SSH)
   und Auslastung (CPU, RAM, Platten, Netz) von sich aus – ohne SSH-Zugang, auch hinter NAT;
   aktualisiert sich selbst.
@@ -199,6 +200,7 @@ sofort, ohne Neustart.
 | `http` | Scanner | täglich 03:30 | Titel, Server-Header, Redirects, Favicon-Hash, 44 Web-App-Signaturen (erweiterbar) |
 | `tls` | Scanner | täglich 03:45 | Zertifikate, Aussteller, Ablauf, Selbstsigniert, schwache Protokolle/Cipher |
 | `snmp` | Scanner | aus | v2c/v3: System, Interfaces, ARP, Bridge-FDB, LLDP (für die Topologie) |
+| `snmp_traffic` | Scanner | aus (alle 5 min) | Traffic, Auslastung, Fehler und Discards je Interface als Zeitreihen (Tab „Traffic“ am Gerät); Events bei Port-Ausfall und Überlast |
 | `ssh` | Scanner | aus | Linux-Inventar: OS, Kernel, CPU/RAM/Disks, Pakete, Dienste, Sockets, Docker, Uptime, Updates – nur feste Lesekommandos; abweichende SSH-Ports je Adresse/Netz oder aus dem Portscan |
 | `wol` | Aktion | – | Wake-on-LAN pro Gerät bzw. als Massenaktion |
 | `agent` | Importer | laufend | Einstellungen der NetScope-Agents: Inventar- und Messintervall, Pakete/Docker, Schwelle „Dateisystem fast voll“, Zeit bis „Agent meldet sich nicht“; manueller Lauf fordert bei allen Agents ein Inventar an |

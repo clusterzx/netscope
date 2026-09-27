@@ -61,6 +61,7 @@
 	import HealthCheckModal from './HealthCheckModal.svelte';
 	import HealthTab from './HealthTab.svelte';
 	import HistoryTab from './HistoryTab.svelte';
+	import InterfaceTraffic from './InterfaceTraffic.svelte';
 	import OverviewTab from './OverviewTab.svelte';
 	import PortsTab from './PortsTab.svelte';
 	import RawTab from './RawTab.svelte';
@@ -178,6 +179,7 @@
 		{ id: 'cves', label: 'CVEs', count: counts.cves ?? null },
 		{ id: 'health', label: 'Health', count: counts.health ?? null },
 		...(agent ? [{ id: 'usage', label: 'Auslastung' }] : []),
+		...(counts.interfaces ? [{ id: 'traffic', label: 'Traffic', count: counts.interfaces }] : []),
 		{ id: 'history', label: 'Historie', count: counts.events ?? null },
 		{ id: 'relations', label: 'Beziehungen', count: counts.relations ?? null },
 		{ id: 'raw', label: 'Rohdaten' }
@@ -522,6 +524,8 @@
 						/>
 					{:else if t.id === 'usage' && agent}
 						<AgentUsage deviceId={id} {agent} {version} active={tab === 'usage'} />
+					{:else if t.id === 'traffic'}
+						<InterfaceTraffic deviceId={id} {version} active={tab === 'traffic'} />
 					{:else if t.id === 'history'}
 						<HistoryTab deviceId={id} {version} active={tab === 'history'} />
 					{:else if t.id === 'relations'}

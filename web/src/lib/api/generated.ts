@@ -2058,6 +2058,7 @@ export interface TimeseriesSeries {
 	deviceId?: number;
 	id: number;
 	key?: string;
+	last?: TimeseriesPoint;
 	metric: string;
 	unit?: string;
 }
