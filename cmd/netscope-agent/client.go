@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,8 +18,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
-
-	"netscope/internal/agent/proto"
 )
 
 // errRevoked: the instance no longer knows this agent (removed or token revoked).
@@ -68,34 +65,6 @@ func normalizeFingerprint(s string) string {
 	return strings.ToLower(strings.NewReplacer(":", "", " ", "").Replace(strings.TrimSpace(s)))
 }
 
-// hostInfo describes this machine.
-func hostInfo() proto.Host {
-	h := proto.Host{Arch: platformArch(), Version: version}
-	for _, p := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
-		if b, err := os.ReadFile(p); err == nil && strings.TrimSpace(string(b)) != "" {
-			h.MachineID = strings.TrimSpace(string(b))
-			break
-		}
-	}
-	h.Hostname, _ = os.Hostname()
-	if b, err := os.ReadFile("/proc/sys/kernel/osrelease"); err == nil {
-		h.Kernel = strings.TrimSpace(string(b))
-	}
-	for _, p := range []string{"/etc/os-release", "/usr/lib/os-release"} {
-		b, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(b), "\n") {
-			if v, ok := strings.CutPrefix(line, "PRETTY_NAME="); ok {
-				h.OS = strings.Trim(v, `"'`)
-			}
-		}
-		break
-	}
-	return h
-}
-
 // platformArch is the platform name of the binaries (amd64, arm64, armv7).
 func platformArch() string {
 	if runtime.GOARCH != "arm" {
@@ -109,16 +78,6 @@ func platformArch() string {
 		}
 	}
 	return "armv7"
-}
-
-// dockerAccess reports whether the agent may talk to the docker engine.
-func dockerAccess() bool {
-	c, err := net.DialTimeout("unix", "/var/run/docker.sock", time.Second)
-	if err != nil {
-		return false
-	}
-	_ = c.Close()
-	return true
 }
 
 // client talks to the instance.

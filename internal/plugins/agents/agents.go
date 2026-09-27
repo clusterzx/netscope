@@ -29,8 +29,9 @@ func (p *Plugin) Info() plugin.Info {
 		ID:   ID,
 		Kind: plugin.KindImporter,
 		Name: "NetScope-Agent",
-		Description: "Systeme mit installiertem NetScope-Agent liefern Inventar (wie per SSH) und Auslastung " +
-			"(CPU, RAM, Platten, Netz) von sich aus – ohne SSH-Zugang, auch hinter NAT. Installation unter Agents.",
+		Description: "Linux- und Windows-Systeme mit installiertem NetScope-Agent liefern Inventar (wie per SSH) und " +
+			"Auslastung (CPU, RAM, Platten, Netz) von sich aus – ohne SSH-Zugang, auch hinter NAT; Windows-DHCP-Server zusätzlich ihre Leases. " +
+			"Installation unter Agents.",
 		Version:            "1.0.0",
 		DefaultEnabled:     true,
 		DefaultTimeout:     time.Minute,
@@ -41,6 +42,7 @@ func (p *Plugin) Info() plugin.Info {
 const (
 	gCollect = "Erfassung"
 	gAlerts  = "Warnungen"
+	gDHCP    = "Windows-DHCP-Server"
 )
 
 // Schema implements plugin.Plugin.
@@ -61,6 +63,11 @@ func (p *Plugin) Schema() plugin.Schema {
 			Validation:  &plugin.Validation{Min: plugin.Int64(0), Max: plugin.Int64(100)}},
 		{Key: "offline_after", Type: plugin.FieldDuration, Label: "Agent gilt als weg nach", Default: "5m", Group: gAlerts,
 			Description: "Ohne Meldung so lange entsteht „Agent meldet sich nicht“; scannt kein anderer Scanner das Gerät, geht es offline."},
+		{Key: "dhcp_leases", Type: plugin.FieldBool, Label: "Leases übernehmen", Default: true, Group: gDHCP,
+			Description: "Agents auf Windows-DHCP-Servern liefern Leases und Reservierungen: Namen und Adressen der Geräte im Netz."},
+		{Key: "dhcp_create", Type: plugin.FieldBool, Label: "Fehlende Geräte anlegen", Default: false, Group: gDHCP,
+			Description: "Geräte aus Leases anlegen, die noch kein Scan gefunden hat – nützlich für Netze, die NetScope nicht selbst scannt. Aus: nur bekannte Geräte ergänzen.",
+			VisibleIf:   &plugin.Condition{Field: "dhcp_leases", Equals: []any{true}}},
 	}}
 }
 

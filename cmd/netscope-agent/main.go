@@ -1,9 +1,10 @@
-// Command netscope-agent collects the inventory and the utilisation of a Linux host and
-// delivers it to a NetScope instance. It only connects out, runs the fixed read-only
-// command list of internal/hostscript and accepts nothing from the instance except
-// "collect now", its settings and a newer version of itself (checked against SHA-256).
+// Command netscope-agent collects the inventory and the utilisation of a Linux or Windows
+// host and delivers it to a NetScope instance. It only connects out, runs the fixed
+// read-only collection script of internal/hostscript (POSIX sh or PowerShell) and accepts
+// nothing from the instance except "collect now", its settings and a newer version of itself
+// (checked against SHA-256).
 //
-//	netscope-agent enroll --url https://netscope.lan --token nse_…   (once, by install.sh)
+//	netscope-agent enroll --url https://netscope.lan --token nse_…   (once, by install.sh / install.ps1)
 //	netscope-agent run [--config FILE]                                (the service)
 //	netscope-agent version
 package main
@@ -16,10 +17,8 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"netscope/internal/agent/proto"
@@ -28,11 +27,15 @@ import (
 // version is set at build time (-ldflags "-X main.version=…").
 var version = "dev"
 
-const defaultConfigPath = "/var/lib/netscope-agent/agent.json"
+// defaultConfigPath is the state file written by enroll (platform specific).
+var defaultConfigPath = defaultConfigFile()
 
 // exitRevoked tells systemd not to restart the agent (RestartPreventExitStatus=3): it was
 // removed in NetScope.
 const exitRevoked = 3
+
+// errRestart: a new binary is in place; the service manager starts it after the agent ends.
+var errRestart = errors.New("neue Version installiert")
 
 func main() {
 	args := os.Args[1:]
@@ -53,7 +56,7 @@ func main() {
 
 Befehle:
   enroll --url URL --token nse_… [--fingerprint SHA256] [--docker] [--config DATEI]
-                  beim NetScope anmelden (macht install.sh)
+                  beim NetScope anmelden (macht install.sh bzw. install.ps1)
   run [--config DATEI]
                   Inventar und Auslastung liefern (Dienst)
   version         Version ausgeben
@@ -124,11 +127,16 @@ func run(args []string) error {
 		return err
 	}
 	a := &agent{cfg: cfg, client: newClient(cfg.URL, cfg.Fingerprint, cfg.Secret), settings: proto.DefaultConfig(),
-		log:     slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		log:     slog.New(slog.NewTextHandler(logWriter(*path), &slog.HandlerOptions{Level: slog.LevelInfo})),
 		refresh: make(chan struct{}, 1), restart: make(chan struct{})}
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
-	defer cancel()
-	a.log.Info("NetScope-Agent gestartet", "version", version, "instanz", cfg.URL, "agent", cfg.AgentID)
+	removeOldBinary()
+	return serve(a.serve, a.log)
+}
+
+// serve runs the agent until ctx ends, it was removed (errRevoked) or it updated itself
+// (errRestart).
+func (a *agent) serve(ctx context.Context) error {
+	a.log.Info("NetScope-Agent gestartet", "version", version, "instanz", a.cfg.URL, "agent", a.cfg.AgentID)
 
 	errc := make(chan error, 3)
 	go func() { errc <- a.pollLoop(ctx) }()
@@ -139,7 +147,7 @@ func run(args []string) error {
 		return nil
 	case <-a.restart:
 		a.log.Info("Neue Version installiert – Neustart")
-		return nil
+		return errRestart
 	case err := <-errc:
 		return err
 	}

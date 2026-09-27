@@ -13,7 +13,7 @@ import (
 	"netscope/internal/agent/proto"
 )
 
-// sampler reads the utilisation from /proc; rates need the previous reading.
+// sampler reads the utilisation of a Linux host from /proc; rates need the previous reading.
 type sampler struct {
 	root   string // file system root (tests use a fixture directory)
 	statfs func(path string) (total, used uint64, ok bool)
@@ -28,8 +28,6 @@ type reading struct {
 
 type counters struct{ rx, tx uint64 }
 
-func newSampler() *sampler { return &sampler{root: "/", statfs: statfs} }
-
 func (s *sampler) read(name string) string {
 	b, _ := os.ReadFile(filepath.Join(s.root, name))
 	return string(b)
@@ -42,8 +40,8 @@ func (s *sampler) sample(now time.Time) (proto.Sample, error) {
 		return proto.Sample{}, errors.New("/proc/stat nicht lesbar")
 	}
 	mem := parseMeminfo(s.read("proc/meminfo"))
-	smp := proto.Sample{At: now, Load1: parseLoad(s.read("proc/loadavg")), MemTotal: mem["MemTotal"],
-		SwapTot: mem["SwapTotal"]}
+	load := parseLoad(s.read("proc/loadavg"))
+	smp := proto.Sample{At: now, Load1: &load, MemTotal: mem["MemTotal"], SwapTot: mem["SwapTotal"]}
 	avail, ok := mem["MemAvailable"]
 	if !ok {
 		avail = mem["MemFree"] + mem["Buffers"] + mem["Cached"]

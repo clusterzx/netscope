@@ -1,0 +1,39 @@
+{"format":1,"errors":{"updates.pending":"timeout"},"unavailable":["antivirus"],
+"os":{"caption":"Microsoft Windows Server 2022 Standard","version":"10.0.20348","build":"20348","ubr":2849,"displayVersion":"21H2","releaseId":"2009","edition":"ServerStandard","installationType":"Server","productType":3,"architecture":"64-Bit","installDate":"2024-03-11T09:12:40.0000000Z","lastBoot":"2026-09-20T02:05:11.5000000Z","hostname":"SRV-DHCP01","timezone":"W. Europe Standard Time"},
+"computer":{"manufacturer":"Dell Inc.","model":"PowerEdge R650xs","family":"PowerEdge","domain":"corp.example","partOfDomain":true,"domainRole":3,"memoryBytes":68719476736,"serial":"8XK2L93","biosVendor":"Dell Inc.","biosVersion":"1.14.1","biosDate":"2025-11-04T00:00:00.0000000Z","chassis":[23]},
+"cpu":[{"name":"Intel(R) Xeon(R) Silver 4314 CPU @ 2.40GHz","cores":16,"threads":32,"mhz":2394}],
+"volumes":[{"drive":"C:","label":"System","fs":"NTFS","size":479554695168,"free":301989888000},{"drive":"D:","label":"Daten","fs":"ReFS","size":1999307276288,"free":1649267441664}],
+"disks":[{"model":"DELL PERC H755 SCSI Disk Device","size":479559942144,"interface":"SCSI","media":"Fixed hard disk media","serial":"0041e5a3c0b1"}],
+"interfaces":[
+ {"index":4,"name":"Ethernet 1","description":"Broadcom NetXtreme Gigabit Ethernet","mac":"B0-7B-25-11-22-33","status":"Up","speedBps":1000000000,"virtual":false,"hardware":true,"addresses":[
+  {"address":"fe80::1c2d:3e4f:5a6b:7c8d%4","prefixLength":64,"family":"IPv6","prefixOrigin":"WellKnown","suffixOrigin":"Link","state":"Preferred"},
+  {"address":"192.168.8.10","prefixLength":24,"family":"IPv4","prefixOrigin":"Manual","suffixOrigin":"Manual","state":"Preferred"}]},
+ {"index":7,"name":"Ethernet 2","description":"Broadcom NetXtreme Gigabit Ethernet #2","mac":"B0-7B-25-11-22-34","status":"Disconnected","speedBps":0,"virtual":false,"hardware":true,"addresses":[]},
+ {"index":12,"name":"iDRAC","description":"Remote NDIS Compatible Device","mac":"B0-7B-25-11-22-35","status":"Up","speedBps":425984000,"virtual":false,"hardware":true,"addresses":[
+  {"address":"169.254.1.2","prefixLength":24,"family":"IPv4","prefixOrigin":"Dhcp","suffixOrigin":"Dhcp","state":"Preferred"}]}],
+"software":[
+ {"name":"Microsoft Edge","version":"140.0.3485.94","publisher":"Microsoft Corporation","installDate":"20260918","arch":"x86"},
+ {"name":"7-Zip 24.08 (x64)","version":"24.08","publisher":"Igor Pavlov","installDate":"","arch":"x64"},
+ {"name":"Microsoft Edge","version":"140.0.3485.94","publisher":"Microsoft Corporation","installDate":"20260918","arch":"x86"},
+ {"name":"Veeam Agent for Microsoft Windows","version":"6.3.1.1074","publisher":"Veeam Software Group GmbH","installDate":"20260402","arch":"x64"}],
+"hotfixes":[
+ {"id":"KB5012170","description":"Security Update","installedOn":"2024-03-12T23:00:00.0000000Z"},
+ {"id":"KB5065432","description":"Security Update","installedOn":"2026-09-10T22:00:00.0000000Z"}],
+"updates":{"rebootRequired":true,"lastSearch":"2026-09-27T03:10:00.0000000Z","lastInstall":"2026-09-11T02:30:00.0000000Z"},
+"services":[
+ {"name":"DHCPServer","displayName":"DHCP Server","state":"Running","startMode":"Auto","account":"NT Authority\\NetworkService"},
+ {"name":"Spooler","displayName":"Print Spooler","state":"Stopped","startMode":"Disabled","account":"LocalSystem"}],
+"listening":[
+ {"proto":"udp","address":"0.0.0.0","port":67,"pid":2144,"process":"svchost"},
+ {"proto":"tcp","address":"0.0.0.0","port":3389,"pid":1180,"process":"svchost"},
+ {"proto":"tcp","address":"0.0.0.0","port":135,"pid":944,"process":"svchost"}],
+"firewall":[{"profile":"Domain","enabled":true},{"profile":"Private","enabled":true},{"profile":"Public","enabled":false}],
+"defender":{"antivirus":true,"realtime":true,"signatureUpdated":"2026-09-26T21:02:11.0000000Z","signatureVersion":"1.459.421.0","productVersion":"4.18.26080.4"},
+"dhcp":{"scopes":[{"id":"192.168.8.0","mask":"255.255.255.0","name":"LAN","state":"Active","start":"192.168.8.100","end":"192.168.8.199"}],
+ "leases":[
+  {"ip":"192.168.8.101","mac":"3c-22-fb-01-02-03","hostname":"LT-MUELLER.corp.example","state":"Active","expires":"2026-09-28T08:00:00.0000000Z","scope":"192.168.8.0","description":""},
+  {"ip":"192.168.8.120","mac":"00-11-32-aa-bb-cc","hostname":"nas01","state":"ActiveReservation","expires":null,"scope":"192.168.8.0","description":""},
+  {"ip":"192.168.8.150","mac":"de-ad-be-ef-00-01","hostname":"","state":"Declined","expires":null,"scope":"192.168.8.0","description":""}],
+ "reservations":[
+  {"ip":"192.168.8.120","mac":"00-11-32-aa-bb-cc","name":"Synology NAS","description":"Backup-Ziel","scope":"192.168.8.0"}]},
+"collectedAt":"2026-09-27T08:00:00.0000000Z"}

@@ -1,6 +1,7 @@
-// Package hostscript is the read-only inventory collection of a Linux host: one POSIX sh
+// Package hostscript is the read-only inventory collection of a host: for Linux one POSIX sh
 // script from a fixed command list (used over SSH by the ssh plugin and locally by the
-// NetScope agent) and the splitter for its output. It has no dependencies so the agent
+// NetScope agent) and the splitter for its output; for Windows one PowerShell script that
+// prints JSON (windows.go, NetScope agent only). It has no dependencies so the agent
 // binary stays small.
 package hostscript
 

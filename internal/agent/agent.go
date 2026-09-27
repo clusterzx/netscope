@@ -1,7 +1,8 @@
 // Package agent is the server side of the NetScope agent: installation tokens, the agents
 // that enrolled with them, the agent protocol (internal/agent/proto) and the conversion of
 // what agents deliver into observations. Inventory output is parsed with the code of the
-// SSH inventory; utilisation samples become time series of the device.
+// SSH inventory (Linux) or as the JSON of the Windows script (internal/agent/wininv);
+// utilisation samples become time series of the device.
 package agent
 
 import (
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"netscope/internal/agent/proto"
+	"netscope/internal/agent/wininv"
 	"netscope/internal/bus"
 	"netscope/internal/db"
 	"netscope/internal/events"
@@ -29,6 +31,7 @@ import (
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
 	"netscope/internal/plugins/agents"
+	"netscope/internal/plugins/netsrc"
 	"netscope/internal/plugins/ssh"
 )
 
@@ -112,11 +115,12 @@ type options struct {
 	inventory, sample, report, offline, cmd time.Duration
 	packages, docker                        bool
 	diskThreshold                           int
+	dhcpLeases, dhcpCreate                  bool
 }
 
 func (s *Service) options() options {
 	st := options{enabled: true, inventory: time.Hour, sample: time.Minute, report: 5 * time.Minute, offline: 5 * time.Minute,
-		cmd: 30 * time.Second, packages: true, docker: true, diskThreshold: 90}
+		cmd: 30 * time.Second, packages: true, docker: true, diskThreshold: 90, dhcpLeases: true}
 	cfg, ok := s.Host.Config(agents.ID)
 	if !ok || cfg == nil {
 		return st
@@ -131,6 +135,7 @@ func (s *Service) options() options {
 	}
 	st.packages, st.docker = ps.Bool("collect_packages"), ps.Bool("collect_docker")
 	st.diskThreshold = ps.Int("disk_threshold")
+	st.dhcpLeases, st.dhcpCreate = ps.Bool("dhcp_leases"), ps.Bool("dhcp_create")
 	return st
 }
 
@@ -289,6 +294,7 @@ type Agent struct {
 	MachineID       string     `json:"machineId"`
 	Hostname        string     `json:"hostname"`
 	OS              string     `json:"os"`
+	Platform        string     `json:"platform"` // linux | windows
 	Arch            string     `json:"arch"`
 	Kernel          string     `json:"kernel"`
 	Version         string     `json:"version"`
@@ -307,7 +313,7 @@ type Agent struct {
 }
 
 const agentSelect = `SELECT a.id, a.device_id, COALESCE(NULLIF(d.display_name, ''), NULLIF(d.hostname, ''), d.primary_ip, ''),
-	a.enrollment_id, COALESCE(e.name, ''), a.machine_id, a.hostname, a.os, a.arch, a.kernel, a.version, a.docker, a.ip,
+	a.enrollment_id, COALESCE(e.name, ''), a.machine_id, a.hostname, a.os, a.platform, a.arch, a.kernel, a.version, a.docker, a.ip,
 	a.enrolled_at, a.last_seen_at, a.last_inventory_at, a.last_metrics_at, a.last_error, a.offline, a.full_disks
 	FROM agents a LEFT JOIN devices d ON d.id = a.device_id LEFT JOIN agent_enrollments e ON e.id = a.enrollment_id`
 
@@ -320,7 +326,7 @@ func (s *Service) scanAgent(sc interface{ Scan(...any) error }, st options) (Age
 		offline            bool
 		full               string
 	)
-	err := sc.Scan(&a.ID, &dev, &a.DeviceName, &enr, &a.EnrollmentName, &a.MachineID, &a.Hostname, &a.OS, &a.Arch, &a.Kernel,
+	err := sc.Scan(&a.ID, &dev, &a.DeviceName, &enr, &a.EnrollmentName, &a.MachineID, &a.Hostname, &a.OS, &a.Platform, &a.Arch, &a.Kernel,
 		&a.Version, &a.Docker, &a.IP, &enrolled, &seen, &inv, &metrics, &a.LastError, &offline, &full)
 	if err != nil {
 		return a, err
@@ -334,7 +340,7 @@ func (s *Service) scanAgent(sc interface{ Scan(...any) error }, st options) (Age
 	a.EnrolledAt = db.Time(enrolled)
 	a.LastSeenAt, a.LastInventoryAt, a.LastMetricsAt = db.NullTime(seen), db.NullTime(inv), db.NullTime(metrics)
 	a.Online = !offline && a.LastSeenAt != nil && time.Since(*a.LastSeenAt) < st.offline
-	a.Outdated = s.offer(a.Arch, a.Version) != nil
+	a.Outdated = s.offer(a.Platform, a.Arch, a.Version) != nil
 	a.FullDisks = []string{}
 	_ = db.Unmarshal(full, &a.FullDisks)
 	return a, nil
@@ -456,6 +462,7 @@ func (s *Service) Enroll(ctx context.Context, req proto.EnrollRequest, ip string
 		return nil, err
 	}
 	h := req.Host
+	platform := platformOf(h.Platform)
 	var id int64
 	err = s.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var enr int64
@@ -480,14 +487,14 @@ func (s *Service) Enroll(ctx context.Context, req proto.EnrollRequest, ip string
 			}
 		}
 		if id > 0 {
-			_, err := tx.ExecContext(ctx, `UPDATE agents SET token_hash = ?, enrollment_id = ?, hostname = ?, os = ?, arch = ?, kernel = ?,
-				version = ?, docker = ?, ip = ?, enrolled_at = ?, last_seen_at = ?, offline = 0, last_error = '' WHERE id = ?`,
-				hash, enr, h.Hostname, h.OS, h.Arch, h.Kernel, h.Version, db.Bool(h.Docker), ip, now, now, id)
+			_, err := tx.ExecContext(ctx, `UPDATE agents SET token_hash = ?, enrollment_id = ?, hostname = ?, os = ?, platform = ?, arch = ?,
+				kernel = ?, version = ?, docker = ?, ip = ?, enrolled_at = ?, last_seen_at = ?, offline = 0, last_error = '' WHERE id = ?`,
+				hash, enr, h.Hostname, h.OS, platform, h.Arch, h.Kernel, h.Version, db.Bool(h.Docker), ip, now, now, id)
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO agents(enrollment_id, machine_id, hostname, os, arch, kernel, version, docker,
-			token_hash, ip, enrolled_at, last_seen_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-			enr, h.MachineID, h.Hostname, h.OS, h.Arch, h.Kernel, h.Version, db.Bool(h.Docker), hash, ip, now, now)
+		res, err := tx.ExecContext(ctx, `INSERT INTO agents(enrollment_id, machine_id, hostname, os, platform, arch, kernel, version, docker,
+			token_hash, ip, enrolled_at, last_seen_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			enr, h.MachineID, h.Hostname, h.OS, platform, h.Arch, h.Kernel, h.Version, db.Bool(h.Docker), hash, ip, now, now)
 		if err != nil {
 			return err
 		}
@@ -507,6 +514,7 @@ type Session struct {
 	id       int64
 	deviceID int64
 	hostname string
+	platform string
 	arch     string
 	version  string
 	offline  bool
@@ -526,8 +534,8 @@ func (s *Service) Authenticate(ctx context.Context, secret, ip string) (*Session
 		stored string
 	)
 	h := hashToken(secret)
-	err := s.DB.R.QueryRowContext(ctx, `SELECT id, device_id, hostname, arch, version, offline, last_seen_at, enrollment_id, token_hash
-		FROM agents WHERE token_hash = ?`, h).Scan(&a.id, &dev, &a.hostname, &a.arch, &a.version, &a.offline, &seen, &a.enroll, &stored)
+	err := s.DB.R.QueryRowContext(ctx, `SELECT id, device_id, hostname, platform, arch, version, offline, last_seen_at, enrollment_id,
+		token_hash FROM agents WHERE token_hash = ?`, h).Scan(&a.id, &dev, &a.hostname, &a.platform, &a.arch, &a.version, &a.offline, &seen, &a.enroll, &stored)
 	if err != nil || subtle.ConstantTimeCompare([]byte(stored), []byte(h)) != 1 {
 		return nil, ErrUnauthenticated
 	}
@@ -572,7 +580,7 @@ func (s *Service) Poll(ctx context.Context, a *Session, wait time.Duration, vers
 	deadline := time.NewTimer(wait)
 	defer deadline.Stop()
 	for {
-		resp := &proto.PollResponse{Config: s.options().proto(), Update: s.offer(a.arch, a.version)}
+		resp := &proto.PollResponse{Config: s.options().proto(), Update: s.offer(a.platform, a.arch, a.version)}
 		res, err := s.DB.W.ExecContext(ctx, "UPDATE agents SET refresh = 0 WHERE id = ? AND refresh = 1", a.id)
 		if err != nil {
 			return nil, err
@@ -633,7 +641,21 @@ func (s *Service) ReportInventory(ctx context.Context, a *Session, r proto.Inven
 	for _, sn := range subnets {
 		prefixes = append(prefixes, sn.CIDR)
 	}
-	obs, sections := ssh.AgentObservation([]byte(r.Stdout), []byte(r.Stderr), r.Truncated, prefixes)
+	var (
+		obs      *plugin.Observation
+		sections int
+		leases   []netsrc.Client
+	)
+	if a.platform == "windows" {
+		res, err := wininv.Parse([]byte(r.Stdout), r.Truncated, prefixes, time.Now())
+		if err != nil {
+			_, err := s.DB.W.ExecContext(ctx, "UPDATE agents SET last_error = ? WHERE id = ?", "Erfassung: "+err.Error(), a.id)
+			return err
+		}
+		obs, sections, leases = res.Observation, res.Sections, res.DHCP
+	} else {
+		obs, sections = ssh.AgentObservation([]byte(r.Stdout), []byte(r.Stderr), r.Truncated, prefixes)
+	}
 	if sections == 0 {
 		_, err := s.DB.W.ExecContext(ctx, "UPDATE agents SET last_error = ? WHERE id = ?", "Erfassung lieferte keine Daten", a.id)
 		return err
@@ -668,8 +690,29 @@ func (s *Service) ReportInventory(ctx context.Context, a *Session, r proto.Inven
 		return err
 	}
 	a.deviceID = devID
+	if len(leases) > 0 {
+		s.importLeases(ctx, a, leases)
+	}
 	s.publish("updated", a.id)
 	return nil
+}
+
+// importLeases records the leases and reservations of a Windows DHCP server like a DHCP
+// importer: names and addresses for known devices, new devices only if the settings say so.
+func (s *Service) importLeases(ctx context.Context, a *Session, leases []netsrc.Client) {
+	st := s.options()
+	if !st.dhcpLeases {
+		return
+	}
+	failed := 0
+	for _, c := range netsrc.Merge(leases) {
+		if _, err := s.Inventory.Observe(ctx, wininv.DHCPSource, 0, c.Observation(wininv.DHCPSource, a.hostname, st.dhcpCreate)); err != nil {
+			failed++
+		}
+	}
+	if failed > 0 {
+		s.Log.Warn("DHCP-Leases nicht vollständig übernommen", "agent", a.id, "host", a.hostname, "fehler", failed)
+	}
 }
 
 func nullID(id int64) any {
@@ -727,7 +770,9 @@ func (s *Service) ReportMetrics(ctx context.Context, a *Session, r proto.Metrics
 		if smp.CPU != nil {
 			add(MetricCPU, "", "%", *smp.CPU, at)
 		}
-		add(MetricLoad, "", "", smp.Load1, at)
+		if smp.Load1 != nil {
+			add(MetricLoad, "", "", *smp.Load1, at)
+		}
 		if smp.MemTotal > 0 {
 			add(MetricMem, "", "%", pct(smp.MemUsed, smp.MemTotal), at)
 		}

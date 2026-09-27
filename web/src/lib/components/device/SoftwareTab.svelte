@@ -21,6 +21,7 @@
 	import { debounce } from '$lib/utils/url';
 	import GenericData from './GenericData.svelte';
 	import SshInventory from './SshInventory.svelte';
+	import WindowsInventory from './WindowsInventory.svelte';
 	import { LazyData, sourceName } from './util';
 
 	interface Props {
@@ -69,6 +70,9 @@
 			return ra - rb || a.localeCompare(b);
 		})
 	);
+	/** the agent inventory of a Windows host (internal/agent/wininv) */
+	const isWindows = (d: unknown) =>
+		!!d && typeof d === 'object' && (d as { platform?: string }).platform === 'windows';
 	let rawView = $state<Record<string, boolean>>({});
 	/** open/closed per source (default: the first two sources are open) */
 	let expanded = $state<Record<string, boolean>>({});
@@ -146,6 +150,8 @@
 					{#if isOpen}
 						{#if rawView[src]}
 							<JsonView value={entry.data} openDepth={2} />
+						{:else if src === 'agent' && isWindows(entry.data)}
+							<WindowsInventory data={entry.data} />
 						{:else if (src === 'ssh' || src === 'agent') && entry.data && typeof entry.data === 'object'}
 							<SshInventory data={entry.data} />
 						{:else}

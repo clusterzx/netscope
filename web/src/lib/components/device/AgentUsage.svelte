@@ -202,12 +202,15 @@
 					<dt class="text-xs text-fg-subtle">Arbeitsspeicher</dt>
 					<dd class="font-medium tabular">{formatPercent(last(u.mem), 0)}</dd>
 				</div>
-				<div>
-					<dt class="text-xs text-fg-subtle">Last (1 min)</dt>
-					<dd class="font-medium tabular">
-						{last(u.load) === null ? '–' : formatNumber(last(u.load) ?? 0, 2)}
-					</dd>
-				</div>
+				{#if u.load.length}
+					<!-- Windows has no load average -->
+					<div>
+						<dt class="text-xs text-fg-subtle">Last (1 min)</dt>
+						<dd class="font-medium tabular">
+							{last(u.load) === null ? '–' : formatNumber(last(u.load) ?? 0, 2)}
+						</dd>
+					</div>
+				{/if}
 				<div>
 					<dt class="text-xs text-fg-subtle">Vollstes Dateisystem</dt>
 					<dd class="font-medium tabular">

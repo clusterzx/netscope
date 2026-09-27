@@ -57,7 +57,7 @@ Paketquellen von Alpine Linux installiert.
 | golang.org/x/crypto | v0.57.0 | BSD-3-Clause | Server |
 | golang.org/x/net | v0.59.0 | BSD-3-Clause | Server |
 | golang.org/x/sync | v0.22.0 | BSD-3-Clause | Server |
-| golang.org/x/sys | v0.48.0 | BSD-3-Clause | Server |
+| golang.org/x/sys | v0.48.0 | BSD-3-Clause | Agent, Server |
 | golang.zx2c4.com/wireguard/wgctrl | v0.0.0-20241231184526-a9ab2273dd10 | MIT | Server |
 | gopkg.in/yaml.v3 | v3.0.1 | MIT und Apache-2.0 | Server |
 | modernc.org/libc | v1.75.7 | BSD-3-Clause | Server |

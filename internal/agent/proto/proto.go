@@ -7,6 +7,9 @@
 //	POST /api/v1/agent/inventory  output of the collection script (internal/hostscript)
 //	POST /api/v1/agent/metrics    batch of utilisation samples
 //
+// The same agent runs on Linux (systemd/OpenRC service, POSIX sh collection script) and on
+// Windows (Windows service, PowerShell collection script).
+//
 // Every call after the enrollment carries "Authorization: Bearer nsag_…".
 package proto
 
@@ -18,7 +21,8 @@ const (
 	PathPoll      = "/api/v1/agent/poll"
 	PathInventory = "/api/v1/agent/inventory"
 	PathMetrics   = "/api/v1/agent/metrics"
-	// PathBinary is followed by the platform, e.g. /agent/bin/linux-amd64 (+ ".sha256").
+	// PathBinary is followed by the platform, e.g. /agent/bin/linux-amd64 or windows-amd64
+	// (+ ".sha256").
 	PathBinary = "/agent/bin/"
 )
 
@@ -30,13 +34,15 @@ const (
 
 // Host describes the machine an agent runs on.
 type Host struct {
-	MachineID string `json:"machineId"` // /etc/machine-id
+	MachineID string `json:"machineId"` // /etc/machine-id, MachineGuid on Windows
 	Hostname  string `json:"hostname"`
-	OS        string `json:"os"`   // PRETTY_NAME of os-release
-	Arch      string `json:"arch"` // GOARCH (+ v7 for arm)
-	Kernel    string `json:"kernel,omitempty"`
-	Version   string `json:"version"` // agent version
-	Docker    bool   `json:"docker"`  // the agent may read the docker socket
+	OS        string `json:"os"` // PRETTY_NAME of os-release, product name and version on Windows
+	// Platform is the operating system family: linux (also when absent, older agents) or windows.
+	Platform string `json:"platform,omitempty"`
+	Arch     string `json:"arch"`             // GOARCH (+ v7 for arm)
+	Kernel   string `json:"kernel,omitempty"` // kernel release, build number on Windows
+	Version  string `json:"version"`          // agent version
+	Docker   bool   `json:"docker"`           // the agent may read the docker socket
 }
 
 // EnrollRequest registers an agent with an enrollment token.
@@ -86,7 +92,8 @@ type Update struct {
 }
 
 // InventoryReport carries the raw output of the collection script; the instance parses it
-// with the same code as the SSH inventory.
+// with the same code as the SSH inventory (Linux) or as the JSON document of the Windows
+// script (internal/agent/wininv).
 type InventoryReport struct {
 	Host        Host      `json:"host"`
 	CollectedAt time.Time `json:"collectedAt"`
@@ -105,10 +112,10 @@ type MetricsReport struct {
 // sample; they are absent in the first sample after the start.
 type Sample struct {
 	At       time.Time `json:"at"`
-	CPU      *float64  `json:"cpu,omitempty"` // busy %, all cores
-	Load1    float64   `json:"load1"`
-	MemTotal uint64    `json:"memTotal"` // bytes
-	MemUsed  uint64    `json:"memUsed"`  // total − available
+	CPU      *float64  `json:"cpu,omitempty"`   // busy %, all cores
+	Load1    *float64  `json:"load1,omitempty"` // load average; Windows has none
+	MemTotal uint64    `json:"memTotal"`        // bytes
+	MemUsed  uint64    `json:"memUsed"`         // total − available
 	SwapUsed uint64    `json:"swapUsed"`
 	SwapTot  uint64    `json:"swapTotal"`
 	Disks    []Disk    `json:"disks,omitempty"`

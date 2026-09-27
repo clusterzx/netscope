@@ -78,7 +78,7 @@ func TestSampler(t *testing.T) {
 	if first.CPU != nil || len(first.Net) != 0 {
 		t.Fatalf("first sample has no rates: %+v", first)
 	}
-	if first.MemTotal != 8000000*1024 || first.MemUsed != 2000000*1024 || first.SwapUsed != 250000*1024 || first.Load1 != 0.42 {
+	if first.MemTotal != 8000000*1024 || first.MemUsed != 2000000*1024 || first.SwapUsed != 250000*1024 || first.Load1 == nil || *first.Load1 != 0.42 {
 		t.Fatalf("memory/load: %+v", first)
 	}
 	wantMounts := []string{"/", "/mnt/data disk", "/srv"}

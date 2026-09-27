@@ -29,9 +29,11 @@ type agentsResponse struct {
 type enrollmentCreated struct {
 	Enrollment *agent.Enrollment `json:"enrollment"`
 	Token      string            `json:"token"` // shown once
-	// Command installs the agent (Docker adds --docker).
-	Command       string `json:"command"`
-	CommandDocker string `json:"commandDocker"`
+	// Command installs the agent on Linux (Docker adds --docker), CommandWindows in an
+	// administrator PowerShell.
+	Command        string `json:"command"`
+	CommandDocker  string `json:"commandDocker"`
+	CommandWindows string `json:"commandWindows"`
 }
 
 // maxAgentBody bounds an uncompressed agent report (the script output is limited to 17 MB).
@@ -65,8 +67,9 @@ func (s *Server) registerAgents() {
 	s.add(&route{Method: "DELETE", Path: "/api/v1/agent-enrollments/{id}", Tag: "Agents", Summary: "Installations-Token widerrufen (installierte Agents laufen weiter)",
 		Scope: scopeWrite, Perm: auth.PermAgentsManage, Params: idParam, Resp: okResponse{}, handler: s.handleRevokeEnrollment})
 
-	// downloads for install.sh and the self-update (contain no secrets)
+	// downloads for install.sh / install.ps1 and the self-update (contain no secrets)
 	s.mux.HandleFunc("GET /agent/install.sh", s.handleAgentInstall)
+	s.mux.HandleFunc("GET /agent/install.ps1", s.handleAgentInstallWindows)
 	s.mux.HandleFunc("GET "+proto.PathBinary+"{file}", s.handleAgentBinary)
 }
 
@@ -292,6 +295,16 @@ func installCommand(base, token string, docker bool) string {
 	return cmd
 }
 
+// installCommandWindows is the PowerShell one-liner (administrator PowerShell). Windows
+// PowerShell 5.1 may still default to TLS 1.0/1.1, so https switches TLS 1.2 on first.
+func installCommandWindows(base, token string) string {
+	cmd := "& ([scriptblock]::Create((irm '" + strings.ReplaceAll(base, "'", "''") + "/agent/install.ps1'))) -Token " + token
+	if strings.HasPrefix(base, "https:") {
+		cmd = "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; " + cmd
+	}
+	return cmd
+}
+
 func (s *Server) handleCreateEnrollment(w http.ResponseWriter, r *http.Request) {
 	if !s.agentsAvailable(w) {
 		return
@@ -309,7 +322,7 @@ func (s *Server) handleCreateEnrollment(w http.ResponseWriter, r *http.Request) 
 	s.record(r, "agent.enrollment_create", "agent_enrollment", strconv.FormatInt(e.ID, 10), "Installations-Token „"+e.Name+"“ erzeugt", nil, in)
 	base := s.agentBase(r)
 	writeJSON(w, http.StatusCreated, enrollmentCreated{Enrollment: e, Token: token, Command: installCommand(base, token, false),
-		CommandDocker: installCommand(base, token, true)})
+		CommandDocker: installCommand(base, token, true), CommandWindows: installCommandWindows(base, token)})
 }
 
 func (s *Server) handleRevokeEnrollment(w http.ResponseWriter, r *http.Request) {
@@ -333,6 +346,12 @@ func (s *Server) handleAgentInstall(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = io.WriteString(w, agent.InstallScript(s.agentBase(r)))
+}
+
+func (s *Server) handleAgentInstallWindows(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = io.WriteString(w, agent.InstallScriptWindows(s.agentBase(r)))
 }
 
 func (s *Server) handleAgentBinary(w http.ResponseWriter, r *http.Request) {

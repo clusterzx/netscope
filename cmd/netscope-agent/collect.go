@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"netscope/internal/agent/proto"
-	"netscope/internal/hostscript"
 )
 
 // Output limits of one inventory run.
@@ -41,18 +40,15 @@ func (l *limited) Write(p []byte) (int, error) {
 	return l.buf.Write(p)
 }
 
-// collect runs the collection script with /bin/sh; the instance parses the output.
+// collect runs the collection script of the platform (collectCommand); the instance parses
+// the output.
 func collect(ctx context.Context, cfg proto.Config) proto.InventoryReport {
-	script := hostscript.Build(hostscript.Options{Packages: cfg.Packages, Docker: cfg.Docker && dockerAccess(),
-		CommandTimeout: cfg.CommandTimeout})
-	ctx, cancel := context.WithTimeout(ctx, hostscript.MaxDuration(cfg.CommandTimeout))
+	ctx, cancel := context.WithTimeout(ctx, collectTimeout(cfg))
 	defer cancel()
 	report := proto.InventoryReport{CollectedAt: time.Now()}
 	stdout, stderr := &limited{max: maxStdout}, &limited{max: maxStderr}
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-s")
-	cmd.Stdin = strings.NewReader(script)
+	cmd := collectCommand(ctx, cfg)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C", "LANG=C"}
 	err := cmd.Run()
 	var exit *exec.ExitError
 	switch {
@@ -94,7 +90,7 @@ func (a *agent) selfUpdate(ctx context.Context, u *proto.Update) error {
 	if err := os.WriteFile(tmp, data, 0o755); err != nil { //nolint:gosec // executable
 		return fmt.Errorf("neue Version ablegen: %w", err)
 	}
-	if err := os.Rename(tmp, exe); err != nil {
+	if err := replaceBinary(exe, tmp); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("neue Version einsetzen: %w", err)
 	}

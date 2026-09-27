@@ -22,6 +22,7 @@ export interface AgentAgent {
 	online: boolean;
 	os: string;
 	outdated: boolean;
+	platform: string;
 	version: string;
 }
 
@@ -222,6 +223,7 @@ export interface ApiDeviceList {
 export interface ApiEnrollmentCreated {
 	command: string;
 	commandDocker: string;
+	commandWindows: string;
 	enrollment?: AgentEnrollment;
 	token: string;
 }
@@ -1815,6 +1817,7 @@ export interface ProtoHost {
 	kernel?: string;
 	machineId: string;
 	os: string;
+	platform?: string;
 	version: string;
 }
 
@@ -1847,7 +1850,7 @@ export interface ProtoSample {
 	at: string;
 	cpu?: number;
 	disks?: ProtoDisk[];
-	load1: number;
+	load1?: number;
 	memTotal: number;
 	memUsed: number;
 	net?: ProtoNetRate[];

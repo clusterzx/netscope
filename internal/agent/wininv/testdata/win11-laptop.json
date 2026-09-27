@@ -1,0 +1,24 @@
+{"format":1,"errors":{},"unavailable":[],
+"os":{"caption":"Microsoft Windows 11 Pro","version":"10.0.22631","build":"22631","ubr":6199,"displayVersion":"23H2","releaseId":"2009","edition":"Professional","installationType":"Client","productType":1,"architecture":"64-Bit","installDate":"2024-02-02T21:30:05.0000000Z","lastBoot":"2026-09-24T05:14:45.5000000Z","hostname":"LT-MUELLER","timezone":"Mitteleuropäische Zeit"},
+"computer":{"manufacturer":"LENOVO","model":"21HD0012GE","family":"ThinkPad T14 Gen 4","domain":"WORKGROUP","partOfDomain":false,"domainRole":0,"memoryBytes":34359738368,"serial":"PF4XYZ12","biosVendor":"LENOVO","biosVersion":"R2FET45W (1.25 )","biosDate":"2025-06-01T00:00:00.0000000Z","chassis":[10]},
+"cpu":[{"name":"13th Gen Intel(R) Core(TM) i7-1365U","cores":10,"threads":12,"mhz":1800}],
+"volumes":[{"drive":"C:","label":"","fs":"NTFS","size":510770802688,"free":201326592000}],
+"disks":[{"model":"SAMSUNG MZVL2512HDJD-00BL2","size":512105932800,"interface":"SCSI","media":"Fixed hard disk media","serial":"0025_38B3_21C3_8F12."}],
+"interfaces":[
+ {"index":9,"name":"WLAN","description":"Intel(R) Wi-Fi 6E AX211 160MHz","mac":"3C-22-FB-01-02-03","status":"Up","speedBps":1200000000,"virtual":false,"hardware":true,"addresses":[
+  {"address":"2001:db8:8::a1b2","prefixLength":64,"family":"IPv6","prefixOrigin":"RouterAdvertisement","suffixOrigin":"Random","state":"Preferred"},
+  {"address":"2001:db8:8::3e22:fbff:fe01:203","prefixLength":64,"family":"IPv6","prefixOrigin":"RouterAdvertisement","suffixOrigin":"Link","state":"Preferred"},
+  {"address":"192.168.8.101","prefixLength":24,"family":"IPv4","prefixOrigin":"Dhcp","suffixOrigin":"Dhcp","state":"Preferred"}]},
+ {"index":21,"name":"vEthernet (Default Switch)","description":"Hyper-V Virtual Ethernet Adapter","mac":"00-15-5D-01-02-03","status":"Up","speedBps":10000000000,"virtual":true,"hardware":false,"addresses":[
+  {"address":"172.20.48.1","prefixLength":20,"family":"IPv4","prefixOrigin":"Manual","suffixOrigin":"Manual","state":"Preferred"}]}],
+"software":[{"name":"Mozilla Firefox (x64 de)","version":"143.0.1","publisher":"Mozilla","installDate":"","arch":"x64"}],
+"hotfixes":[{"id":"KB5066133","description":"Update","installedOn":"2026-09-09T22:00:00.0000000Z"}],
+"updates":{"rebootRequired":false,"lastSearch":"2026-09-27T05:36:14.0000000Z","lastInstall":"2026-09-26T19:12:45.0000000Z","pending":[
+ {"title":"2026-10 Cumulative Update for Windows 11 Version 23H2 for x64-based Systems (KB5067112)","kb":["5067112"],"severity":"Critical","categories":["Security Updates"],"downloaded":true},
+ {"title":"Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.459.450.0)","kb":["2267602"],"severity":"","categories":["Definition Updates"],"downloaded":false}]},
+"services":[{"name":"WSearch","displayName":"Windows Search","state":"Running","startMode":"Auto","account":"LocalSystem"}],
+"listening":[{"proto":"tcp","address":"::","port":445,"pid":4,"process":"System"}],
+"firewall":[{"profile":"Domain","enabled":true},{"profile":"Private","enabled":true},{"profile":"Public","enabled":true}],
+"defender":{"antivirus":false,"realtime":false,"signatureUpdated":null,"signatureVersion":"","productVersion":"4.18.26080.4"},
+"antivirus":[{"name":"Windows Defender","state":393472},{"name":"ESET Security","state":266240}],
+"collectedAt":"2026-09-27T08:04:57.9255672Z"}

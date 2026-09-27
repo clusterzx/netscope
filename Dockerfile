@@ -29,6 +29,10 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
       case $t in armv7) arch=arm arm=7 ;; *) arch=$t arm= ;; esac; \
       env GOOS=linux GOARCH=$arch GOARM=$arm go build -ldflags "-s -w -X main.version=${VERSION}" \
         -o /out/agent/netscope-agent-linux-$t ./cmd/netscope-agent; \
+    done; \
+    for t in amd64 arm64; do \
+      env GOOS=windows GOARCH=$t go build -ldflags "-s -w -X main.version=${VERSION}" \
+        -o /out/agent/netscope-agent-windows-$t ./cmd/netscope-agent; \
     done
 
 # ---- 3. runtime ----

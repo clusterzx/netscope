@@ -105,7 +105,7 @@ Ausschlusskriterium.
 
 ## FR-008: Firewalls, Router und DHCP-Server als Quellen
 
-**Status:** umgesetzt am 27.09.2026 (bis auf Windows-DHCP, das mit FR-010 kommt) – README
+**Status:** umgesetzt am 27.09.2026 (Windows-DHCP über den Windows-Agent, FR-010) – README
 „Plugins“, ARCHITECTURE `internal/plugins/netsrc`
 
 ### Anlass
@@ -178,7 +178,8 @@ Auslastung.
 
 ## FR-010: NetScope-Agent für Windows
 
-**Status:** erfasst am 27.09.2026
+**Status:** umgesetzt am 27.09.2026 – README „NetScope-Agent → Windows“, ARCHITECTURE
+„NetScope-Agent“
 
 ### Festgelegt
 
@@ -186,6 +187,27 @@ Auslastung.
 |---|---|
 | Weg | **Der vorhandene Agent als Windows-Dienst**, installiert mit einem PowerShell-Befehl; nur ausgehend wie unter Linux. Kein WinRM. |
 | Umfang | Inventar (OS, Hardware, installierte Software, Updates, Dienste, offene Ports) und Auslastung; auf DHCP-Servern zusätzlich die Leases (FR-008). |
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Ein Agent, zwei Plattformen:** dasselbe Programm, unter Windows als Dienst (Neustart nach
+  Fehlern und nach Selbst-Updates über die Wiederherstellungsoptionen des Dienstes). Das
+  Leseskript ist PowerShell mit festen Abfragen und gibt JSON aus; es erreicht PowerShell über
+  stdin, also ohne Skriptdatei.
+- **Rechte:** virtuelles Dienstkonto `NT SERVICE\NetScopeAgent` statt LocalSystem – wie unter Linux
+  ein eigener Benutzer ohne Administratorrechte. Für die DHCP-Leases Mitglied der lokalen Gruppe
+  „DHCP Users“; auf Domänencontrollern (keine lokalen Gruppen) mit `-RunAsSystem`.
+- **Updates:** ausstehende Updates aus der Offline-Suche von Windows Update (was der Rechner schon
+  kennt, keine eigene Suche im Internet, mit Zeitlimit), dazu Hotfixes, letzte Installation und
+  „Neustart erforderlich“.
+- **CVE-Abgleich** (über den Umfang hinaus): Aus Build und Update-Revision entsteht die CPE der
+  Windows-Version; der vorhandene Abgleich zeigt damit fehlende Windows-Patches. Programme der
+  Softwareliste werden (noch) nicht auf CPEs abgebildet.
+- **Kein Last-Wert** unter Windows; die Auslagerungsdatei wird nicht als Swap gemeldet.
+- **Getestet** auf Windows 11 23H2 gegen eine lokale Testinstanz: Leseskript, Messwerte,
+  Konsolenbetrieb, Anmeldung, Inventar auf Knopfdruck, Geräteseite; das Installationsskript bis
+  zur Admin-Prüfung. Noch zu prüfen: Einrichtung als Dienst, Selbst-Update und ein
+  DHCP-Server – das braucht ein Windows-System mit Administratorrechten.
 
 ---
 

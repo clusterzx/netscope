@@ -1,6 +1,6 @@
 <!--
 	Agents: systems with the NetScope agent (status, version, last inventory), the install
-	command and the installation tokens.
+	command for Linux and Windows and the installation tokens.
 -->
 <script lang="ts">
 	import { api } from '$lib/api';
@@ -74,6 +74,22 @@
 	let saving = $state(false);
 	let created = $state<EnrollmentCreated | null>(null);
 	let docker = $state(false);
+	/** target system of the install command */
+	let platform = $state<'linux' | 'windows'>('linux');
+
+	const PLATFORMS = [
+		{ id: 'linux', label: 'Linux' },
+		{ id: 'windows', label: 'Windows' }
+	] as const;
+
+	/** install command for the edited address (the same one-liners the API returns) */
+	function installCommand(token: string): string {
+		const b = base.replace(/\/+$/, '');
+		if (platform === 'linux')
+			return `curl -fsSL ${b}/agent/install.sh | sudo sh -s -- --token ${token}${docker ? ' --docker' : ''}`;
+		const tls = b.startsWith('https:') ? "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; " : '';
+		return `${tls}& ([scriptblock]::Create((irm '${b.replace(/'/g, "''")}/agent/install.ps1'))) -Token ${token}`;
+	}
 
 	const VALIDITY = [
 		{ value: '1', label: '1 Tag' },
@@ -98,6 +114,7 @@
 		general = null;
 		created = null;
 		docker = false;
+		platform = 'linux';
 		base = data.data?.baseUrl ?? '';
 		open = true;
 	}
@@ -164,8 +181,11 @@
 	async function remove(a: Agent) {
 		const ok = await confirm({
 			title: `Agent auf „${a.hostname}“ entfernen?`,
-			message:
-				'Der Agent wird abgemeldet und beendet sich beim nächsten Kontakt. Das Gerät und seine Daten bleiben. Zum vollständigen Entfernen auf dem System: … install.sh | sudo sh -s -- --uninstall',
+			message: `Der Agent wird abgemeldet und beendet sich beim nächsten Kontakt. Das Gerät und seine Daten bleiben. Zum vollständigen Entfernen auf dem System: ${
+				a.platform === 'windows'
+					? 'den Installationsbefehl mit -Uninstall statt -Token ausführen'
+					: '… install.sh | sudo sh -s -- --uninstall'
+			}`,
 			confirmLabel: 'Entfernen',
 			danger: true
 		});
@@ -352,13 +372,34 @@
 	busy={saving}
 >
 	{#if created}
-		{@const cmd = `curl -fsSL ${base.replace(/\/+$/, '')}/agent/install.sh | sudo sh -s -- --token ${created.token}${docker ? ' --docker' : ''}`}
+		{@const cmd = installCommand(created.token)}
 		<div class="flex flex-col gap-3 text-sm">
-			<p class="text-fg-muted">
-				Auf dem Linux-System als root bzw. mit sudo ausführen. Der Befehl lädt den Agent von dieser Instanz,
-				prüft die Prüfsumme, legt den Benutzer <code class="mono">netscope-agent</code> an und startet den Dienst.
-				Das System erscheint danach hier und in der Geräteliste.
-			</p>
+			<div class="flex w-fit rounded-md border border-border p-0.5" role="group" aria-label="Zielsystem">
+				{#each PLATFORMS as p (p.id)}
+					<button
+						type="button"
+						class="rounded px-3 py-1 text-xs {platform === p.id
+							? 'bg-accent-soft font-medium text-accent'
+							: 'text-fg-muted hover:text-fg'}"
+						aria-pressed={platform === p.id}
+						onclick={() => (platform = p.id)}>{p.label}</button
+					>
+				{/each}
+			</div>
+			{#if platform === 'linux'}
+				<p class="text-fg-muted">
+					Auf dem Linux-System als root bzw. mit sudo ausführen. Der Befehl lädt den Agent von dieser Instanz,
+					prüft die Prüfsumme, legt den Benutzer <code class="mono">netscope-agent</code> an und startet den Dienst.
+					Das System erscheint danach hier und in der Geräteliste.
+				</p>
+			{:else}
+				<p class="text-fg-muted">
+					In einer PowerShell <strong>als Administrator</strong> ausführen (Windows 10/11, Windows Server 2016
+					und neuer). Der Befehl lädt den Agent von dieser Instanz, prüft die Prüfsumme und richtet den Dienst
+					<code class="mono">NetScopeAgent</code> unter einem eigenen virtuellen Dienstkonto ohne Administratorrechte
+					ein. Das System erscheint danach hier und in der Geräteliste.
+				</p>
+			{/if}
 			<Input
 				label="Adresse von NetScope aus Sicht der Systeme"
 				bind:value={base}
@@ -372,11 +413,20 @@
 				>
 				<CopyButton text={cmd} label="Befehl kopieren" size="sm" />
 			</div>
-			<Toggle
-				bind:checked={docker}
-				label="Docker-Container erfassen (--docker)"
-				description="Nimmt den Agent in die Gruppe docker auf – das entspricht root-Rechten auf dem System."
-			/>
+			{#if platform === 'linux'}
+				<Toggle
+					bind:checked={docker}
+					label="Docker-Container erfassen (--docker)"
+					description="Nimmt den Agent in die Gruppe docker auf – das entspricht root-Rechten auf dem System."
+				/>
+			{:else}
+				<p class="text-xs text-fg-subtle">
+					Auf einem DHCP-Server liest der Agent auch die Leases (als Mitglied der Gruppe „DHCP Users“). Auf
+					einem Domänencontroller gibt es diese lokale Gruppe nicht – dort <code class="mono"
+						>-RunAsSystem</code
+					> anhängen.
+				</p>
+			{/if}
 			<Alert tone="warn" title="Token nur jetzt sichtbar">
 				Der Befehl enthält das Installations-Token „{created.enrollment?.name}“ ({created.enrollment?.maxUses
 					? `${created.enrollment.maxUses}× nutzbar`
@@ -394,7 +444,8 @@
 			{#if binaries.length}
 				<p class="text-xs text-fg-subtle">
 					Verfügbar für {binaries.map((b) => `${b.platform} (${formatBytes(b.size)})`).join(', ')}. Entfernen
-					auf dem System: dasselbe Skript mit <code class="mono">--uninstall</code>.
+					auf dem System: derselbe Befehl mit
+					<code class="mono">{platform === 'linux' ? '--uninstall' : '-Uninstall'}</code> statt des Tokens.
 				</p>
 			{/if}
 		</div>

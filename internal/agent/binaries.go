@@ -2,6 +2,7 @@ package agent
 
 import (
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"io"
 	"os"
@@ -15,7 +16,16 @@ import (
 )
 
 // Platforms the agent is built for.
-var Platforms = []string{"linux-amd64", "linux-arm64", "linux-armv7"}
+var Platforms = []string{"linux-amd64", "linux-arm64", "linux-armv7", "windows-amd64", "windows-arm64"}
+
+// platformOf normalises the operating system family an agent reports (older agents send
+// none: they all run on Linux).
+func platformOf(p string) string {
+	if p == "windows" {
+		return "windows"
+	}
+	return "linux"
+}
 
 // Binary is an agent binary the instance can hand out.
 type Binary struct {
@@ -99,11 +109,11 @@ func (s *Service) Binaries() []Binary {
 
 // offer returns the update for an agent whose version differs from the instance (the
 // binaries are built together with the instance). Development builds are not offered.
-func (s *Service) offer(arch, version string) *proto.Update {
+func (s *Service) offer(platform, arch, version string) *proto.Update {
 	if s.Version == "" || s.Version == "dev" || version == "" || version == s.Version {
 		return nil
 	}
-	b := s.Binary("linux-" + arch)
+	b := s.Binary(platformOf(platform) + "-" + arch)
 	if b == nil {
 		return nil
 	}
@@ -116,6 +126,15 @@ func InstallScript(base string) string {
 }
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
+//go:embed install.ps1
+var installPS1 string
+
+// InstallScriptWindows returns install.ps1 for an instance reachable at base (no trailing
+// slash): the PowerShell counterpart of install.sh.
+func InstallScriptWindows(base string) string {
+	return strings.ReplaceAll(installPS1, "'@@URL@@'", "'"+strings.ReplaceAll(base, "'", "''")+"'")
+}
 
 // installScript installs the agent as a service of its own unprivileged user. Placeholder
 // @@URL@@ is the quoted instance URL.

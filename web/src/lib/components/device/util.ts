@@ -69,7 +69,8 @@ const staticSources: Record<string, string> = {
 	cve: 'CVE-Abgleich',
 	healthcheck: 'Health-Check',
 	topology: 'Topologie',
-	cleanup: 'Cleanup'
+	cleanup: 'Cleanup',
+	windows_dhcp: 'Windows-DHCP'
 };
 
 /** Human readable name of a data source (plugin id or "manual"). */

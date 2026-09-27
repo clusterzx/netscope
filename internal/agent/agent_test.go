@@ -18,6 +18,7 @@ import (
 	"netscope/internal/events"
 	"netscope/internal/inventory"
 	"netscope/internal/logging"
+	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
 	"netscope/internal/settings"
 	"netscope/internal/vault"
@@ -274,10 +275,105 @@ func TestEnrollmentRules(t *testing.T) {
 		t.Fatal("revoked token usable")
 	}
 	// development builds offer no updates
-	if u := h.s.offer("amd64", "v1"); u != nil {
+	if u := h.s.offer("linux", "amd64", "v1"); u != nil {
 		t.Fatalf("dev offers %+v", u)
 	}
 	if InstallScript("http://x:8080") == "" || !strings.Contains(InstallScript("http://x:8080"), "URL='http://x:8080'") {
 		t.Fatal("install script without URL")
+	}
+}
+
+func TestWindowsAgent(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t, "v2")
+	_, token, _ := h.s.CreateEnrollment(ctx, EnrollmentInput{Name: "Server"}, "admin")
+	host := proto.Host{MachineID: "4c4c4544-0058-4b10-8032-b8c04f4c3933", Hostname: "SRV-DHCP01", OS: "Windows Server 2022 Standard 21H2",
+		Platform: "windows", Arch: "amd64", Kernel: "10.0.20348.2849", Version: "v1"}
+	resp, err := h.s.Enroll(ctx, proto.EnrollRequest{Token: token, Host: host}, "192.168.8.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, _ := h.s.Authenticate(ctx, resp.Secret, "192.168.8.10")
+	if a, _ := h.s.Agent(ctx, resp.AgentID); a.Platform != "windows" {
+		t.Fatalf("platform %q", a.Platform)
+	}
+
+	// a NAS the scanners already know; the laptop of the second lease is unknown
+	nas, err := h.inv.Observe(ctx, "arpscan", 0, &plugin.Observation{MACs: []string{"00:11:32:aa:bb:cc"}, IP: "192.168.8.120", Present: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := os.ReadFile(filepath.Join("wininv", "testdata", "server2022-dhcp.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.s.ReportInventory(ctx, sess, proto.InventoryReport{Host: host, CollectedAt: time.Now(), Stdout: string(out)}); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := h.s.Agent(ctx, resp.AgentID)
+	if a.DeviceID == nil || a.LastError != "" {
+		t.Fatalf("agent after inventory: %+v", a)
+	}
+	dev, err := h.inv.Device(ctx, *a.DeviceID)
+	if err != nil || dev.Hostname != "SRV-DHCP01" || dev.PrimaryIP != "192.168.8.10" || dev.Type != "server" || dev.Vendor != "Dell Inc." ||
+		!strings.HasPrefix(dev.OS, "Windows Server 2022") || !slices.Contains(dev.MACs, "b0:7b:25:11:22:33") {
+		t.Fatalf("device: %+v %v", dev, err)
+	}
+	if n := h.count(t, "SELECT COUNT(*) FROM packages WHERE device_id = ? AND manager = 'windows' AND gone_at IS NULL", *a.DeviceID); n != 3 {
+		t.Fatalf("%d packages", n)
+	}
+	// leases: the reservation names the known NAS, the unknown laptop is not created
+	if d, _ := h.inv.Device(ctx, nas); d.Hostname != "Synology NAS" {
+		t.Fatalf("NAS after the leases: %+v", d)
+	}
+	if n := h.count(t, "SELECT COUNT(*) FROM devices"); n != 2 {
+		t.Fatalf("%d devices (leases must not create devices by default)", n)
+	}
+
+	// Windows has no load average
+	cpu := 3.0
+	if err := h.s.ReportMetrics(ctx, sess, proto.MetricsReport{Samples: []proto.Sample{{At: time.Now(), CPU: &cpu, MemTotal: 100, MemUsed: 40,
+		Disks: []proto.Disk{{Mount: "C:", Total: 100, Used: 30}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.count(t, "SELECT COUNT(*) FROM ts_series WHERE device_id = ? AND metric = ?", *a.DeviceID, MetricLoad); n != 0 {
+		t.Fatal("load series for Windows")
+	}
+	if n := h.count(t, "SELECT COUNT(*) FROM ts_series WHERE device_id = ? AND metric = ? AND key = 'C:'", *a.DeviceID, MetricDisk); n != 1 {
+		t.Fatal("disk series missing")
+	}
+
+	// the update offer points at the Windows build
+	if err := os.WriteFile(h.s.BinaryPath("windows-amd64"), []byte("agent-v2.exe"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p, err := h.s.Poll(ctx, sess, time.Minute, "v1")
+	if err != nil || p.Update == nil || p.Update.Path != "/agent/bin/windows-amd64" {
+		t.Fatalf("update offer: %+v %v", p, err)
+	}
+	if s := InstallScriptWindows("http://x:8080"); !strings.Contains(s, "[string]$Url = 'http://x:8080'") || strings.Contains(s, "@@URL@@") {
+		t.Fatal("install.ps1 without URL")
+	}
+	if s := InstallScriptWindows("http://o'hara"); !strings.Contains(s, "'http://o''hara'") {
+		t.Fatal("quote not escaped")
+	}
+}
+
+func (h *harness) count(t *testing.T, q string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := h.d.R.QueryRow(q, args...).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// install.ps1 is often saved and run from a file: Windows PowerShell reads files without a
+// byte order mark in the ANSI code page, so the script must stay ASCII.
+func TestInstallScriptWindowsASCII(t *testing.T) {
+	for i, r := range installPS1 {
+		if r > 0x7e || (r < 0x20 && r != '\n' && r != '\r' && r != '\t') {
+			t.Fatalf("non-ASCII character %q at %d", r, i)
+		}
 	}
 }

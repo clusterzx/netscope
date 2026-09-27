@@ -50,9 +50,10 @@
   (Pakete, Dienste, Sockets, Docker), Wake-on-LAN.
 - **Importer:** Proxmox VE, OpenWrt/GL.iNet (DHCP), OPNsense, pfSense, UniFi, MikroTik,
   FortiGate, Sophos Firewall, Cisco Meraki, FRITZ!Box, Pi-hole, Docker, NetAlertX, CSV.
-- **NetScope-Agent:** ein Befehl auf einem Linux-System, und es liefert Inventar (wie per SSH)
-  und Auslastung (CPU, RAM, Platten, Netz) von sich aus – ohne SSH-Zugang, auch hinter NAT;
-  aktualisiert sich selbst.
+- **NetScope-Agent:** ein Befehl auf einem Linux- oder Windows-System, und es liefert Inventar
+  (wie per SSH) und Auslastung (CPU, RAM, Platten, Netz) von sich aus – ohne SSH-Zugang, auch
+  hinter NAT; aktualisiert sich selbst. Unter Windows mit Update-Stand, CVE-Abgleich des
+  Patch-Levels und den Leases von Windows-DHCP-Servern.
 - **Entfernte Netze:** Subnetze hinter Routern oder über einen eigenen WireGuard-Tunnel von
   NetScope (z. B. ins Rechenzentrum) – Konfiguration hochladen, fertig.
 - **Mehrere Standorte:** In jedem Netz eine eigene NetScope-Instanz, die an eine Zentrale
@@ -203,7 +204,7 @@ sofort, ohne Neustart.
 | `snmp_traffic` | Scanner | aus (alle 5 min) | Traffic, Auslastung, Fehler und Discards je Interface als Zeitreihen (Tab „Traffic“ am Gerät); Events bei Port-Ausfall und Überlast |
 | `ssh` | Scanner | aus | Linux-Inventar: OS, Kernel, CPU/RAM/Disks, Pakete, Dienste, Sockets, Docker, Uptime, Updates – nur feste Lesekommandos; abweichende SSH-Ports je Adresse/Netz oder aus dem Portscan |
 | `wol` | Aktion | – | Wake-on-LAN pro Gerät bzw. als Massenaktion |
-| `agent` | Importer | laufend | Einstellungen der NetScope-Agents: Inventar- und Messintervall, Pakete/Docker, Schwelle „Dateisystem fast voll“, Zeit bis „Agent meldet sich nicht“; manueller Lauf fordert bei allen Agents ein Inventar an |
+| `agent` | Importer | laufend | Einstellungen der NetScope-Agents (Linux und Windows): Inventar- und Messintervall, Pakete/Docker, Schwelle „Dateisystem fast voll“, Zeit bis „Agent meldet sich nicht“, Leases von Windows-DHCP-Servern; manueller Lauf fordert bei allen Agents ein Inventar an |
 | `proxmox` | Importer | aus | VMs/CTs mit VMID, Status, MACs, Ressourcen, Node; verknüpft VM ↔ Gerät („läuft auf Node X“); Online-Status aus Proxmox für Gäste, die kein Scanner erreicht (Event nur bei Autostart); mehrere Hosts/Cluster; optional Docker-Container in LXCs |
 | `openwrt` | Importer | aus | DHCP-Leases und statische Leases (SSH oder LuCI-RPC), mehrere Router |
 | `opnsense` | Importer | aus | OPNsense über die REST-API: Leases (Kea, Dnsmasq, ISC), Reservierungen, ARP-Tabelle; alte (camelCase) und neue URLs ab 25.7 |
@@ -290,8 +291,8 @@ NetScope schickt dann dasselbe Skript als Befehl mit.
 
 ## NetScope-Agent
 
-Statt per SSH abzufragen, kann ein Linux-System den **NetScope-Agent** installieren. Er
-verbindet sich von sich aus mit NetScope (auch hinter NAT und Firewalls, ohne SSH-Zugang und
+Statt per SSH abzufragen, kann ein Linux- oder Windows-System den **NetScope-Agent**
+installieren. Er verbindet sich von sich aus mit NetScope (auch hinter NAT und Firewalls, ohne SSH-Zugang und
 ohne Zugangsdaten in NetScope) und liefert:
 
 - das **Inventar** wie das SSH-Inventar – dieselbe feste Liste von Lesebefehlen: OS, Kernel,
@@ -324,6 +325,45 @@ Scanner das Gerät, geht es offline. Ein Dateisystem über der Schwelle (Standar
 Agents melden sich bei der Instanz an, deren Befehl sie ausführen – im Verbund also am
 Standort, der die Daten wie alles andere an die Zentrale liefert. Wird ein Agent in NetScope
 entfernt, beendet sich sein Dienst beim nächsten Kontakt; das Gerät bleibt.
+
+### Windows
+
+Derselbe Agent läuft als Windows-Dienst (Windows 10/11, Windows Server 2016 und neuer, amd64
+und arm64). Unter **Agents → Agent installieren** auf **Windows** umschalten und den Befehl in
+einer PowerShell **als Administrator** ausführen:
+
+```powershell
+& ([scriptblock]::Create((irm 'http://192.168.8.123:8080/agent/install.ps1'))) -Token nse_…
+```
+
+Das Skript lädt den Agent, prüft die Prüfsumme, legt ihn unter `C:\Program Files\NetScope Agent`
+ab und richtet den Dienst `NetScopeAgent` unter dem virtuellen Konto `NT SERVICE\NetScopeAgent`
+ein – ohne Administratorrechte. Konfiguration und Protokoll (`agent.log`) liegen in
+`C:\ProgramData\NetScope Agent`, lesbar nur für SYSTEM und Administratoren. Nach Fehlern und
+nach einem Selbst-Update startet Windows den Dienst neu. Entfernen: derselbe Befehl mit
+`-Uninstall` statt `-Token …`. Ein selbst signiertes Zertifikat der Instanz pinnt
+`-Fingerprint <SHA-256>`.
+
+Das Inventar kommt aus einer festen Liste von Leseabfragen (CIM/WMI, Registry, Windows Update,
+PowerShell-Module – nie `Win32_Product`):
+
+- Windows-Version mit Build und Update-Revision, Hardware (Hersteller, Modell, Seriennummer,
+  BIOS), CPU, RAM, Laufwerke, Netzwerkadapter, Domäne oder Arbeitsgruppe,
+- installierte Programme (Liste **Installierte Pakete**), Hotfixes, **ausstehende Updates**
+  (was Windows Update bereits kennt – ohne eigene Suche im Internet), „Neustart erforderlich“,
+- Dienste, offene Ports mit Prozess, Firewall-Profile, Microsoft Defender und die im
+  Sicherheitscenter registrierten Virenschutzprodukte.
+
+Aus Build und Update-Revision (z. B. `10.0.22631.6199`) entsteht die CPE der Windows-Version:
+Der **CVE-Abgleich** zeigt damit die Windows-Schwachstellen, deren Patch auf dem System noch
+fehlt. Die Auslastung (CPU, RAM, Laufwerke, Netz) kommt ohne Last-Wert – den kennt Windows nicht.
+
+**Windows-DHCP-Server:** Läuft der Agent auf einem DHCP-Server, liefert er zusätzlich Bereiche,
+Leases und Reservierungen. Sie ergänzen wie die Router-Importer Namen und Adressen der Geräte
+im Netz (Quelle „Windows-DHCP“; Einstellungen im Plugin **NetScope-Agent**, auf Wunsch mit neu
+angelegten Geräten). Dafür nimmt das Installationsskript den Dienst in die lokale Gruppe
+„DHCP Users“ auf. Auf einem Domänencontroller gibt es diese Gruppe nicht – dort mit
+`-RunAsSystem` installieren.
 
 ## Entfernte Netze (Router, WireGuard)
 

@@ -33,7 +33,7 @@ Benachrichtigungen plant und über Publisher zustellt.
 | Pfad | Inhalt |
 |---|---|
 | `cmd/netscope` | Einstiegspunkt und CLI (`serve`, `token create`, `passwd`, `2fa-reset`, `healthcheck`, `openapi`) |
-| `cmd/netscope-agent` | NetScope-Agent für überwachte Linux-Systeme (`enroll`, `run`): Inventar, Messwerte, Long Poll, Selbst-Update |
+| `cmd/netscope-agent` | NetScope-Agent für überwachte Linux- und Windows-Systeme (`enroll`, `run`, Windows-Dienst): Inventar, Messwerte, Long Poll, Selbst-Update |
 | `internal/app` | Verdrahtung, Start/Shutdown, In-Process-Neustart nach Restore |
 | `internal/config` | Bootstrap-Konfiguration (`/data/config.yaml`, `NETSCOPE_*`) |
 | `internal/db` | SQLite (modernc), Schreib-/Lese-Pools, eingebettete Migrationen, angehängter NVD-Spiegel, Backup (gzip) |
@@ -53,8 +53,8 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `internal/tunnel` | eigene WireGuard-Tunnel in entfernte Subnetze (Netlink, Handshake-Überwachung, Events) |
 | `internal/wgconf` | Parser für WireGuard-Client-Konfigurationen (wg-quick-Format) |
 | `internal/federation` | Verbund: Rolle, Pufferung und Zustellung am Standort, Annahme und Standort-Verwaltung in der Zentrale; `federation/wire` = Protokoll |
-| `internal/agent` | Agent-Dienst: Installations-Tokens, Anmeldung, Long Poll, Inventar und Messwerte als Beobachtungen, Offline-Erkennung, Auslieferung der Builds; `agent/proto` = Protokoll |
-| `internal/hostscript` | feste Liste der Lesebefehle für das Linux-Inventar und Zerlegung ihrer Ausgabe (SSH-Inventar und Agent) |
+| `internal/agent` | Agent-Dienst: Installations-Tokens, Anmeldung, Long Poll, Inventar und Messwerte als Beobachtungen, Offline-Erkennung, Auslieferung der Builds; `agent/proto` = Protokoll, `agent/wininv` = Windows-Inventar (JSON → Beobachtung, OS-CPE, DHCP-Leases) |
+| `internal/hostscript` | feste Liste der Lesebefehle für das Linux-Inventar und Zerlegung ihrer Ausgabe (SSH-Inventar und Agent); `windows.ps1` = Leseskript des Windows-Agents |
 | `internal/dockercli` | Parser für `docker ps`/`docker images` (SSH-Inventar, Docker in Proxmox-LXCs) |
 | `internal/sshx`, `internal/execx`, `internal/netutil` | gemeinsame Helfer (SSH mit TOFU, Prozesse streamend, Adressen) |
 | `web/` | SvelteKit-Quellen (TypeScript, Tailwind) |
@@ -198,9 +198,11 @@ mit Hinweis, welche Seite zu aktualisieren ist); unbekannte Eintragsarten werden
 
 ## NetScope-Agent
 
-Der Agent (`cmd/netscope-agent`, ein statisches Go-Binary für linux-amd64/arm64/armv7) wird
-mit dem Image gebaut und von der Instanz unter `/agent/bin/linux-<arch>` (+ `.sha256`)
-ausgeliefert; `/agent/install.sh` richtet ihn als Dienst eines eigenen Benutzers ein. Er
+Der Agent (`cmd/netscope-agent`, ein statisches Go-Binary für linux-amd64/arm64/armv7 und
+windows-amd64/arm64) wird mit dem Image gebaut und von der Instanz unter
+`/agent/bin/<os>-<arch>` (+ `.sha256`) ausgeliefert; `/agent/install.sh` richtet ihn als Dienst
+eines eigenen Benutzers ein, `/agent/install.ps1` als Windows-Dienst unter einem virtuellen
+Dienstkonto. Er
 verbindet sich nur nach außen (Protokoll `internal/agent/proto`, JSON mit gzip):
 
 | Aufruf | Zweck |
@@ -220,6 +222,21 @@ Adressen in fremden Netzen nichts zusammenführen. Messwerte werden Zeitreihen
 Kontakt auf offline und das Gerät per `Power` offline, wenn keine andere Präsenzquelle es
 kennt. Beim Beenden weckt der Dienst alle wartenden Polls, damit der HTTP-Server sofort
 herunterfährt.
+
+**Windows** (`agents.platform = 'windows'`, gemeldet in `Host.Platform`): Der Agent läuft unter
+dem Dienststeuerungs-Manager (`golang.org/x/sys/windows/svc`) und führt statt des sh-Skripts
+`internal/hostscript/windows.ps1` aus – über stdin an `powershell.exe -Command`, also ohne
+Skriptdatei; es gibt ein JSON-Dokument aus, das `internal/agent/wininv` in die Beobachtung
+übersetzt (Paketverwalter `windows`, Inventar mit `platform: "windows"` für die Geräteseite).
+Die OS-CPE entsteht aus Build und UBR (`microsoft:windows_11_23h2:10.0.22631.6199`, Tabelle
+Build → NVD-Produkt in `wininv/cpe.go`); ohne UBR gibt es keine CPE, sonst träfe jede CVE der
+Version. Leases und Reservierungen eines Windows-DHCP-Servers gehen wie bei den Importern
+(`netsrc.Client`) unter der Quelle `windows_dhcp` ein. Messwerte kommen aus `GetSystemTimes`,
+`GlobalMemoryStatusEx`, `GetIfTable2Ex` (verbundene Hardware-Adapter, keine Filter-Treiber)
+und `GetDiskFreeSpaceEx` (Key = Laufwerk `C:`); `load1` fehlt. Selbst-Update: das laufende
+Binary wird umbenannt (`.old`, beim nächsten Start gelöscht), der Dienst endet mit Exit-Code 1,
+die Wiederherstellungsoptionen (`sc failure` + `failureflag`) starten ihn neu; ein entfernter
+Agent endet mit 0 und bleibt aus.
 
 ## SNMP-Traffic
 
