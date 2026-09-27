@@ -23,6 +23,7 @@ import (
 // selfService are the changing routes every signed-in user may call for the own account.
 var selfService = map[string]bool{
 	"PUT /api/v1/auth/password":               true,
+	"PUT /api/v1/auth/preferences":            true, // own language
 	"POST /api/v1/auth/2fa/totp":              true,
 	"POST /api/v1/auth/2fa/totp/confirm":      true,
 	"POST /api/v1/auth/2fa/totp/disable":      true,

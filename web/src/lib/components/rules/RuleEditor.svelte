@@ -27,6 +27,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { groups, subnets, tags, eventTypes } from '$lib/stores/catalog.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
+	import { t } from '$lib/i18n';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { SEVERITIES } from '$lib/api';
@@ -74,8 +75,14 @@
 	function initial(): Rule {
 		if (stored) return normRule(stored);
 		if (template) {
-			const t = normRule(template);
-			return { ...t, id: 0, name: `${t.name} (Kopie)`, builtin: undefined, sortOrder: nextSortOrder };
+			const tpl = normRule(template);
+			return {
+				...tpl,
+				id: 0,
+				name: t('{name} (Kopie)', { name: tpl.name }),
+				builtin: undefined,
+				sortOrder: nextSortOrder
+			};
 		}
 		const r = normRule(emptyRule());
 		r.sortOrder = nextSortOrder;
@@ -111,18 +118,18 @@
 	// field errors (backend JSON paths): server errors of the last save plus – once the user
 	// tried to save – the live client validation
 	const errors = $derived(showErrors ? { ...serverErrors, ...clientErrors } : serverErrors);
-	const FIX_FIELDS = 'Bitte die markierten Felder korrigieren.';
+	const FIX_FIELDS = t('Bitte die markierten Felder korrigieren.');
 	$effect(() => {
 		if (showErrors && !Object.keys(errors).length && untrack(() => formError) === FIX_FIELDS) formError = '';
 	});
 
-	const testRule = $derived({ ...payload, name: payload.name || 'Neue Regel' });
+	const testRule = $derived({ ...payload, name: payload.name || t('Neue Regel') });
 	const blocked = $derived.by(() => {
 		const e = Object.entries(clientErrors).filter(([k]) => k !== 'name');
 		if (!e.length) return '';
 		const [k, msg] = e[0];
 		const m = /^actions\.(\d+)\./.exec(k);
-		return m ? `Aktion ${Number(m[1]) + 1}: ${msg}` : msg;
+		return m ? t('Aktion {n}: {message}', { n: Number(m[1]) + 1, message: msg }) : msg;
 	});
 
 	const typesForPayload = $derived(matchedTypes(draft.conditions.eventTypes ?? [], eventTypes.value ?? []));
@@ -130,19 +137,26 @@
 	// ---------------------------------------------------------------- condition helpers
 	let siteIds = $state<string[]>(untrack(() => (draft.conditions.sites ?? []).map(String)));
 	const siteOptions = $derived([
-		{ value: '0', label: federation.localName, description: 'Events dieser Zentrale' },
-		...federation.sites.map((s) => ({ value: String(s.id), label: s.name, description: 'NetScope-Standort' }))
+		{ value: '0', label: federation.localName, description: t('Events dieser Zentrale') },
+		...federation.sites.map((s) => ({
+			value: String(s.id),
+			label: s.name,
+			description: t('NetScope-Standort')
+		}))
 	]);
 	let groupIds = $state<string[]>(untrack(() => (draft.conditions.groups ?? []).map(String)));
 	const groupOptions = $derived(
 		(groups.value ?? []).map((g) => ({
 			value: String(g.id),
 			label: g.name,
-			description: g.kind === 'query' ? 'regelbasiert' : 'manuell'
+			description: g.kind === 'query' ? t('regelbasiert') : t('manuell')
 		}))
 	);
 	const stateOptions = ['known', 'unknown', 'ignored'].map((s) => ({ value: s, label: stateLabel[s] }));
-	const severityOptions = SEVERITIES.map((s) => ({ value: s, label: `ab ${severityLabel[s]}` }));
+	const severityOptions = SEVERITIES.map((s) => ({
+		value: s,
+		label: t('ab {severity}', { severity: severityLabel[s] })
+	}));
 
 	function setTimeWindow(on: boolean) {
 		draft.conditions.timeWindow = on ? { from: '08:00', to: '18:00', days: [1, 2, 3, 4, 5] } : undefined;
@@ -188,7 +202,7 @@
 			draft = normRule(saved);
 			if (!isNew) stored = saved;
 			showErrors = false;
-			toast.success(isNew ? 'Regel angelegt' : 'Regel gespeichert', { title: saved.name });
+			toast.success(isNew ? t('Regel angelegt') : t('Regel gespeichert'), { title: saved.name });
 			if (isNew) {
 				bypass = true;
 				await goto(`/rules/${saved.id}`, { replaceState: true });
@@ -206,22 +220,22 @@
 	async function remove() {
 		if (!stored) return;
 		const ok = await confirm({
-			title: `Regel „${stored.name}“ löschen?`,
+			title: t('Regel „{name}“ löschen?', { name: stored.name }),
 			message: stored.builtin
-				? 'Das ist eine mitgelieferte Standardregel. Sie wird nicht automatisch wiederhergestellt.'
-				: 'Bereits verschickte Benachrichtigungen bleiben im Verlauf erhalten.',
-			confirmLabel: 'Löschen',
+				? t('Das ist eine mitgelieferte Standardregel. Sie wird nicht automatisch wiederhergestellt.')
+				: t('Bereits verschickte Benachrichtigungen bleiben im Verlauf erhalten.'),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		deleting = true;
 		try {
 			await api.delete('/api/v1/rules/{id}', { path: { id: stored.id } });
-			toast.success(`Regel „${stored.name}“ gelöscht`);
+			toast.success(t('Regel „{name}“ gelöscht', { name: stored.name }));
 			bypass = true;
 			await goto('/rules');
 		} catch (e) {
-			toast.error(errorMessage(e), { title: 'Löschen fehlgeschlagen' });
+			toast.error(errorMessage(e), { title: t('Löschen fehlgeschlagen') });
 		} finally {
 			bypass = false;
 			deleting = false;
@@ -247,10 +261,10 @@
 		if (nav.type === 'leave') return;
 		const to = nav.to?.url;
 		confirm({
-			title: 'Ungespeicherte Änderungen verwerfen?',
-			message: 'Die Regel wurde geändert, aber noch nicht gespeichert.',
-			confirmLabel: 'Verwerfen',
-			cancelLabel: 'Weiter bearbeiten',
+			title: t('Ungespeicherte Änderungen verwerfen?'),
+			message: t('Die Regel wurde geändert, aber noch nicht gespeichert.'),
+			confirmLabel: t('Verwerfen'),
+			cancelLabel: t('Weiter bearbeiten'),
 			danger: true
 		}).then((ok) => {
 			if (!ok || !to) return;
@@ -264,32 +278,33 @@
 </script>
 
 <PageHeader
-	title={isNew ? 'Neue Regel' : draft.name || stored?.name || 'Regel'}
-	docTitle={isNew ? 'Neue Regel' : `Regel: ${stored?.name ?? ''}`}
+	title={isNew ? t('Neue Regel') : draft.name || stored?.name || t('Regel')}
+	docTitle={isNew ? t('Neue Regel') : t('Regel: {name}', { name: stored?.name ?? '' })}
 	description={isNew
-		? 'Bedingungen festlegen und bestimmen, wer wie benachrichtigt wird.'
+		? t('Bedingungen festlegen und bestimmen, wer wie benachrichtigt wird.')
 		: stored?.description || undefined}
 >
 	{#snippet breadcrumb()}
-		<a href="/rules" class="hover:text-fg">Regeln</a>
+		<a href="/rules" class="hover:text-fg">{t('Regeln')}</a>
 	{/snippet}
 	{#snippet meta()}
 		{#if stored}
-			{#if stored.builtin}<Badge tone="accent" title="Mitgelieferte Standardregel ({stored.builtin})"
-					>Standardregel</Badge
+			{#if stored.builtin}<Badge
+					tone="accent"
+					title={t('Mitgelieferte Standardregel ({id})', { id: stored.builtin })}>{t('Standardregel')}</Badge
 				>{/if}
-			{#if !stored.enabled}<Badge>inaktiv</Badge>{/if}
-			<span class="text-xs">geändert <RelativeTime value={stored.updatedAt} /></span>
+			{#if !stored.enabled}<Badge>{t('inaktiv')}</Badge>{/if}
+			<span class="text-xs">{t('geändert')} <RelativeTime value={stored.updatedAt} /></span>
 		{/if}
 	{/snippet}
 	{#snippet actions()}
 		{#if stored}
 			<Button variant="ghost" icon="bell" href="/rules?tab=notifications&rule={stored.id}"
-				>Benachrichtigungen</Button
+				>{t('Benachrichtigungen')}</Button
 			>
 			{#if canManage}
-				<Button icon="copy" href="/rules/new?from={stored.id}">Duplizieren</Button>
-				<Button variant="danger" icon="trash" loading={deleting} onclick={remove}>Löschen</Button>
+				<Button icon="copy" href="/rules/new?from={stored.id}">{t('Duplizieren')}</Button>
+				<Button variant="danger" icon="trash" loading={deleting} onclick={remove}>{t('Löschen')}</Button>
 			{/if}
 		{/if}
 	{/snippet}
@@ -305,10 +320,12 @@
 		}}
 	>
 		{#if !canManage}
-			<p class="text-xs text-fg-subtle">Nur lesen – dafür fehlt die Berechtigung „Regeln verwalten“.</p>
+			<p class="text-xs text-fg-subtle">
+				{t('Nur lesen – dafür fehlt die Berechtigung „Regeln verwalten“.')}
+			</p>
 		{/if}
 		<fieldset disabled={!canManage} class="contents">
-			<Card title="Allgemein" icon="rules">
+			<Card title={t('Allgemein')} icon="rules">
 				<div class="flex flex-col gap-4">
 					<Input
 						id="rule-name"
@@ -318,36 +335,40 @@
 						error={err('name')}
 						maxlength={200}
 					/>
-					<Textarea id="rule-desc" label="Beschreibung" bind:value={draft.description} rows={2} />
+					<Textarea id="rule-desc" label={t('Beschreibung')} bind:value={draft.description} rows={2} />
 					<div class="flex flex-col gap-3 sm:flex-row sm:gap-8">
 						<Toggle
 							bind:checked={draft.enabled}
-							label="Aktiv"
-							description="Inaktive Regeln werden nicht ausgewertet."
+							label={t('Aktiv')}
+							description={t('Inaktive Regeln werden nicht ausgewertet.')}
 						/>
 						<Toggle
 							bind:checked={draft.stop}
-							label="Auswertung stoppen"
-							description="Greift diese Regel, werden nachfolgende Regeln nicht mehr ausgewertet."
+							label={t('Auswertung stoppen')}
+							description={t('Greift diese Regel, werden nachfolgende Regeln nicht mehr ausgewertet.')}
 						/>
 					</div>
 				</div>
 			</Card>
 
-			<Card title="Wenn …" description="Alle gesetzten Bedingungen müssen erfüllt sein." icon="filter">
+			<Card
+				title={t('Wenn …')}
+				description={t('Alle gesetzten Bedingungen müssen erfüllt sein.')}
+				icon="filter"
+			>
 				<div class="flex flex-col gap-6">
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
 						<EventTypePicker
 							id="rule-types"
 							bind:value={draft.conditions.eventTypes}
 							error={err('conditions.eventTypes')}
-							hint="Leer = alle Event-Typen. Muster wie „port.*“ decken ganze Bereiche ab."
+							hint={t('Leer = alle Event-Typen. Muster wie „port.*“ decken ganze Bereiche ab.')}
 						/>
 						<Select
 							id="rule-sev"
-							label="Mindest-Schweregrad"
+							label={t('Mindest-Schweregrad')}
 							options={severityOptions}
-							placeholder="beliebig"
+							placeholder={t('beliebig')}
 							bind:value={draft.conditions.minSeverity}
 							error={err('conditions.minSeverity')}
 						/>
@@ -356,67 +377,67 @@
 					{#if federation.role === 'central' && (federation.sites.length || siteIds.length)}
 						<MultiSelect
 							id="rule-sites"
-							label="Standorte (einer davon)"
+							label={t('Standorte (einer davon)')}
 							options={siteOptions}
 							bind:value={siteIds}
 							onchange={(v) => (draft.conditions.sites = v.length ? v.map(Number) : undefined)}
-							placeholder="alle Standorte"
-							hint="Events der Standorte kommen mit ihrem Gerät hierher; leer = Events von überall."
+							placeholder={t('alle Standorte')}
+							hint={t('Events der Standorte kommen mit ihrem Gerät hierher; leer = Events von überall.')}
 							error={err('conditions.sites')}
 						/>
 					{/if}
 
 					<fieldset class="flex flex-col gap-3">
-						<legend class="mb-1 text-sm font-semibold text-fg">Gerät</legend>
+						<legend class="mb-1 text-sm font-semibold text-fg">{t('Gerät')}</legend>
 						<p class="-mt-1 text-xs text-fg-subtle">
-							Gerätebedingungen gelten nur für Events mit Gerät; Events ohne Gerät passen dann nicht.
+							{t('Gerätebedingungen gelten nur für Events mit Gerät; Events ohne Gerät passen dann nicht.')}
 						</p>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							<TagInput
 								id="rule-tags"
-								label="Tags (eines davon)"
+								label={t('Tags (eines davon)')}
 								bind:value={draft.conditions.tags}
-								suggestions={(tags.value ?? []).map((t) => t.tag)}
+								suggestions={(tags.value ?? []).map((x) => x.tag)}
 								normalize={(s) => s.trim().toLowerCase()}
-								placeholder="Tag hinzufügen …"
+								placeholder={t('Tag hinzufügen …')}
 							/>
 							<MultiSelect
 								id="rule-groups"
-								label="Gruppen (eine davon)"
+								label={t('Gruppen (eine davon)')}
 								options={groupOptions}
 								bind:value={groupIds}
 								onchange={(v) => (draft.conditions.groups = v.map(Number))}
-								placeholder={groupOptions.length ? 'Gruppen wählen …' : 'Keine Gruppen angelegt'}
+								placeholder={groupOptions.length ? t('Gruppen wählen …') : t('Keine Gruppen angelegt')}
 							/>
 							<TagInput
 								id="rule-subnets"
-								label="Subnetze (eines davon)"
+								label={t('Subnetze (eines davon)')}
 								bind:value={draft.conditions.subnets}
 								suggestions={(subnets.value ?? []).map((s) => s.cidr)}
-								placeholder="CIDR, z. B. 192.168.1.0/24"
+								placeholder={t('CIDR, z. B. 192.168.1.0/24')}
 								error={err('conditions.subnets')}
 							/>
 							<MultiSelect
 								id="rule-states"
-								label="Gerätezustand"
+								label={t('Gerätezustand')}
 								options={stateOptions}
 								bind:value={draft.conditions.deviceStates}
-								placeholder="beliebig"
-								hint="Ignorierte Geräte lösen nie Benachrichtigungen aus."
+								placeholder={t('beliebig')}
+								hint={t('Ignorierte Geräte lösen nie Benachrichtigungen aus.')}
 								error={err('conditions.deviceStates')}
 							/>
 						</div>
 						<Checkbox
 							id="rule-unknown"
 							bind:checked={draft.conditions.onlyUnknown}
-							label="Nur Geräte, die nicht als bekannt markiert sind"
+							label={t('Nur Geräte, die nicht als bekannt markiert sind')}
 						/>
 						<QueryInput
 							id="rule-query"
-							label="Geräte-Filter (Abfragesprache)"
+							label={t('Geräte-Filter (Abfragesprache)')}
 							showLabel
 							bind:value={draft.conditions.deviceQuery}
-							placeholder="z. B. tag:server crit>=high"
+							placeholder={t('z. B. tag:server crit>=high')}
 						/>
 					</fieldset>
 
@@ -426,18 +447,18 @@
 					</fieldset>
 
 					<fieldset class="flex flex-col gap-2">
-						<legend class="mb-1 text-sm font-semibold text-fg">Zeitfenster</legend>
+						<legend class="mb-1 text-sm font-semibold text-fg">{t('Zeitfenster')}</legend>
 						<Checkbox
 							id="rule-tw"
 							checked={!!draft.conditions.timeWindow}
 							onchange={(e) => setTimeWindow((e.currentTarget as HTMLInputElement).checked)}
-							label="Nur zu bestimmten Zeiten"
-							description="Außerhalb des Zeitfensters greift die Regel nicht (Zeitzone des Servers)."
+							label={t('Nur zu bestimmten Zeiten')}
+							description={t('Außerhalb des Zeitfensters greift die Regel nicht (Zeitzone des Servers).')}
 						/>
 						{#if draft.conditions.timeWindow}
 							{@const tw = draft.conditions.timeWindow}
 							<div class="flex flex-col gap-3 sm:ml-6">
-								<div role="group" aria-label="Wochentage" class="flex flex-wrap gap-1">
+								<div role="group" aria-label={t('Wochentage')} class="flex flex-wrap gap-1">
 									{#each WEEKDAYS as d (d.value)}
 										{@const on = (tw.days ?? []).includes(d.value)}
 										<button
@@ -458,21 +479,21 @@
 									<p class="text-xs text-danger">{err('conditions.timeWindow.days')}</p>
 								{/if}
 								<p class="text-xs text-fg-subtle">
-									{(tw.days ?? []).length ? '' : 'Kein Tag gewählt = jeden Tag. '}Liegt „Bis“ vor „Von“,
-									reicht das Fenster über Mitternacht.
+									{#if !(tw.days ?? []).length}{t('Kein Tag gewählt = jeden Tag.')}{/if}
+									{t('Liegt „Bis“ vor „Von“, reicht das Fenster über Mitternacht.')}
 								</p>
 								<div class="grid grid-cols-2 gap-3 sm:w-80">
 									<Input
 										id="rule-tw-from"
 										type="time"
-										label="Von"
+										label={t('Von')}
 										bind:value={tw.from}
 										error={err('conditions.timeWindow.from')}
 									/>
 									<Input
 										id="rule-tw-to"
 										type="time"
-										label="Bis"
+										label={t('Bis')}
 										bind:value={tw.to}
 										error={err('conditions.timeWindow.to')}
 									/>
@@ -483,14 +504,15 @@
 				</div>
 			</Card>
 
-			<Card title="Dann …" description="Aktionen werden der Reihe nach ausgeführt." icon="bell">
+			<Card title={t('Dann …')} description={t('Aktionen werden der Reihe nach ausgeführt.')} icon="bell">
 				<div class="flex flex-col gap-3">
 					{#if errors.actions}<Alert tone="danger">{fieldMessage(errors.actions)}</Alert>{/if}
 					{#if publishers.value && !pubs.some((p) => p.enabled)}
-						<Alert tone="warn" title="Kein Publisher aktiv">
-							Benachrichtigungen werden erst verschickt, wenn mindestens ein Publisher eingerichtet und
-							aktiviert ist.
-							<a class="link" href="/plugins#kind-publisher">Publisher einrichten</a>
+						<Alert tone="warn" title={t('Kein Publisher aktiv')}>
+							{t(
+								'Benachrichtigungen werden erst verschickt, wenn mindestens ein Publisher eingerichtet und aktiviert ist.'
+							)}
+							<a class="link" href="/plugins#kind-publisher">{t('Publisher einrichten')}</a>
 						</Alert>
 					{/if}
 					{#each draft.actions as _, i (i)}
@@ -506,7 +528,7 @@
 						/>
 					{/each}
 					<div>
-						<Button icon="plus" onclick={addAction}>Aktion hinzufügen</Button>
+						<Button icon="plus" onclick={addAction}>{t('Aktion hinzufügen')}</Button>
 					</div>
 				</div>
 			</Card>
@@ -522,18 +544,20 @@
 						<Icon name="x-circle" size={16} class="shrink-0 text-danger" />
 						<span class="min-w-0 truncate text-danger" title={formError}>{formError}</span>
 					{:else if dirty}
-						<Badge tone="warn" dot>{isNew ? 'Noch nicht gespeichert' : 'Ungespeicherte Änderungen'}</Badge>
+						<Badge tone="warn" dot
+							>{isNew ? t('Noch nicht gespeichert') : t('Ungespeicherte Änderungen')}</Badge
+						>
 					{:else}
-						<span class="text-fg-subtle">Gespeichert</span>
+						<span class="text-fg-subtle">{t('Gespeichert')}</span>
 					{/if}
 				</div>
 				{#if !isNew}
-					<Button onclick={discard} disabled={!dirty || saving} icon="refresh">Zurücksetzen</Button>
+					<Button onclick={discard} disabled={!dirty || saving} icon="refresh">{t('Zurücksetzen')}</Button>
 				{:else}
-					<Button href="/rules" variant="ghost">Abbrechen</Button>
+					<Button href="/rules" variant="ghost">{t('Abbrechen')}</Button>
 				{/if}
 				<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!isNew && !dirty}>
-					{isNew ? 'Regel anlegen' : 'Speichern'}
+					{isNew ? t('Regel anlegen') : t('Speichern')}
 				</Button>
 			</div>
 		{/if}
@@ -541,8 +565,8 @@
 
 	{#if canManage}
 		<Card
-			title="Event simulieren"
-			description="Prüft die Regel – auch ungespeichert – gegen ein Beispiel-Event."
+			title={t('Event simulieren')}
+			description={t('Prüft die Regel – auch ungespeichert – gegen ein Beispiel-Event.')}
 			icon="play"
 			class="xl:sticky xl:top-4"
 		>

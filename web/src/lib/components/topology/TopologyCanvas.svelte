@@ -11,6 +11,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import type { GraphEdge, GraphNode } from '$lib/api';
+	import { t } from '$lib/i18n';
 	import { deviceTypeName, relationKindLabel, stateLabel, label as lbl } from '$lib/utils/labels';
 	import {
 		TopologyEngine,
@@ -213,55 +214,64 @@
 	></canvas>
 
 	{#if hover}
-		{@const t = hover.target}
+		{@const target = hover.target}
 		<div
 			class="pointer-events-none absolute z-10 max-w-64 rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-md"
 			style={tipStyle}
 		>
-			{#if t.node}
-				{@const n = t.node.data}
+			{#if target.node}
+				{@const n = target.node.data}
 				<div class="truncate text-sm font-semibold text-fg">{n.label}</div>
 				{#if n.ip}<div class="mono text-fg-muted">{n.ip}</div>{/if}
 				<dl class="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
 					{#if n.kind === 'container'}
-						<dt class="text-fg-subtle">Typ</dt>
+						<dt class="text-fg-subtle">{t('Typ')}</dt>
 						<dd class="text-fg">Container</dd>
 						{#if n.image}
 							<dt class="text-fg-subtle">Image</dt>
 							<dd class="mono truncate text-fg">{n.image}</dd>
 						{/if}
 					{:else}
-						<dt class="text-fg-subtle">Typ</dt>
+						<dt class="text-fg-subtle">{t('Typ')}</dt>
 						<dd class="text-fg">{deviceTypeName(n.type)}</dd>
-						<dt class="text-fg-subtle">Hersteller</dt>
+						<dt class="text-fg-subtle">{t('Hersteller')}</dt>
 						<dd class="truncate text-fg">{n.vendor || '–'}</dd>
 					{/if}
 					<dt class="text-fg-subtle">Status</dt>
 					<dd class="text-fg">
 						<span class={n.online ? 'text-online' : 'text-fg-muted'}>
-							{n.kind === 'container' ? (n.online ? 'läuft' : 'gestoppt') : n.online ? 'Online' : 'Offline'}
+							{n.kind === 'container'
+								? n.online
+									? t('läuft')
+									: t('gestoppt')
+								: n.online
+									? 'Online'
+									: 'Offline'}
 						</span>{#if n.state && n.kind !== 'container'}{' · '}{lbl(stateLabel, n.state)}{/if}
 					</dd>
 				</dl>
 				<div class="mt-1.5 text-fg-subtle">
 					{#if connectMode}
-						Klicken zum Verbinden
+						{t('Klicken zum Verbinden')}
 					{:else if n.id === selected && n.deviceId}
-						Erneut klicken: Gerät öffnen
+						{t('Erneut klicken: Gerät öffnen')}
 					{:else}
-						Klicken für Details
+						{t('Klicken für Details')}
 					{/if}
 				</div>
-			{:else if t.link}
-				{@const e = t.link.data}
+			{:else if target.link}
+				{@const e = target.link.data}
 				<div class="font-semibold text-fg">{lbl(relationKindLabel, e.kind)}</div>
 				<div class="mt-0.5 text-fg-muted">
 					{nodeLabel(e.source)}{#if e.parentPort}{' '}<span class="mono">({e.parentPort})</span>{/if}
 					→ {nodeLabel(e.target)}{#if e.childPort}{' '}<span class="mono">({e.childPort})</span>{/if}
 				</div>
-				{#if edgeLabel(e)}<div class="mt-0.5 text-fg-muted">„{edgeLabel(e)}“</div>{/if}
+				{#if edgeLabel(e)}<div class="mt-0.5 text-fg-muted">
+						{t('„{label}“', { label: edgeLabel(e) })}
+					</div>{/if}
 				<div class="mt-1 text-fg-subtle">
-					{e.origin === 'manual' ? 'Manuell angelegt' : `Quelle: ${e.origin}`} · Klicken für Details
+					{e.origin === 'manual' ? t('Manuell angelegt') : t('Quelle: {origin}', { origin: e.origin })} ·
+					{t('Klicken für Details')}
 				</div>
 			{/if}
 		</div>

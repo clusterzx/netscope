@@ -19,6 +19,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { formatDateTime } from '$lib/utils/format';
@@ -73,31 +74,33 @@
 	$effect(() => () => refresh.cancel());
 
 	const statusOptions = [
-		{ value: '', label: 'Alle Status' },
+		{ value: '', label: t('Alle Status') },
 		...['pending', 'sending', 'sent', 'failed', 'skipped'].map((s) => ({
 			value: s,
 			label: notificationStatusLabel[s]
 		}))
 	];
 	const publisherOptions = $derived([
-		{ value: '', label: 'Alle Publisher' },
+		{ value: '', label: t('Alle Publisher') },
 		...pubs.map((p) => ({ value: p.id, label: p.name }))
 	]);
 	const ruleOptions = $derived([
-		{ value: '', label: 'Alle Regeln' },
+		{ value: '', label: t('Alle Regeln') },
 		...[...rules]
 			.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
 			.map((r) => ({ value: String(r.id), label: r.name })),
-		...(rule && !rules.some((r) => r.id === rule) ? [{ value: String(rule), label: `Regel #${rule}` }] : [])
+		...(rule && !rules.some((r) => r.id === rule)
+			? [{ value: String(rule), label: t('Regel #{id}', { id: rule }) }]
+			: [])
 	]);
 
 	const columns: Column<NotificationView>[] = [
-		{ key: 'createdAt', label: 'Erstellt', width: '9rem', hideBelow: 'sm' },
-		{ key: 'rule', label: 'Regel / Titel' },
+		{ key: 'createdAt', label: t('Erstellt'), width: '9rem', hideBelow: 'sm' },
+		{ key: 'rule', label: t('Regel / Titel') },
 		{ key: 'publisher', label: 'Publisher', hideBelow: 'md' },
-		{ key: 'priority', label: 'Priorität', hideBelow: 'lg' },
+		{ key: 'priority', label: t('Priorität'), hideBelow: 'lg' },
 		{ key: 'status', label: 'Status' },
-		{ key: 'delivery', label: 'Zustellung', hideBelow: 'lg' },
+		{ key: 'delivery', label: t('Zustellung'), hideBelow: 'lg' },
 		{ key: 'events', label: 'Events', hideBelow: 'sm' }
 	];
 
@@ -126,7 +129,7 @@
 			class="w-44"
 		/>
 		<Select
-			label="Regel"
+			label={t('Regel')}
 			size="sm"
 			options={ruleOptions}
 			value={rule ? String(rule) : ''}
@@ -138,7 +141,7 @@
 			<Button
 				size="sm"
 				icon="refresh"
-				label="Aktualisieren"
+				label={t('Aktualisieren')}
 				loading={data.loading && !!data.data}
 				onclick={() => data.reload()}
 			/>
@@ -154,7 +157,7 @@
 			key={(n) => n.id}
 			loading={data.loading && !data.data}
 			dense
-			caption="Benachrichtigungsverlauf"
+			caption={t('Benachrichtigungsverlauf')}
 		>
 			{#snippet cell(n, col)}
 				{#if col.key === 'createdAt'}
@@ -162,7 +165,7 @@
 				{:else if col.key === 'rule'}
 					<div class="min-w-0">
 						{#if n.ruleId}
-							<a href="/rules/{n.ruleId}" class="link">{n.ruleName || `Regel #${n.ruleId}`}</a>
+							<a href="/rules/{n.ruleId}" class="link">{n.ruleName || t('Regel #{id}', { id: n.ruleId })}</a>
 						{:else}
 							<span class="text-fg-muted">{notificationKindLabel[n.kind] ?? n.kind}</span>
 						{/if}
@@ -194,15 +197,17 @@
 							{notificationStatusLabel[n.status] ?? n.status}
 						</Badge>
 						{#if n.attempts > 1 || (n.status === 'failed' && n.attempts > 0)}
-							<span class="text-xs text-fg-subtle">{n.attempts} Versuche</span>
+							<span class="text-xs text-fg-subtle">{tn(n.attempts, '{n} Versuch', '{n} Versuche')}</span>
 						{/if}
 					</span>
 				{:else if col.key === 'delivery'}
 					{#if n.sentAt}
-						<span title={formatDateTime(n.sentAt, true)}>gesendet <RelativeTime value={n.sentAt} /></span>
+						<span title={formatDateTime(n.sentAt, true)}
+							>{t('gesendet')} <RelativeTime value={n.sentAt} /></span
+						>
 					{:else if n.status === 'pending'}
 						<span title={formatDateTime(n.deliverAfter, true)}
-							>geplant <RelativeTime value={n.deliverAfter} /></span
+							>{t('geplant')} <RelativeTime value={n.deliverAfter} /></span
 						>
 					{:else}
 						<span class="text-fg-subtle">–</span>
@@ -220,12 +225,12 @@
 			{/snippet}
 			{#snippet empty()}
 				{#if filtered}
-					<EmptyState compact icon="filter" title="Keine Benachrichtigungen für diesen Filter">
+					<EmptyState compact icon="filter" title={t('Keine Benachrichtigungen für diesen Filter')}>
 						{#snippet actions()}
 							<Button
 								size="sm"
 								onclick={() => setParams({ status: null, publisher: null, rule: null, offset: null })}
-								>Filter zurücksetzen</Button
+								>{t('Filter zurücksetzen')}</Button
 							>
 						{/snippet}
 					</EmptyState>
@@ -233,8 +238,10 @@
 					<EmptyState
 						compact
 						icon="bell"
-						title="Noch keine Benachrichtigungen"
-						description="Sobald eine Regel greift, erscheinen die geplanten und verschickten Benachrichtigungen hier."
+						title={t('Noch keine Benachrichtigungen')}
+						description={t(
+							'Sobald eine Regel greift, erscheinen die geplanten und verschickten Benachrichtigungen hier.'
+						)}
 					/>
 				{/if}
 			{/snippet}

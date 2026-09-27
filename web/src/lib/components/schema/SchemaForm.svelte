@@ -27,6 +27,7 @@
 -->
 <script lang="ts">
 	import type { SchemaField as Field } from '$lib/api/types';
+	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import SchemaField from './SchemaField.svelte';
 	import { groupFields, isVisible } from './schema';
@@ -88,7 +89,7 @@
 
 <div class="flex flex-col {compact ? 'gap-5' : 'gap-7'} {klass}">
 	{#if (fields ?? []).length === 0}
-		<p class="text-sm text-fg-subtle">Keine Einstellungen vorhanden.</p>
+		<p class="text-sm text-fg-subtle">{t('Keine Einstellungen vorhanden.')}</p>
 	{/if}
 	{#each sections as s, si (si)}
 		<div
@@ -113,7 +114,7 @@
 						class="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-[0.8125rem] font-medium text-fg-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden"
 					>
 						<Icon name="chevron-right" size={14} class="transition-transform group-open:rotate-90" />
-						Erweiterte Einstellungen
+						{t('Erweiterte Einstellungen')}
 						<span class="text-xs font-normal text-fg-subtle">({s.adv.length})</span>
 					</summary>
 					<div class="flex flex-col gap-4 border-t border-border px-3 py-3">

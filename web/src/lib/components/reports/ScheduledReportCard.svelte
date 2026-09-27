@@ -6,6 +6,7 @@
 	import { api } from '$lib/api';
 	import type { PluginView } from '$lib/api';
 	import { Badge, Button, Card, ErrorState, RelativeTime, Skeleton } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -28,12 +29,12 @@
 </script>
 
 {#snippet configure()}
-	<Button size="sm" href="/plugins/report" icon="system">Bericht konfigurieren</Button>
+	<Button size="sm" href="/plugins/report" icon="system">{t('Bericht konfigurieren')}</Button>
 {/snippet}
 
 <Card
-	title="Geplanter Bericht"
-	description="Änderungsbericht automatisch per Publisher"
+	title={t('Geplanter Bericht')}
+	description={t('Änderungsbericht automatisch per Publisher')}
 	icon="calendar"
 	class={klass}
 	footer={auth.can('plugins.manage') ? configure : undefined}
@@ -46,22 +47,25 @@
 		<div class="flex flex-col gap-3 text-sm">
 			<div class="flex flex-wrap items-center gap-2">
 				<Badge tone={p.config?.enabled ? 'ok' : 'neutral'} dot
-					>{p.config?.enabled ? 'Aktiv' : 'Inaktiv'}</Badge
+					>{p.config?.enabled ? t('Aktiv') : t('Inaktiv')}</Badge
 				>
-				<span class="text-fg-muted">{p.config?.scheduleText || p.config?.schedule || 'ohne Zeitplan'}</span>
+				<span class="text-fg-muted">{p.config?.scheduleText || p.config?.schedule || t('ohne Zeitplan')}</span
+				>
 			</div>
 			<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-				<dt class="text-fg-subtle">Zeitraum</dt>
-				<dd>{typeof settings.period_days === 'number' ? `${settings.period_days} Tage` : '–'}</dd>
+				<dt class="text-fg-subtle">{t('Zeitraum')}</dt>
+				<dd>
+					{typeof settings.period_days === 'number' ? tn(settings.period_days, '{n} Tag', '{n} Tage') : '–'}
+				</dd>
 				<dt class="text-fg-subtle">Publisher</dt>
 				<dd>
-					{#if pubs.length}{pubs.join(', ')}{:else}<span class="text-warn">keiner gewählt</span>{/if}
+					{#if pubs.length}{pubs.join(', ')}{:else}<span class="text-warn">{t('keiner gewählt')}</span>{/if}
 				</dd>
 				{#if p.config?.enabled}
-					<dt class="text-fg-subtle">Nächster Versand</dt>
+					<dt class="text-fg-subtle">{t('Nächster Versand')}</dt>
 					<dd><RelativeTime value={p.nextRun} absolute fallback="–" /></dd>
 				{/if}
-				<dt class="text-fg-subtle">Letzter Lauf</dt>
+				<dt class="text-fg-subtle">{t('Letzter Lauf')}</dt>
 				<dd class="flex flex-wrap items-center gap-1.5">
 					{#if p.lastRun}
 						<RelativeTime value={p.lastRun.finishedAt ?? p.lastRun.createdAt} />
@@ -69,14 +73,15 @@
 							>{runStatusLabel[p.lastRun.status] ?? p.lastRun.status}</Badge
 						>
 					{:else}
-						<span class="text-fg-subtle">noch nie</span>
+						<span class="text-fg-subtle">{t('noch nie')}</span>
 					{/if}
 				</dd>
 			</dl>
 			{#if !p.config?.enabled || !pubs.length}
 				<p class="text-xs text-fg-subtle">
-					Zum automatischen Versand das Plugin aktivieren und mindestens einen konfigurierten Publisher
-					wählen.
+					{t(
+						'Zum automatischen Versand das Plugin aktivieren und mindestens einen konfigurierten Publisher wählen.'
+					)}
 				</p>
 			{/if}
 		</div>

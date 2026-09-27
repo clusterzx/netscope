@@ -4,6 +4,7 @@
 	import { api } from '$lib/api';
 	import type { AuthLDAPConfig, AuthLDAPTest } from '$lib/api/generated';
 	import { Alert, Button, Card, Input, Textarea, Toggle } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { apiErrors } from '../system';
 	import Provisioning from './Provisioning.svelte';
@@ -42,7 +43,7 @@
 				userFilter: '(&(objectClass=user)(sAMAccountName={username}))',
 				usernameAttr: 'sAMAccountName',
 				displayNameAttr: 'displayName',
-				emailAttr: 'mail',
+				emailAttr: 'mail', // i18n-ignore: LDAP attribute
 				groupAttr: 'memberOf',
 				groupBaseDn: '',
 				groupFilter: ''
@@ -52,7 +53,7 @@
 				userFilter: '(&(objectClass=inetOrgPerson)(uid={username}))',
 				usernameAttr: 'uid',
 				displayNameAttr: 'cn',
-				emailAttr: 'mail',
+				emailAttr: 'mail', // i18n-ignore: LDAP attribute
 				groupAttr: '',
 				groupBaseDn: form.baseDn ? `ou=groups,${form.baseDn.replace(/^ou=[^,]+,/i, '')}` : '',
 				groupFilter: '(|(member={dn})(uniqueMember={dn})(memberUid={username}))'
@@ -73,7 +74,7 @@
 			removePassword = false;
 			form = structuredClone(saved);
 			onsaved(saved);
-			toast.success('LDAP-Anmeldung gespeichert');
+			toast.success(t('LDAP-Anmeldung gespeichert'));
 		} catch (e) {
 			({ errors, general } = apiErrors(e, [
 				...FIELDS,
@@ -113,28 +114,30 @@
 >
 	<Card
 		title="LDAP / Active Directory"
-		description="Anmeldung mit dem Konto aus dem Verzeichnis über das normale Anmeldeformular"
+		description={t('Anmeldung mit dem Konto aus dem Verzeichnis über das normale Anmeldeformular')}
 		icon="user"
 	>
 		<div class="flex flex-col gap-5">
-			{#if general}<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>{/if}
+			{#if general}<Alert tone="danger" title={t('Speichern fehlgeschlagen')}>{general}</Alert>{/if}
 			<Toggle
 				bind:checked={form.enabled}
-				label="LDAP-Anmeldung aktiv"
-				description="Lokale Konten melden sich weiter mit ihrem NetScope-Passwort an; ein lokales Konto hat bei gleichem Namen Vorrang."
+				label={t('LDAP-Anmeldung aktiv')}
+				description={t(
+					'Lokale Konten melden sich weiter mit ihrem NetScope-Passwort an; ein lokales Konto hat bei gleichem Namen Vorrang.'
+				)}
 			/>
 			<div class="flex flex-wrap items-center gap-2 text-sm">
-				<span class="text-fg-muted">Vorlage:</span>
+				<span class="text-fg-muted">{t('Vorlage:')}</span>
 				<Button size="sm" onclick={() => preset('ad')}>Active Directory</Button>
 				<Button size="sm" onclick={() => preset('openldap')}>OpenLDAP / FreeIPA</Button>
 			</div>
 
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 				<Input
-					label="Server-URL"
+					label={t('Server-URL')}
 					bind:value={form.url}
 					placeholder="ldaps://dc01.example.local"
-					hint="ldaps:// (Port 636) oder ldap:// (389), mit StartTLS verschlüsselt"
+					hint={t('ldaps:// (Port 636) oder ldap:// (389), mit StartTLS verschlüsselt')}
 					error={errors.url}
 					mono
 					required
@@ -142,32 +145,33 @@
 				<Toggle
 					bind:checked={form.startTls}
 					label="StartTLS"
-					description="Verbindung über ldap:// verschlüsseln"
+					description={t('Verbindung über ldap:// verschlüsseln')}
 				/>
 				<Input
-					label="Dienstkonto (Bind-DN)"
+					label={t('Dienstkonto (Bind-DN)')}
 					bind:value={form.bindDn}
 					placeholder="cn=netscope,ou=services,dc=example,dc=local"
-					hint="Leer: anonyme Suche. Im AD auch netscope@example.local"
+					hint={t('Leer: anonyme Suche. Im AD auch netscope@example.local')}
 					mono
 				/>
 				<div class="flex flex-col gap-1.5">
 					<Input
-						label="Passwort des Dienstkontos"
+						label={t('Passwort des Dienstkontos')}
 						type="password"
 						bind:value={password}
 						autocomplete="new-password"
-						placeholder={form.hasPassword ? 'gespeichert – leer lassen zum Beibehalten' : ''}
+						placeholder={form.hasPassword ? t('gespeichert – leer lassen zum Beibehalten') : ''}
 						disabled={removePassword}
 					/>
 					{#if form.hasPassword}
 						<label class="flex items-center gap-2 text-xs text-fg-muted">
-							<input type="checkbox" bind:checked={removePassword} /> Gespeichertes Passwort entfernen
+							<input type="checkbox" bind:checked={removePassword} />
+							{t('Gespeichertes Passwort entfernen')}
 						</label>
 					{/if}
 				</div>
 				<Input
-					label="Basis-DN der Benutzer"
+					label={t('Basis-DN der Benutzer')}
 					bind:value={form.baseDn}
 					placeholder="ou=people,dc=example,dc=local"
 					error={errors.baseDn}
@@ -176,34 +180,36 @@
 					required
 				/>
 				<Input
-					label="Benutzerfilter"
+					label={t('Benutzerfilter')}
 					bind:value={form.userFilter}
-					hint="{'{username}'} wird durch den eingegebenen Namen ersetzt (sicher maskiert)"
+					hint={t('{username} wird durch den eingegebenen Namen ersetzt (sicher maskiert)')}
 					error={errors.userFilter}
 					class="md:col-span-2"
 					mono
 				/>
-				<Input label="Attribut Benutzername" bind:value={form.usernameAttr} placeholder="uid" mono />
-				<Input label="Attribut Anzeigename" bind:value={form.displayNameAttr} placeholder="cn" mono />
-				<Input label="Attribut E-Mail" bind:value={form.emailAttr} placeholder="mail" mono />
+				<Input label={t('Attribut Benutzername')} bind:value={form.usernameAttr} placeholder="uid" mono />
+				<Input label={t('Attribut Anzeigename')} bind:value={form.displayNameAttr} placeholder="cn" mono />
+				<Input label={t('Attribut E-Mail')} bind:value={form.emailAttr} placeholder="mail" mono />
 				<Input
-					label="Attribut Gruppen"
+					label={t('Attribut Gruppen')}
 					bind:value={form.groupAttr}
 					placeholder="memberOf"
-					hint="Leer: Gruppen per Suche (unten)"
+					hint={t('Leer: Gruppen per Suche (unten)')}
 					mono
 				/>
 				{#if !form.groupAttr?.trim()}
 					<Input
-						label="Basis-DN der Gruppen"
+						label={t('Basis-DN der Gruppen')}
 						bind:value={form.groupBaseDn}
 						placeholder="ou=groups,dc=example,dc=local"
 						mono
 					/>
 					<Input
-						label="Gruppenfilter"
+						label={t('Gruppenfilter')}
 						bind:value={form.groupFilter}
-						hint="{'{dn}'} = DN des Kontos, {'{username}'} = Anmeldename. AD mit verschachtelten Gruppen: (member:1.2.840.113556.1.4.1941:={'{dn}'})"
+						hint={t(
+							'{dn} = DN des Kontos, {username} = Anmeldename. AD mit verschachtelten Gruppen: (member:1.2.840.113556.1.4.1941:={dn})'
+						)}
 						error={errors.groupFilter}
 						mono
 					/>
@@ -215,44 +221,44 @@
 				bind:defaultRoleId={form.defaultRoleId}
 				bind:syncRole={form.syncRole}
 				{roles}
-				groupHint="Eine Gruppe passt mit vollem DN oder ihrem Namen (CN), Groß-/Kleinschreibung egal."
-				groupPlaceholder="netscope-admins oder cn=netscope-admins,ou=groups,dc=…"
+				groupHint={t('Eine Gruppe passt mit vollem DN oder ihrem Namen (CN), Groß-/Kleinschreibung egal.')}
+				groupPlaceholder={t('netscope-admins oder cn=netscope-admins,ou=groups,dc=…')}
 				{errors}
 			/>
 
 			<details class="rounded-md border border-border">
 				<summary class="cursor-pointer px-3 py-2 text-sm font-medium text-fg-muted hover:text-fg">
-					Erweitert: eigene Zertifizierungsstelle
+					{t('Erweitert: eigene Zertifizierungsstelle')}
 				</summary>
 				<div class="flex flex-col gap-4 border-t border-border p-3">
 					<Textarea
-						label="CA-Zertifikat (PEM)"
+						label={t('CA-Zertifikat (PEM)')}
 						bind:value={form.ca}
 						rows={4}
 						mono
 						placeholder="-----BEGIN CERTIFICATE-----"
-						hint="Für Domänencontroller mit Zertifikat der eigenen Firmen-CA"
+						hint={t('Für Domänencontroller mit Zertifikat der eigenen Firmen-CA')}
 						error={errors.ca}
 					/>
 					<Toggle
 						bind:checked={form.insecureSkipVerify}
-						label="Zertifikat nicht prüfen"
-						description="Nur zum Testen – ohne Prüfung könnte ein Angreifer im Netz Passwörter abfangen."
+						label={t('Zertifikat nicht prüfen')}
+						description={t('Nur zum Testen – ohne Prüfung könnte ein Angreifer im Netz Passwörter abfangen.')}
 					/>
 				</div>
 			</details>
 
 			<div class="flex flex-col gap-3 rounded-md border border-border p-3">
-				<p class="text-sm font-medium text-fg">Einstellungen prüfen</p>
+				<p class="text-sm font-medium text-fg">{t('Einstellungen prüfen')}</p>
 				<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 					<Input
-						label="Testbenutzer (optional)"
+						label={t('Testbenutzer (optional)')}
 						bind:value={testUser}
 						autocomplete="off"
-						hint="Wird gesucht; mit Passwort auch angemeldet"
+						hint={t('Wird gesucht; mit Passwort auch angemeldet')}
 					/>
 					<Input
-						label="Passwort (optional)"
+						label={t('Passwort (optional)')}
 						type="password"
 						bind:value={testPassword}
 						autocomplete="new-password"
@@ -264,15 +270,15 @@
 						<dl class="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1 text-xs">
 							<dt class="text-fg-subtle">DN</dt>
 							<dd class="mono break-all">{test.dn}</dd>
-							<dt class="text-fg-subtle">Benutzername</dt>
+							<dt class="text-fg-subtle">{t('Benutzername')}</dt>
 							<dd class="mono">{test.username || '–'}</dd>
-							<dt class="text-fg-subtle">Name, E-Mail</dt>
+							<dt class="text-fg-subtle">{t('Name, E-Mail')}</dt>
 							<dd>{test.displayName || '–'} · {test.email || '–'}</dd>
-							<dt class="text-fg-subtle">Gruppen</dt>
-							<dd class="mono break-all">{(test.groups ?? []).join(' · ') || 'keine'}</dd>
-							<dt class="text-fg-subtle">Rolle</dt>
+							<dt class="text-fg-subtle">{t('Gruppen')}</dt>
+							<dd class="mono break-all">{(test.groups ?? []).join(' · ') || t('keine')}</dd>
+							<dt class="text-fg-subtle">{t('Rolle')}</dt>
 							<dd class={test.roleId ? 'font-medium text-fg' : 'font-medium text-danger'}>
-								{test.roleId ? roleName(test.roleId) : 'kein Zugriff (keine passende Gruppe)'}
+								{test.roleId ? roleName(test.roleId) : t('kein Zugriff (keine passende Gruppe)')}
 							</dd>
 						</dl>
 					{/if}
@@ -281,8 +287,9 @@
 		</div>
 		{#snippet footer()}
 			<div class="flex flex-wrap items-center justify-end gap-2">
-				<Button icon="zap" loading={testing} disabled={!form.url.trim()} onclick={check}>Prüfen</Button>
-				<Button type="submit" variant="primary" icon="save" loading={saving}>Speichern</Button>
+				<Button icon="zap" loading={testing} disabled={!form.url.trim()} onclick={check}>{t('Prüfen')}</Button
+				>
+				<Button type="submit" variant="primary" icon="save" loading={saving}>{t('Speichern')}</Button>
 			</div>
 		{/snippet}
 	</Card>

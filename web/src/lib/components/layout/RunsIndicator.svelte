@@ -11,6 +11,7 @@
 	import { runs } from '$lib/stores/runs.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDuration } from '$lib/utils/format';
+	import { t, tn } from '$lib/i18n';
 	import { runStatusLabel, runStatusTone } from '$lib/utils/labels';
 
 	let open = $state(false);
@@ -28,7 +29,7 @@
 	async function cancel(id: number) {
 		try {
 			await api.post('/api/v1/runs/{id}/cancel', { path: { id } });
-			toast.info('Lauf wird abgebrochen');
+			toast.info(t('Lauf wird abgebrochen'));
 		} catch (e) {
 			toast.error(errorMessage(e));
 		}
@@ -41,10 +42,12 @@
 	onclick={() => (open = !open)}
 	aria-haspopup="dialog"
 	aria-expanded={open}
-	aria-label={count ? `${count} laufende oder wartende Läufe` : 'Läufe – zurzeit keine aktiv'}
+	aria-label={count
+		? tn(count, '{n} laufender oder wartender Lauf', '{n} laufende oder wartende Läufe')
+		: t('Läufe – zurzeit keine aktiv')}
 	class="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors hover:bg-surface-3
 		{count ? 'text-live' : 'text-fg-subtle'}"
-	title={count ? `${count} Läufe aktiv` : 'Keine laufenden Scans'}
+	title={count ? tn(count, '{n} Lauf aktiv', '{n} Läufe aktiv') : t('Keine laufenden Scans')}
 >
 	{#if running.length}
 		<Spinner size={14} />
@@ -68,15 +71,15 @@
 	bind:open
 	anchor={btn}
 	placement="bottom-end"
-	label="Laufende Scans"
+	label={t('Laufende Scans')}
 	class="w-[min(24rem,calc(100vw-1rem))]"
 >
 	<div class="flex items-center justify-between border-b border-border px-3.5 py-2.5">
-		<h2 class="text-sm font-semibold">Läufe</h2>
+		<h2 class="text-sm font-semibold">{t('Läufe')}</h2>
 		<a href="/plugins" class="text-xs text-accent hover:underline" onclick={() => (open = false)}>Plugins</a>
 	</div>
 	{#if runs.active.length === 0}
-		<p class="px-3.5 py-4 text-sm text-fg-subtle">Zurzeit läuft kein Scan.</p>
+		<p class="px-3.5 py-4 text-sm text-fg-subtle">{t('Zurzeit läuft kein Scan.')}</p>
 	{:else}
 		<ul class="divide-y divide-border">
 			{#each runs.active as r (r.id)}
@@ -88,8 +91,8 @@
 							<button
 								type="button"
 								class="rounded p-1 text-fg-subtle hover:bg-surface-3 hover:text-danger"
-								aria-label="Lauf {r.id} abbrechen"
-								title="Abbrechen"
+								aria-label={t('Lauf {id} abbrechen', { id: r.id })}
+								title={t('Abbrechen')}
 								onclick={() => cancel(r.id)}
 							>
 								<Icon name="stop" size={13} />
@@ -105,7 +108,7 @@
 									)}{/if}</span
 							>
 						{:else}
-							<span>Lauf #{r.id} · eingereiht <RelativeTime value={r.createdAt} /></span>
+							<span>{t('Lauf #{id} · eingereiht', { id: r.id })} <RelativeTime value={r.createdAt} /></span>
 						{/if}
 					</div>
 				</li>
@@ -116,7 +119,7 @@
 		<div
 			class="border-t border-border px-3.5 pt-2 pb-1 text-[0.68rem] font-semibold tracking-wider text-fg-subtle uppercase"
 		>
-			Zuletzt beendet
+			{t('Zuletzt beendet')}
 		</div>
 		<ul class="pb-2">
 			{#each runs.recent.slice(0, 5) as r (r.id)}

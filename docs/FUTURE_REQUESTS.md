@@ -232,13 +232,76 @@ nmap lässt sich in einem proprietären Produkt nur mit OEM-Lizenz nutzen (FR-00
 
 ## FR-012: Englische Oberfläche
 
-**Status:** erfasst am 27.09.2026
+**Status:** umgesetzt am 27.09.2026 – README „Sprache: Deutsch und Englisch“, ARCHITECTURE
+„Sprachen“, FRONTEND.md Abschnitt 9, PLUGINS.md „Übersetzungen“
 
 ### Festgelegt
 
 Oberfläche auf Deutsch und Englisch, umschaltbar je Benutzer (Standard: Browsersprache);
 dazu die Texte, die der Server liefert (Plugin-Einstellungen, Events, Fehlermeldungen,
 Berichte).
+
+### Umsetzung – Entscheidungen und Abweichungen
+
+- **Deutsch bleibt Quelle, der deutsche Text ist der Schlüssel:** keine Schlüssel wie
+  `devices.delete.title`, sondern `t('Gerät löschen')` in der Oberfläche und ein Katalog
+  „deutscher Text → Englisch“ (`web/src/lib/i18n/en/*.json`, rund 2 800 Einträge). Im Server
+  registriert jedes Paket seine Übersetzungen in `i18n_en.go` (`internal/i18n`, rund 3 000
+  Einträge). So bleibt im Code lesbar, was angezeigt wird, und die vorhandenen Texte mussten
+  nicht umbenannt werden. Preis: Wer einen deutschen Text ändert, muss den Katalogeintrag
+  mitziehen – die Prüfungen melden das.
+- **Formatierte Texte als Muster:** `fmt`-Texte stehen mit ihren Verben im Katalog
+  (`"Neues Gerät: %s"` → `"New device: %s"`, Reihenfolge per `%[2]s`). Damit übersetzt die API
+  auch Texte, die zur Laufzeit auf Deutsch entstehen und gespeichert werden: Event-Titel und
+  -Nachrichten, Lauf-Fehler, Run-Logs und Server-Log, Audit-Log, Health-Fehler,
+  Benachrichtigungsverlauf. Fehler in `%w`/`%v` werden mitübersetzt, Namen in `%s` bleiben.
+- **Gespeicherte Events:** Titel bleiben in der Datenbank deutsch und werden beim Lesen
+  übersetzt – das gilt auch für Events aus der Zeit vor FR-012. Passt kein Muster (eigene
+  Titel, Texte älterer Versionen), bleibt der gespeicherte Text stehen. Die Suche (`q`)
+  durchsucht weiter den deutschen Text.
+- **Sprache einer Anfrage:** Einstellung des Benutzers (neue Spalte `users.locale`, Migration
+  0012; `PUT /api/v1/auth/preferences`, Administratoren auch unter Benutzer), sonst
+  `Accept-Language`, sonst Deutsch. Die Oberfläche schickt ihre Sprache als
+  `Accept-Language` mit; die Anmeldeseite folgt immer dem Browser.
+- **Umschalten lädt die Seite neu:** Die Sprache steht für die Lebensdauer der Seite fest.
+  Das ist einfacher als ein reaktiver Wechsel und holt zwischengespeicherte Server-Kataloge
+  (Plugins, Event-Typen) gleich mit in der neuen Sprache. Gilt für einen Benutzer eine andere
+  Sprache als die, mit der die Seite gestartet ist, lädt sie einmal neu.
+- **Formate:** Deutsch unverändert (27.09.2026 14:05, 1.234,5, „12 %“); Englisch in der
+  englischen Variante des Browsers, sonst en-GB (27/09/2026 14:05) – ein deutscher Browser mit
+  englischer Oberfläche bekommt so kein US-Datum.
+- **Benachrichtigungen und Berichte (über den Auftrag hinaus):** Sie gehen an Empfänger ohne
+  Sitzung, daher eine Systemeinstellung „Sprache für Benachrichtigungen und Berichte“
+  (Standard Deutsch). E-Mail, Telegram, ntfy, Webhook, n8n und geplante Berichte schreiben in
+  dieser Sprache; in der Oberfläche heruntergeladene Berichte in der Sprache des Benutzers.
+  Die CLI im Container spricht Englisch mit `LANG=en_…`, `cron`-Beschreibungen gibt es in
+  beiden Sprachen, ebenso die API-Dokumentation.
+- **Prüfungen:** `go test ./internal/i18n/` verlangt für jedes Label, jede Beschreibung und
+  Option der ausgelieferten Kataloge (Plugins, Aktionen, Events, Credential-Typen,
+  Berechtigungen, Filterfelder) eine Übersetzung und sucht im Quelltext deutsche Texte ohne
+  Eintrag (Heuristik: Umlaute und typische deutsche Wörter; deutsche Daten wie CSV-Spaltennamen
+  tragen `// i18n:ignore`). Die Oberfläche: `t()` ist typisiert, ein fehlender Eintrag ist ein
+  Fehler in `npm run check`; dort prüft `scripts/i18n-check.mjs` zusätzlich doppelte und
+  ungenutzte Schlüssel, Platzhalter und deutschen Text außerhalb von `t()`.
+- **Kleine Änderungen am deutschen Text:** Wo ein deutsches Wort in zwei Bedeutungen vorkam,
+  bekam eine Stelle einen eindeutigen Text (z. B. „Laufprotokoll“ statt „Protokoll“, „Abgleich
+  läuft“, „Token „…“ wurde widerrufen“); Zahlen mit Einzahl heißen jetzt richtig „1 Gerät“,
+  „1 Versuch“ usw.
+- **Nicht übersetzt:**
+  - Daten: Gerätenamen, Namen und Beschreibungen von Rollen (auch der vorgegebenen „Bearbeiter“
+    und „Betrachter“ – eine Übersetzung beim Anzeigen würde sie beim nächsten Speichern
+    umbenennen), Werte in Event-Payloads (`direction: eingehend`), auf die Regeln filtern.
+  - Der Agent und seine Installationsskripte (laufen auf dem Zielsystem ohne Sitzung).
+  - Log-Attribute: Nur Fehlertexte werden übersetzt, Schlüssel wie `zeile` bleiben; das
+    Server-Log auf stdout bleibt deutsch (übersetzt wird die Anzeige in der Oberfläche).
+  - Teilweise deutsch bleiben zusammengesetzte Texte ohne passendes Muster: die
+    Zusammenfassung der CVE-Aktion mit mehreren Teilen („… · …“), der Tunnelzustand
+    „Konfiguration ungültig: …“, deutsche Plugin-Namen innerhalb von Titeln wie
+    „%s: Lauf fehlgeschlagen“ und in Audit-Einträgen, eigene Berichtstitel.
+- **Getestet:** Muster, Auswahl der Sprache und Katalogvollständigkeit als Unit-Tests
+  (`internal/i18n`), API-Tests für Präferenz, `Accept-Language`, Feldfehler und gespeicherte
+  Events, englische Cron-Beschreibungen, Berichte (Markdown, E-Mail, PDF) und CLI-Texte;
+  Oberfläche per svelte-check und i18n-check.
 
 ---
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"netscope/internal/auth"
+	"netscope/internal/i18n"
 	"netscope/internal/netutil"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
@@ -201,7 +202,7 @@ func (s *Server) handleTestRule(w http.ResponseWriter, r *http.Request) {
 	if err == nil && req.Event.Deliver {
 		s.record(r, "rule.test", "rule", strconv.FormatInt(req.Rule.ID, 10), "Regeltest mit Versand", nil, req.Event)
 	}
-	s.respond(w, r, res, err)
+	s.respond(w, r, localizeSimResult(res, requestLocale(r), s.Settings.System().Lang()), err)
 }
 
 func (s *Server) handleTestSavedRule(w http.ResponseWriter, r *http.Request) {
@@ -224,7 +225,7 @@ func (s *Server) handleTestSavedRule(w http.ResponseWriter, r *http.Request) {
 	if err == nil && in.Deliver {
 		s.record(r, "rule.test", "rule", strconv.FormatInt(id, 10), "Regeltest mit Versand", nil, in)
 	}
-	s.respond(w, r, res, err)
+	s.respond(w, r, localizeSimResult(res, requestLocale(r), s.Settings.System().Lang()), err)
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +236,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, notificationList{Total: total, Items: list})
+	writeJSON(w, http.StatusOK, notificationList{Total: total, Items: localizeNotifications(list, requestLocale(r))})
 }
 
 func (s *Server) handlePublishers(w http.ResponseWriter, r *http.Request) {
@@ -243,13 +244,13 @@ func (s *Server) handlePublishers(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []pluginhost.PublisherInfo{}
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeJSON(w, http.StatusOK, localizePublishers(list, requestLocale(r)))
 }
 
 // credentialUsers lists the plugins (among ids) that use a credential of the given type:
 // explicitly referenced or picked automatically by a visible multi credential field
 // left empty.
-func (s *Server) credentialUsers(ids []string, id int64, typ string) []credentialUse {
+func (s *Server) credentialUsers(loc i18n.Locale, ids []string, id int64, typ string) []credentialUse {
 	out := []credentialUse{}
 	for _, pid := range ids {
 		p, _ := s.Host.Plugin(pid)
@@ -263,7 +264,7 @@ func (s *Server) credentialUsers(ids []string, id int64, typ string) []credentia
 			}
 			sel := st.CredentialIDs(f.Key)
 			if slices.Contains(sel, id) || (f.Multi && len(sel) == 0) {
-				out = append(out, credentialUse{ID: pid, Name: p.Info().Name, Kind: "plugin"})
+				out = append(out, credentialUse{ID: pid, Name: i18n.T(loc, p.Info().Name), Kind: "plugin"})
 				break
 			}
 		}
@@ -352,13 +353,13 @@ func (s *Server) handleDeviceCredentials(w http.ResponseWriter, r *http.Request)
 	plugins := s.pluginsCovering(r.Context(), dev)
 	out := make([]deviceCredential, 0, len(list))
 	for _, m := range list {
-		out = append(out, deviceCredential{CredentialMatch: m, UsedBy: s.credentialUsers(plugins, m.ID, m.Type)})
+		out = append(out, deviceCredential{CredentialMatch: m, UsedBy: s.credentialUsers(requestLocale(r), plugins, m.ID, m.Type)})
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
 // credentialUsage lists the plugins whose settings reference a credential.
-func (s *Server) credentialUsage(id int64) []credentialUse {
+func (s *Server) credentialUsage(loc i18n.Locale, id int64) []credentialUse {
 	out := []credentialUse{}
 	for _, pid := range s.Host.IDs() {
 		p, _ := s.Host.Plugin(pid)
@@ -370,7 +371,7 @@ func (s *Server) credentialUsage(id int64) []credentialUse {
 			}
 			for _, cid := range st.CredentialIDs(f.Key) {
 				if cid == id && (len(out) == 0 || out[len(out)-1].ID != pid) {
-					out = append(out, credentialUse{ID: pid, Name: p.Info().Name, Kind: "plugin"})
+					out = append(out, credentialUse{ID: pid, Name: i18n.T(loc, p.Info().Name), Kind: "plugin"})
 				}
 			}
 		}
@@ -379,7 +380,7 @@ func (s *Server) credentialUsage(id int64) []credentialUse {
 	if list, err := s.Inventory.ListSubnets(context.Background()); err == nil {
 		for _, sn := range list {
 			if sn.TunnelCredentialID != nil && *sn.TunnelCredentialID == id {
-				name := "Subnetz " + sn.CIDR
+				name := i18n.Sprintf(loc, "Subnetz %s", sn.CIDR)
 				if sn.Name != "" {
 					name += " (" + sn.Name + ")"
 				}
@@ -398,13 +399,13 @@ func (s *Server) handleCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]credentialView, 0, len(list))
 	for _, c := range list {
-		out = append(out, credentialView{CredentialMeta: c, UsedBy: s.credentialUsage(c.ID)})
+		out = append(out, credentialView{CredentialMeta: c, UsedBy: s.credentialUsage(requestLocale(r), c.ID)})
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handleCredentialTypes(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, plugin.CredentialTypes())
+	writeJSON(w, http.StatusOK, plugin.LocalizedCredentialTypes(requestLocale(r)))
 }
 
 func (s *Server) handleCredential(w http.ResponseWriter, r *http.Request) {
@@ -418,7 +419,7 @@ func (s *Server) handleCredential(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, credentialView{CredentialMeta: *m, UsedBy: s.credentialUsage(id)})
+	writeJSON(w, http.StatusOK, credentialView{CredentialMeta: *m, UsedBy: s.credentialUsage(requestLocale(r), id)})
 }
 
 func (s *Server) handleSaveCredential(w http.ResponseWriter, r *http.Request) {
@@ -463,7 +464,7 @@ func (s *Server) handleSaveCredential(w http.ResponseWriter, r *http.Request) {
 	if m.Type == plugin.CredWireGuard {
 		s.reconcileTunnels()
 	}
-	writeJSON(w, status, credentialView{CredentialMeta: *m, UsedBy: s.credentialUsage(id)})
+	writeJSON(w, status, credentialView{CredentialMeta: *m, UsedBy: s.credentialUsage(requestLocale(r), id)})
 }
 
 func (s *Server) handleDeleteCredential(w http.ResponseWriter, r *http.Request) {
@@ -472,12 +473,12 @@ func (s *Server) handleDeleteCredential(w http.ResponseWriter, r *http.Request) 
 		s.fail(w, r, err)
 		return
 	}
-	if used := s.credentialUsage(id); len(used) > 0 {
+	if used := s.credentialUsage(requestLocale(r), id); len(used) > 0 {
 		names := make([]string, len(used))
 		for i, u := range used {
 			names[i] = u.Name
 		}
-		writeError(w, http.StatusConflict, "in_use", "Credential wird noch verwendet von: "+strings.Join(names, ", "), nil)
+		writeError(w, r, http.StatusConflict, "in_use", "Credential wird noch verwendet von: "+strings.Join(names, ", "), nil)
 		return
 	}
 	m, err := s.Vault.Meta(r.Context(), id)

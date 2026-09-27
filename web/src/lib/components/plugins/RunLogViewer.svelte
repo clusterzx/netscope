@@ -9,9 +9,10 @@
 	import { untrack } from 'svelte';
 	import { api } from '$lib/api';
 	import type { RunLog, RunLogMessageData } from '$lib/api';
+	import { t, tn } from '$lib/i18n';
 	import { Button, EmptyState, ErrorState, Icon, Input, Select, Skeleton, Toggle } from '$lib/components/ui';
 	import { live } from '$lib/stores/live.svelte';
-	import { formatTime, formatDateTime } from '$lib/utils/format';
+	import { formatDateTime, formatNumber, formatTime } from '$lib/utils/format';
 	import { levelRank, logLevelClass } from './plugin';
 
 	interface Props {
@@ -150,10 +151,10 @@
 	$effect(() => live.onReconnect(() => load()));
 
 	const levels = [
-		{ value: '', label: 'Alle Stufen' },
-		{ value: 'INFO', label: 'Ab Info' },
-		{ value: 'WARN', label: 'Ab Warnung' },
-		{ value: 'ERROR', label: 'Nur Fehler' }
+		{ value: '', label: t('Alle Stufen') },
+		{ value: 'INFO', label: t('Ab Info') },
+		{ value: 'WARN', label: t('Ab Warnung') },
+		{ value: 'ERROR', label: t('Nur Fehler') }
 	];
 
 	const filtered = $derived.by(() => {
@@ -224,31 +225,31 @@
 
 <div class="flex min-w-0 flex-col gap-2 {klass}">
 	<div class="flex flex-wrap items-end gap-2">
-		<Select label="Stufe" size="sm" options={levels} bind:value={minLevel} class="w-36" />
+		<Select label={t('Stufe')} size="sm" options={levels} bind:value={minLevel} class="w-36" />
 		<Input
-			label="Suche"
+			label={t('Suche')}
 			size="sm"
 			icon="search"
 			type="search"
-			placeholder="Text oder Attribut …"
+			placeholder={t('Text oder Attribut …')}
 			bind:value={search}
 			class="min-w-40 flex-1 sm:max-w-72"
 		/>
 		<div class="ml-auto flex items-center gap-3 pb-1">
 			{#if active}
-				<Toggle size="sm" label="Automatisch scrollen" bind:checked={follow} />
+				<Toggle size="sm" label={t('Automatisch scrollen')} bind:checked={follow} />
 			{/if}
 			<Button
 				size="sm"
 				icon="copy"
-				label="Angezeigte Zeilen kopieren"
+				label={t('Angezeigte Zeilen kopieren')}
 				onclick={copyAll}
 				disabled={!filtered.length}
 			/>
 			<Button
 				size="sm"
 				icon="refresh"
-				label="Protokoll neu laden"
+				label={t('Protokoll neu laden')}
 				onclick={() => load(true)}
 				disabled={frozen}
 			/>
@@ -256,16 +257,21 @@
 	</div>
 
 	<div class="flex flex-wrap items-center gap-3 text-xs text-fg-subtle" aria-live="polite">
-		<span class="tabular">{filtered.length} von {lines.length} Zeilen</span>
-		{#if counts.warn}<span class="text-warn">{counts.warn} Warnungen</span>{/if}
-		{#if counts.err}<span class="text-danger">{counts.err} Fehler</span>{/if}
+		<span class="tabular"
+			>{tn(lines.length, '{shown} von {n} Zeile', '{shown} von {n} Zeilen', {
+				shown: formatNumber(filtered.length)
+			})}</span
+		>
+		{#if counts.warn}<span class="text-warn">{tn(counts.warn, '{n} Warnung', '{n} Warnungen')}</span>{/if}
+		{#if counts.err}<span class="text-danger">{tn(counts.err, '1 Fehler', '{n} Fehler')}</span>{/if}
 		{#if active}
 			<span class="inline-flex items-center gap-1 text-live">
 				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-live"></span> live
 			</span>
 			{#if !follow}
 				<button type="button" class="link" onclick={() => (follow = true)}>
-					<Icon name="arrow-down" size={12} class="inline" /> zum Ende springen
+					<Icon name="arrow-down" size={12} class="inline" />
+					{t('zum Ende springen')}
 				</button>
 			{/if}
 		{/if}
@@ -279,10 +285,10 @@
 		<EmptyState
 			compact
 			icon="terminal"
-			title={active ? 'Noch keine Protokollzeilen' : 'Keine Protokollzeilen'}
+			title={active ? t('Noch keine Protokollzeilen') : t('Keine Protokollzeilen')}
 			description={active
-				? 'Neue Zeilen erscheinen hier automatisch.'
-				: 'Dieser Lauf hat nichts protokolliert.'}
+				? t('Neue Zeilen erscheinen hier automatisch.')
+				: t('Dieser Lauf hat nichts protokolliert.')}
 		/>
 	{:else}
 		<!-- the scroll container must be reachable by keyboard -->
@@ -292,12 +298,12 @@
 			onscroll={onScroll}
 			class="max-h-[60vh] min-h-40 overflow-auto rounded-md border border-border bg-surface-2 py-1 font-mono text-[0.78rem] leading-relaxed"
 			role="log"
-			aria-label="Protokoll von Lauf {runId}"
+			aria-label={t('Protokoll von Lauf {id}', { id: runId })}
 			aria-live={active && follow ? 'polite' : 'off'}
 			tabindex="0"
 		>
 			{#if !filtered.length}
-				<p class="px-3 py-2 font-sans text-sm text-fg-subtle">Keine Zeile passt zum Filter.</p>
+				<p class="px-3 py-2 font-sans text-sm text-fg-subtle">{t('Keine Zeile passt zum Filter.')}</p>
 			{/if}
 			{#each filtered as l (l.key)}
 				{@const hasAttrs = !!l.attrs && Object.keys(l.attrs).length > 0}
@@ -324,7 +330,7 @@
 								type="button"
 								class="shrink-0 rounded px-1 text-fg-subtle hover:bg-border hover:text-fg"
 								aria-expanded={open}
-								aria-label={open ? 'Attribute einklappen' : 'Attribute anzeigen'}
+								aria-label={open ? t('Attribute einklappen') : t('Attribute anzeigen')}
 								onclick={() => (expanded[l.key] = !open)}
 							>
 								<Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} />

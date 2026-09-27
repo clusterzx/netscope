@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
 	import { Icon } from '$lib/components/ui';
+	import { intlLocale, t } from '$lib/i18n';
 	import { deviceTypeName, relationKindLabel, label } from '$lib/utils/labels';
 	import { EDGE_KINDS, edgeStyle, typeIcon } from './graph';
 
@@ -28,7 +29,7 @@
 		types
 			.map((t) => ({ type: t, icon: typeIcon(t) }))
 			.filter((g) => g.icon !== null)
-			.sort((a, b) => deviceTypeName(a.type).localeCompare(deviceTypeName(b.type), 'de'))
+			.sort((a, b) => deviceTypeName(a.type).localeCompare(deviceTypeName(b.type), intlLocale))
 	);
 </script>
 
@@ -40,7 +41,7 @@
 		onclick={() => (open = !open)}
 	>
 		<Icon name="info" size={14} class="text-fg-subtle" />
-		<span class="flex-1">Legende</span>
+		<span class="flex-1">{t('Legende')}</span>
 		<Icon name={open ? 'chevron-down' : 'chevron-up'} size={14} class="text-fg-subtle" />
 	</button>
 	{#if open}
@@ -48,7 +49,7 @@
 			class="flex max-h-[min(24rem,50dvh)] flex-col gap-3 overflow-y-auto border-t border-border px-3 py-2.5"
 		>
 			<section>
-				<h3 class="mb-1.5 font-semibold tracking-wide text-fg-subtle uppercase">Geräte</h3>
+				<h3 class="mb-1.5 font-semibold tracking-wide text-fg-subtle uppercase">{t('Geräte')}</h3>
 				<ul class="flex flex-col gap-1.5 text-fg-muted">
 					<li class="flex items-center gap-2">
 						<span class="inline-block size-3 rounded-full bg-online"></span> Online
@@ -60,7 +61,7 @@
 						<span
 							class="inline-block size-3 rounded-full bg-online ring-2 ring-unknown ring-offset-1 ring-offset-surface"
 						></span>
-						Unbekanntes Gerät
+						{t('Unbekanntes Gerät')}
 					</li>
 					{#if containers}
 						<li class="flex items-center gap-2">
@@ -73,14 +74,14 @@
 								class="absolute -top-0.5 -right-0.5 size-1.5 rounded-full border border-surface bg-fg-muted"
 							></span>
 						</span>
-						Fixiert (Doppelklick löst)
+						{t('Fixiert (Doppelklick löst)')}
 					</li>
 				</ul>
 			</section>
 
 			{#if glyphs.length}
 				<section>
-					<h3 class="mb-1.5 font-semibold tracking-wide text-fg-subtle uppercase">Typen</h3>
+					<h3 class="mb-1.5 font-semibold tracking-wide text-fg-subtle uppercase">{t('Typen')}</h3>
 					<ul class="grid grid-cols-2 gap-x-3 gap-y-1 text-fg-muted">
 						{#each glyphs as g (g.type)}
 							<li class="flex min-w-0 items-center gap-1.5">
@@ -94,7 +95,7 @@
 
 			{#if edgeKinds.length}
 				<section>
-					<h3 class="mb-1.5 font-semibold tracking-wide text-fg-subtle uppercase">Verbindungen</h3>
+					<h3 class="mb-1.5 font-semibold tracking-wide text-fg-subtle uppercase">{t('Verbindungen')}</h3>
 					<ul class="flex flex-col gap-1 text-fg-muted">
 						{#each edgeKinds as k (k)}
 							{@const s = edgeStyle(k)}

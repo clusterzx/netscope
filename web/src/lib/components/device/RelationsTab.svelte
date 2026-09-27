@@ -17,6 +17,7 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
+	import { locale, t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -62,25 +63,30 @@
 				(a, b) =>
 					(a.dir === b.dir ? 0 : a.dir === 'parent' ? -1 : 1) ||
 					a.kind.localeCompare(b.kind) ||
-					a.otherName.localeCompare(b.otherName, 'de')
+					a.otherName.localeCompare(b.otherName, locale)
 			)
 	);
 
 	async function remove(r: Row) {
 		const ok = await confirm({
-			title: 'Verbindung löschen?',
-			message: `${r.parentName} → ${r.childName} (${relationKindLabel[r.kind] ?? r.kind}) wird entfernt.${
+			title: t('Verbindung löschen?'),
+			message: [
+				t('{edge} wird entfernt.', {
+					edge: `${r.parentName} → ${r.childName} (${relationKindLabel[r.kind] ?? r.kind})`
+				}),
 				r.source === 'manual'
 					? ''
-					: ' Automatisch erkannte Verbindungen kommen beim nächsten Topologie-Lauf wieder.'
-			}`,
-			confirmLabel: 'Löschen',
+					: t('Automatisch erkannte Verbindungen kommen beim nächsten Topologie-Lauf wieder.')
+			]
+				.filter(Boolean)
+				.join(' '),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/topology/edges/{id}', { path: { id: r.id } });
-			toast.success('Verbindung gelöscht');
+			toast.success(t('Verbindung gelöscht'));
 			data.invalidate();
 			onchanged();
 		} catch (e) {
@@ -89,12 +95,12 @@
 	}
 
 	const columns: Column<Row>[] = [
-		{ key: 'dir', label: 'Richtung', cell: dirCell },
-		{ key: 'other', label: 'Gerät', cell: otherCell },
-		{ key: 'kind', label: 'Art', value: (r) => relationKindLabel[r.kind] ?? r.kind },
+		{ key: 'dir', label: t('Richtung'), cell: dirCell }, // i18n-ignore: 'dir' is the column id
+		{ key: 'other', label: t('Gerät'), cell: otherCell },
+		{ key: 'kind', label: t('Art'), value: (r) => relationKindLabel[r.kind] ?? r.kind },
 		{ key: 'ports', label: 'Ports', hideBelow: 'md', cell: portsCell },
-		{ key: 'source', label: 'Quelle', hideBelow: 'lg', cell: sourceCell },
-		{ key: 'lastSeen', label: 'Zuletzt bestätigt', hideBelow: 'lg', cell: seenCell },
+		{ key: 'source', label: t('Quelle'), hideBelow: 'lg', cell: sourceCell },
+		{ key: 'lastSeen', label: t('Zuletzt bestätigt'), hideBelow: 'lg', cell: seenCell },
 		{ key: 'actions', label: '', align: 'right', cell: actionCell }
 	];
 
@@ -125,7 +131,7 @@
 		errors = {};
 		error = '';
 		if (!other) {
-			errors = { other: 'Gerät auswählen' };
+			errors = { other: t('Gerät auswählen') };
 			return;
 		}
 		const parentId = dir === 'parent' ? other : id;
@@ -142,13 +148,14 @@
 					label: label.trim()
 				}
 			});
-			toast.success('Verbindung angelegt');
+			toast.success(t('Verbindung angelegt'));
 			addOpen = false;
 			data.invalidate();
 			onchanged();
 		} catch (e) {
 			const msg = errorMessage(e);
-			if (/Gerät|selbst/.test(msg)) errors = { other: msg };
+			// server errors about the chosen device (German or English, as the server answers)
+			if (/Gerät|selbst|device|itself/i.test(msg)) errors = { other: msg };
 			else error = msg;
 		} finally {
 			busy = false;
@@ -159,7 +166,7 @@
 {#snippet dirCell(r: Row)}
 	<span class="inline-flex items-center gap-1.5 whitespace-nowrap text-fg-muted">
 		<Icon name={r.dir === 'parent' ? 'arrow-up' : 'arrow-down'} size={13} />
-		{r.dir === 'parent' ? 'Eltern' : 'Kind'}
+		{r.dir === 'parent' ? t('Eltern') : t('Kind')}
 	</span>
 {/snippet}
 {#snippet otherCell(r: Row)}
@@ -174,24 +181,30 @@
 {#snippet sourceCell(r: Row)}
 	<span class="inline-flex items-center gap-1.5">
 		{sourceName(r.source)}
-		{#if r.protected}<Badge tone="accent" title="Manuell angelegt, wird von Scans nicht verändert"
-				>geschützt</Badge
+		{#if r.protected}<Badge tone="accent" title={t('Manuell angelegt, wird von Scans nicht verändert')}
+				>{t('geschützt')}</Badge
 			>{/if}
 	</span>
 {/snippet}
 {#snippet seenCell(r: Row)}<RelativeTime value={r.lastSeen} class="text-fg-muted" />{/snippet}
 {#snippet actionCell(r: Row)}
 	{#if canEdit && (r.source === 'manual' || r.protected)}
-		<Button size="xs" variant="ghost" icon="trash" label="Verbindung löschen" onclick={() => remove(r)} />
+		<Button
+			size="xs"
+			variant="ghost"
+			icon="trash"
+			label={t('Verbindung löschen')}
+			onclick={() => remove(r)}
+		/>
 	{/if}
 {/snippet}
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-center gap-2">
-		<h2 class="flex-1 text-sm font-semibold">Beziehungen</h2>
-		<Button size="sm" variant="ghost" href="/topology" iconRight="arrow-right">Topologie</Button>
+		<h2 class="flex-1 text-sm font-semibold">{t('Beziehungen')}</h2>
+		<Button size="sm" variant="ghost" href="/topology" iconRight="arrow-right">{t('Topologie')}</Button>
 		{#if canEdit}
-			<Button size="sm" variant="primary" icon="plus" onclick={openAdd}>Verbindung hinzufügen</Button>
+			<Button size="sm" variant="primary" icon="plus" onclick={openAdd}>{t('Verbindung hinzufügen')}</Button>
 		{/if}
 	</div>
 	{#if data.error && !data.data}
@@ -199,27 +212,37 @@
 	{:else if !data.data}
 		<Skeleton rows={4} />
 	{:else}
-		<Table {columns} {rows} key={(r) => r.id} dense caption="Beziehungen des Geräts" loading={data.loading}>
+		<Table
+			{columns}
+			{rows}
+			key={(r) => r.id}
+			dense
+			caption={t('Beziehungen des Geräts')}
+			loading={data.loading}
+		>
 			{#snippet empty()}
 				<EmptyState
 					compact
 					icon="topology"
-					title="Keine Beziehungen"
-					description="Beziehungen entstehen aus SNMP/LLDP, Proxmox, Docker und dem Routing – oder manuell."
+					title={t('Keine Beziehungen')}
+					description={t(
+						'Beziehungen entstehen aus SNMP/LLDP, Proxmox, Docker und dem Routing – oder manuell.'
+					)}
 				/>
 			{/snippet}
 		</Table>
 		<p class="text-xs text-fg-subtle">
-			Eltern = übergeordnetes Gerät (z. B. Switch, Hypervisor, Router); Kind = untergeordnet. Manuelle
-			Verbindungen sind geschützt und werden von Scans nicht verändert.
+			{t(
+				'Eltern = übergeordnetes Gerät (z. B. Switch, Hypervisor, Router); Kind = untergeordnet. Manuelle Verbindungen sind geschützt und werden von Scans nicht verändert.'
+			)}
 		</p>
 	{/if}
 </div>
 
 <Modal
 	bind:open={addOpen}
-	title="Verbindung hinzufügen"
-	description="Manuelle, geschützte Kante für „{device.name || device.ip}“."
+	title={t('Verbindung hinzufügen')}
+	description={t('Manuelle, geschützte Kante für „{name}“.', { name: device.name || device.ip })}
 	as="form"
 	onsubmit={submitAdd}
 	{busy}
@@ -227,38 +250,43 @@
 	<div class="flex flex-col gap-3">
 		{#if error}<Alert tone="danger">{error}</Alert>{/if}
 		<Select
-			label="Dieses Gerät ist"
+			label={t('Dieses Gerät ist')}
 			bind:value={dir}
 			options={[
-				{ value: 'parent', label: 'Kind des anderen Geräts (hängt an / läuft auf)' },
-				{ value: 'child', label: 'Eltern des anderen Geräts (übergeordnet)' }
+				{ value: 'parent', label: t('Kind des anderen Geräts (hängt an / läuft auf)') },
+				{ value: 'child', label: t('Eltern des anderen Geräts (übergeordnet)') }
 			]}
 		/>
 		<DevicePicker
-			label={dir === 'parent' ? 'Übergeordnetes Gerät' : 'Untergeordnetes Gerät'}
+			label={dir === 'parent' ? t('Übergeordnetes Gerät') : t('Untergeordnetes Gerät')}
 			bind:value={other}
 			exclude={[id]}
 			error={errors.other}
 			required
 		/>
 		<Select
-			label="Art"
+			label={t('Art')}
 			bind:value={kind}
 			options={KINDS.map((k) => ({ value: k, label: relationKindLabel[k] ?? k }))}
 		/>
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 			<Input
-				label="Port am Eltern-Gerät (optional)"
+				label={t('Port am Eltern-Gerät (optional)')}
 				bind:value={parentPort}
 				mono
-				placeholder="z. B. Port 7"
+				placeholder={t('z. B. Port 7')}
 			/>
-			<Input label="Port am Kind-Gerät (optional)" bind:value={childPort} mono placeholder="z. B. eth0" />
+			<Input
+				label={t('Port am Kind-Gerät (optional)')}
+				bind:value={childPort}
+				mono
+				placeholder={t('z. B. eth0')}
+			/>
 		</div>
-		<Input label="Beschriftung (optional)" bind:value={label} maxlength={120} />
+		<Input label={t('Beschriftung (optional)')} bind:value={label} maxlength={120} />
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (addOpen = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="plus" loading={busy}>Anlegen</Button>
+		<Button onclick={() => (addOpen = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="plus" loading={busy}>{t('Anlegen')}</Button>
 	{/snippet}
 </Modal>

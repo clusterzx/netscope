@@ -7,8 +7,8 @@
 	import { api, ApiError, errorMessage } from '$lib/api';
 	import QueryInput from '$lib/components/QueryInput.svelte';
 	import { Button, Card, Icon, Spinner } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatNumber } from '$lib/utils/format';
 
 	interface Props {
 		class?: string;
@@ -50,26 +50,26 @@
 			await api.download(
 				'/api/v1/reports/inventory',
 				{ format, q: applied || null },
-				`netscope-inventar.${format}`
+				`${t('netscope-inventar')}.${format}`
 			);
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 400) queryError = e.message;
-			else toast.error(errorMessage(e), { title: 'Export fehlgeschlagen' });
+			else toast.error(errorMessage(e), { title: t('Export fehlgeschlagen') });
 		} finally {
 			busy = null;
 		}
 	}
 
 	const formats = [
-		{ id: 'csv', label: 'CSV', hint: 'Tabellenkalkulation, Re-Import über den CSV-Importer' },
-		{ id: 'json', label: 'JSON', hint: 'Vollständige Gerätedaten für Skripte' },
-		{ id: 'pdf', label: 'PDF', hint: 'Druckfertige Inventarliste' }
+		{ id: 'csv', label: 'CSV', hint: t('Tabellenkalkulation, Re-Import über den CSV-Importer') },
+		{ id: 'json', label: 'JSON', hint: t('Vollständige Gerätedaten für Skripte') },
+		{ id: 'pdf', label: 'PDF', hint: t('Druckfertige Inventarliste') }
 	] as const;
 </script>
 
 <Card
-	title="Inventar-Export"
-	description="Alle Geräte oder eine gefilterte Auswahl herunterladen"
+	title={t('Inventar-Export')}
+	description={t('Alle Geräte oder eine gefilterte Auswahl herunterladen')}
 	icon="download"
 	class={klass}
 >
@@ -79,18 +79,21 @@
 				bind:value={q}
 				onsubmit={apply}
 				error={queryError}
-				label="Filter für den Export"
+				label={t('Filter für den Export')}
 				showLabel
 			/>
 			<p class="mt-1.5 flex items-center gap-1.5 text-xs text-fg-subtle" aria-live="polite">
 				{#if counting}
-					<Spinner size={12} /> Zähle Geräte …
+					<Spinner size={12} />
+					{t('Zähle Geräte …')}
 				{:else if count !== null && !queryError}
 					{applied
-						? `${formatNumber(count)} Geräte passen zum Filter „${applied}“`
-						: `${formatNumber(count)} Geräte (ohne Filter)`}
+						? tn(count, '{n} Gerät passt zum Filter „{filter}“', '{n} Geräte passen zum Filter „{filter}“', {
+								filter: applied
+							})
+						: tn(count, '{n} Gerät (ohne Filter)', '{n} Geräte (ohne Filter)')}
 				{:else}
-					Leer lassen für das komplette Inventar. Enter übernimmt den Filter.
+					{t('Leer lassen für das komplette Inventar. Enter übernimmt den Filter.')}
 				{/if}
 			</p>
 		</div>
@@ -106,7 +109,9 @@
 						{#if busy === f.id}<Spinner size={16} />{:else}<Icon name="download" size={16} />{/if}
 					</span>
 					<span class="min-w-0">
-						<span class="block text-sm font-medium text-fg">{f.label} herunterladen</span>
+						<span class="block text-sm font-medium text-fg"
+							>{t('{format} herunterladen', { format: f.label })}</span
+						>
 						<span class="block text-xs text-fg-subtle">{f.hint}</span>
 					</span>
 				</button>
@@ -115,12 +120,12 @@
 	</div>
 	{#snippet footer()}
 		<div class="flex flex-wrap items-center justify-between gap-2 text-xs text-fg-subtle">
-			<span>Die Filtersprache entspricht der Geräteliste.</span>
+			<span>{t('Die Filtersprache entspricht der Geräteliste.')}</span>
 			<Button
 				size="xs"
 				variant="ghost"
 				href={applied ? `/devices?q=${encodeURIComponent(applied)}` : '/devices'}
-				iconRight="arrow-right">In der Geräteliste ansehen</Button
+				iconRight="arrow-right">{t('In der Geräteliste ansehen')}</Button
 			>
 		</div>
 	{/snippet}

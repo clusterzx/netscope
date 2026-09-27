@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"netscope/internal/db"
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 	"netscope/internal/reports"
 )
@@ -73,6 +74,8 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if loc == nil {
 		loc = time.Local
 	}
+	// the report goes out in the language of the notifications (system setting)
+	lang := rc.Env.Lang()
 	to := time.Now()
 	from := to.Add(-time.Duration(rc.Settings.Int("period_days")) * 24 * time.Hour)
 	r, err := reports.BuildChangeReport(ctx, rc.DB, from, to)
@@ -83,8 +86,8 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if rc.Env.PublicURL != "" {
 		base = rc.Env.PublicURL + "/reports"
 	}
-	body := r.Markdown(loc, base)
-	extra, err := r.NotificationExtra(loc, rc.Env.PublicURL)
+	body := r.Markdown(lang, loc, base)
+	extra, err := r.NotificationExtra(lang, loc, rc.Env.PublicURL)
 	if err != nil {
 		return fmt.Errorf("Bericht als PDF: %w", err)
 	}
@@ -93,7 +96,10 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if title == "" {
 		title = "NetScope Bericht"
 	}
-	title = fmt.Sprintf("%s KW %d (%s–%s)", title, week, from.In(loc).Format("02.01."), to.In(loc).Format("02.01.2006"))
+	// the default title (and any other title with a translation) follows the language
+	title = i18n.T(lang, title)
+	title = i18n.Sprintf(lang, "%s KW %d (%s–%s)", title, week, from.In(loc).Format(reports.DateLayout(lang, "02.01.")),
+		to.In(loc).Format(reports.DateLayout(lang, "02.01.2006")))
 	now := db.Now()
 	for _, pub := range pubs {
 		if _, err := rc.DB.W.ExecContext(ctx, `INSERT INTO notifications(publisher_id, kind, priority, status, event_ids, title, body,

@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	import { api, errorMessage } from '$lib/api';
 	import type { RunList, RunMessageData, RunView } from '$lib/api';
+	import { t } from '$lib/i18n';
 	import {
 		Button,
 		EmptyState,
@@ -90,23 +91,23 @@
 	let cancelling = $state<number | null>(null);
 	async function cancel(r: RunView) {
 		const ok = await confirm({
-			title: `Lauf #${r.id} abbrechen?`,
+			title: t('Lauf #{id} abbrechen?', { id: r.id }),
 			message:
 				r.status === 'running'
-					? 'Der laufende Vorgang wird abgebrochen; bereits gespeicherte Ergebnisse bleiben erhalten.'
-					: 'Der wartende Lauf wird aus der Warteschlange entfernt.',
-			confirmLabel: 'Abbrechen',
-			cancelLabel: 'Weiterlaufen lassen',
+					? t('Der laufende Vorgang wird abgebrochen; bereits gespeicherte Ergebnisse bleiben erhalten.')
+					: t('Der wartende Lauf wird aus der Warteschlange entfernt.'),
+			confirmLabel: t('Abbrechen'),
+			cancelLabel: t('Weiterlaufen lassen'),
 			danger: true
 		});
 		if (!ok) return;
 		cancelling = r.id;
 		try {
 			await api.post('/api/v1/runs/{id}/cancel', { path: { id: r.id } });
-			toast.info(`Lauf #${r.id} wird abgebrochen`);
+			toast.info(t('Lauf #{id} wird abgebrochen', { id: r.id }));
 			refresh();
 		} catch (e) {
-			toast.error(errorMessage(e), { title: 'Abbrechen fehlgeschlagen' });
+			toast.error(errorMessage(e), { title: t('Abbrechen fehlgeschlagen') });
 		} finally {
 			cancelling = null;
 		}
@@ -118,7 +119,7 @@
 		try {
 			const prev = await previousSuccessfulRun(r);
 			if (!prev) {
-				toast.info('Es gibt keinen früheren erfolgreichen Lauf dieses Plugins zum Vergleichen.');
+				toast.info(t('Es gibt keinen früheren erfolgreichen Lauf dieses Plugins zum Vergleichen.'));
 				return;
 			}
 			await goto(diffUrl(prev, r));
@@ -132,7 +133,7 @@
 	const detailHref = (r: RunView) => `/plugins/${encodeURIComponent(pluginId)}/runs/${r.id}`;
 
 	const statusOptions = [
-		{ value: '', label: 'Alle Status' },
+		{ value: '', label: t('Alle Status') },
 		...['running,queued', 'success', 'failed,timeout', 'cancelled'].map((v) => ({
 			value: v,
 			label: v
@@ -143,13 +144,13 @@
 	];
 
 	const columns: Column<RunView>[] = [
-		{ key: 'id', label: 'Lauf', width: '5.5rem' },
+		{ key: 'id', label: t('Lauf'), width: '5.5rem' },
 		{ key: 'status', label: 'Status', width: '13rem' },
-		{ key: 'trigger', label: 'Auslöser', hideBelow: 'md' },
-		{ key: 'started', label: 'Gestartet' },
-		{ key: 'duration', label: 'Dauer', align: 'right', hideBelow: 'sm' },
-		{ key: 'stats', label: 'Ergebnis', hideBelow: 'lg' },
-		{ key: 'actions', label: 'Aktionen', align: 'right' }
+		{ key: 'trigger', label: t('Auslöser'), hideBelow: 'md' },
+		{ key: 'started', label: t('Gestartet') },
+		{ key: 'duration', label: t('Dauer'), align: 'right', hideBelow: 'sm' },
+		{ key: 'stats', label: t('Ergebnis'), hideBelow: 'lg' },
+		{ key: 'actions', label: t('Aktionen'), align: 'right' }
 	];
 </script>
 
@@ -168,7 +169,7 @@
 			<Button
 				size="sm"
 				icon="refresh"
-				label="Aktualisieren"
+				label={t('Aktualisieren')}
 				loading={data.loading && !!data.data}
 				onclick={() => data.reload()}
 			/>
@@ -184,7 +185,7 @@
 			key={(r) => r.id}
 			loading={data.loading && !data.data}
 			dense
-			caption="Laufhistorie"
+			caption={t('Laufhistorie')}
 		>
 			{#snippet cell(r, col)}
 				{#if col.key === 'id'}
@@ -193,8 +194,8 @@
 					<div class="flex min-w-0 flex-col gap-1">
 						<span class="flex items-center gap-1.5">
 							<RunStatusBadge status={r.status} />
-							{#if r.attempt > 1}<span class="text-xs text-fg-subtle" title="Versuch"
-									>Versuch {r.attempt}</span
+							{#if r.attempt > 1}<span class="text-xs text-fg-subtle" title={t('Versuch')}
+									>{t('Versuch {n}', { n: r.attempt })}</span
 								>{/if}
 						</span>
 						{#if isActive(r.status)}
@@ -211,7 +212,9 @@
 				{:else if col.key === 'started'}
 					<RelativeTime value={r.startedAt ?? r.createdAt} />
 					{#if r.status === 'queued' && r.notBefore}
-						<span class="block text-xs text-fg-subtle">frühestens <RelativeTime value={r.notBefore} /></span>
+						<span class="block text-xs text-fg-subtle"
+							>{t('frühestens')} <RelativeTime value={r.notBefore} /></span
+						>
 					{/if}
 				{:else if col.key === 'duration'}
 					<span class="tabular">{r.startedAt ? formatDuration(r.durationMs) : '–'}</span>
@@ -236,7 +239,7 @@
 								size="xs"
 								variant="ghost"
 								icon="stop"
-								label="Lauf #{r.id} abbrechen"
+								label={t('Lauf #{id} abbrechen', { id: r.id })}
 								loading={cancelling === r.id}
 								onclick={() => cancel(r)}
 							/>
@@ -246,7 +249,7 @@
 								size="xs"
 								variant="ghost"
 								icon="diff"
-								label="Diff zum vorherigen erfolgreichen Lauf"
+								label={t('Diff zum vorherigen erfolgreichen Lauf')}
 								loading={diffing === r.id}
 								onclick={() => openDiff(r)}
 							/>
@@ -255,7 +258,7 @@
 							size="xs"
 							variant="ghost"
 							icon="terminal"
-							label="Details und Protokoll"
+							label={t('Details und Protokoll')}
 							href={detailHref(r)}
 						/>
 					</span>
@@ -263,10 +266,10 @@
 			{/snippet}
 			{#snippet empty()}
 				{#if status}
-					<EmptyState compact icon="filter" title="Keine Läufe mit diesem Status">
+					<EmptyState compact icon="filter" title={t('Keine Läufe mit diesem Status')}>
 						{#snippet actions()}
 							<Button size="sm" onclick={() => setParams({ status: null, offset: null })}
-								>Filter zurücksetzen</Button
+								>{t('Filter zurücksetzen')}</Button
 							>
 						{/snippet}
 					</EmptyState>
@@ -274,8 +277,8 @@
 					<EmptyState
 						compact
 						icon="history"
-						title="Noch keine Läufe"
-						description="Sobald das Plugin nach Zeitplan oder manuell läuft, erscheinen die Läufe hier."
+						title={t('Noch keine Läufe')}
+						description={t('Sobald das Plugin nach Zeitplan oder manuell läuft, erscheinen die Läufe hier.')}
 					/>
 				{/if}
 			{/snippet}

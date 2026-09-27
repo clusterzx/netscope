@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError, errorMessage } from '$lib/api';
 	import type { PluginView, RunMessageData } from '$lib/api';
+	import { t, tn } from '$lib/i18n';
 	import {
 		Alert,
 		Badge,
@@ -39,7 +40,7 @@
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatDuration, formatNumber } from '$lib/utils/format';
+	import { formatDuration } from '$lib/utils/format';
 	import { pluginKindLabel } from '$lib/utils/labels';
 	import { debounce, setParams } from '$lib/utils/url';
 
@@ -78,19 +79,23 @@
 	const activeRun = $derived(p ? (runs.forPlugin(p.info.id)[0] ?? p.running) : undefined);
 	const groupName = (gid: number) => groups.value?.find((g) => g.id === gid)?.name ?? `#${gid}`;
 	const canManage = $derived(auth.can('plugins.manage'));
+	// the program names are set in monospace: the sentence is split at its placeholder
+	const missingText = t(
+		'Für dieses Plugin fehlen auf dem Server: {list}. Läufe schlagen fehl, bis die Programme installiert sind.'
+	).split('{list}');
 
 	// ---------------------------------------------------------------- tabs (URL synced)
 	const tabs = $derived.by((): TabItem[] => {
 		if (!p) return [];
-		const out: TabItem[] = [{ id: 'settings', label: 'Einstellungen', icon: 'system' }];
+		const out: TabItem[] = [{ id: 'settings', label: t('Einstellungen'), icon: 'system' }];
 		if (canManage && ((p.actions ?? []).length || isPublisher(p)))
-			out.push({ id: 'actions', label: 'Aktionen', icon: 'zap', count: (p.actions ?? []).length || null });
-		if (hasRuns(p)) out.push({ id: 'runs', label: 'Läufe', icon: 'history' });
+			out.push({ id: 'actions', label: t('Aktionen'), icon: 'zap', count: (p.actions ?? []).length || null });
+		if (hasRuns(p)) out.push({ id: 'runs', label: t('Läufe'), icon: 'history' });
 		return out;
 	});
 	const tab = $derived.by(() => {
-		const t = page.url.searchParams.get('tab') ?? 'settings';
-		return tabs.some((x) => x.id === t) ? t : 'settings';
+		const v = page.url.searchParams.get('tab') ?? 'settings';
+		return tabs.some((x) => x.id === v) ? v : 'settings';
 	});
 
 	// local tab state (the Tabs bar must snap back when the unsaved-changes guard cancels)
@@ -99,8 +104,11 @@
 		activeTab = tab;
 	});
 
-	function selectTab(t: string) {
-		setParams({ tab: t === 'settings' ? null : t, status: null, offset: null, limit: null }, { push: true });
+	function selectTab(id: string) {
+		setParams(
+			{ tab: id === 'settings' ? null : id, status: null, offset: null, limit: null },
+			{ push: true }
+		);
 	}
 
 	// ---------------------------------------------------------------- unsaved changes guard
@@ -119,10 +127,10 @@
 		nav.cancel();
 		activeTab = tab;
 		confirm({
-			title: 'Ungespeicherte Änderungen verwerfen?',
-			message: 'Die Einstellungen dieses Plugins wurden geändert, aber noch nicht gespeichert.',
-			confirmLabel: 'Verwerfen',
-			cancelLabel: 'Weiter bearbeiten',
+			title: t('Ungespeicherte Änderungen verwerfen?'),
+			message: t('Die Einstellungen dieses Plugins wurden geändert, aber noch nicht gespeichert.'),
+			confirmLabel: t('Verwerfen'),
+			cancelLabel: t('Weiter bearbeiten'),
 			danger: true
 		}).then((ok) => {
 			if (!ok || !to) return;
@@ -144,10 +152,14 @@
 				body: { enabled: v }
 			});
 			data.set(next);
-			toast.success(`${next.info.name} ${v ? 'aktiviert' : 'deaktiviert'}`);
+			toast.success(
+				v
+					? t('{name} aktiviert', { name: next.info.name })
+					: t('{name} deaktiviert', { name: next.info.name })
+			);
 		} catch (e) {
 			if (p.config) p.config.enabled = prev;
-			toast.error(errorMessage(e), { title: `${p.info.name}: Umschalten fehlgeschlagen` });
+			toast.error(errorMessage(e), { title: t('{name}: Umschalten fehlgeschlagen', { name: p.info.name }) });
 		} finally {
 			enabledBusy = false;
 		}
@@ -160,13 +172,13 @@
 		try {
 			const res = await api.post('/api/v1/plugins/{id}/run', { path: { id: p.info.id }, body: {} });
 			const href = `/plugins/${encodeURIComponent(p.info.id)}/runs/${res.id}`;
-			toast.success(`Lauf #${res.id} wurde eingeplant.`, {
+			toast.success(t('Lauf #{id} wurde eingeplant.', { id: res.id }), {
 				title: p.info.name,
-				action: { label: 'Protokoll', onClick: () => goto(href) }
+				action: { label: t('Laufprotokoll'), onClick: () => goto(href) }
 			});
 			refresh();
 		} catch (e) {
-			toast.error(errorMessage(e), { title: `${p.info.name}: Start fehlgeschlagen` });
+			toast.error(errorMessage(e), { title: t('{name}: Start fehlgeschlagen', { name: p.info.name }) });
 		} finally {
 			starting = false;
 		}
@@ -198,10 +210,12 @@
 	{#snippet actions()}
 		{#if p?.config}
 			{#if canManage}
-				<Toggle checked={p.config.enabled} onchange={setEnabled} disabled={enabledBusy} label="Aktiv" />
+				<Toggle checked={p.config.enabled} onchange={setEnabled} disabled={enabledBusy} label={t('Aktiv')} />
 			{/if}
 			{#if canRun(p) && auth.can('devices.scan')}
-				<Button variant="primary" icon="play" loading={starting} onclick={runNow}>Jetzt ausführen</Button>
+				<Button variant="primary" icon="play" loading={starting} onclick={runNow}
+					>{t('Jetzt ausführen')}</Button
+				>
 			{/if}
 		{/if}
 	{/snippet}
@@ -210,11 +224,11 @@
 {#if notFound}
 	<EmptyState
 		icon="plugins"
-		title="Plugin nicht gefunden"
-		description="Ein Plugin mit der ID „{id}“ gibt es nicht."
+		title={t('Plugin nicht gefunden')}
+		description={t('Ein Plugin mit der ID „{id}“ gibt es nicht.', { id })}
 	>
 		{#snippet actions()}
-			<Button href="/plugins">Zur Pluginliste</Button>
+			<Button href="/plugins">{t('Zur Pluginliste')}</Button>
 		{/snippet}
 	</EmptyState>
 {:else if data.error && !p}
@@ -225,11 +239,11 @@
 {:else}
 	<div class="flex flex-col gap-4">
 		{#if p.missingBinaries?.length}
-			<Alert tone="warn" title="Programme fehlen">
-				Für dieses Plugin fehlen auf dem Server:
-				{#each p.missingBinaries as b, i (b)}<span class="mono">{b}</span>{i < p.missingBinaries.length - 1
+			<Alert tone="warn" title={t('Programme fehlen')}>
+				{missingText[0]}{#each p.missingBinaries as b, i (b)}<span class="mono">{b}</span>{i <
+					p.missingBinaries.length - 1
 						? ', '
-						: ''}{/each}. Läufe schlagen fehl, bis die Programme installiert sind.
+						: ''}{/each}{missingText[1]}
 			</Alert>
 		{/if}
 
@@ -240,22 +254,22 @@
 				class="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border shadow-sm sm:grid-cols-2"
 			>
 				<div class="flex flex-col gap-1 bg-surface px-4 py-3">
-					<span class="text-xs text-fg-subtle">Zustellung</span>
+					<span class="text-xs text-fg-subtle">{t('Zustellung')}</span>
 					{#if p.config?.enabled}
-						<span class="text-sm">Aktiv – stellt Benachrichtigungen aus Regeln zu</span>
+						<span class="text-sm">{t('Aktiv – stellt Benachrichtigungen aus Regeln zu')}</span>
 					{:else}
 						<span class="text-sm text-warn"
-							>Inaktiv – Benachrichtigungen an diesen Publisher werden übersprungen</span
+							>{t('Inaktiv – Benachrichtigungen an diesen Publisher werden übersprungen')}</span
 						>
 					{/if}
 				</div>
 				<div class="flex flex-col gap-1 bg-surface px-4 py-3">
-					<span class="text-xs text-fg-subtle">Benachrichtigungen</span>
+					<span class="text-xs text-fg-subtle">{t('Benachrichtigungen')}</span>
 					<span class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
 						<a class="link" href="/rules?tab=notifications&publisher={encodeURIComponent(p.info.id)}"
-							>Verlauf</a
+							>{t('Verlauf')}</a
 						>
-						<a class="link" href="/rules">Regeln</a>
+						<a class="link" href="/rules">{t('Regeln')}</a>
 					</span>
 				</div>
 			</section>
@@ -265,7 +279,7 @@
 				class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border shadow-sm xl:grid-cols-4"
 			>
 				<div class="flex flex-col gap-1 bg-surface px-4 py-3">
-					<span class="text-xs text-fg-subtle">{activeRun ? 'Aktueller Lauf' : 'Letzter Lauf'}</span>
+					<span class="text-xs text-fg-subtle">{activeRun ? t('Aktueller Lauf') : t('Letzter Lauf')}</span>
 					{#if activeRun}
 						<span class="flex items-center gap-2 text-sm">
 							<RunStatusBadge status={activeRun.status} />
@@ -291,60 +305,64 @@
 						{/if}
 					{:else}
 						<span class="text-sm text-fg-muted"
-							>{isPublisher(p) ? 'Publisher haben keine Läufe' : 'Noch nicht gelaufen'}</span
+							>{isPublisher(p) ? t('Publisher haben keine Läufe') : t('Noch nicht gelaufen')}</span
 						>
 					{/if}
 				</div>
 				<div class="flex flex-col gap-1 bg-surface px-4 py-3">
-					<span class="text-xs text-fg-subtle">Zeitplan</span>
+					<span class="text-xs text-fg-subtle">{t('Zeitplan')}</span>
 					{#if !canRun(p)}
 						<span class="text-sm text-fg-muted"
-							>{isPublisher(p) ? 'Wird von Regeln ausgelöst' : 'Nur über Aktionen/Hooks'}</span
+							>{isPublisher(p) ? t('Wird von Regeln ausgelöst') : t('Nur über Aktionen/Hooks')}</span
 						>
 					{:else if p.config?.schedule}
 						<span class="text-sm">{p.config.scheduleText || p.config.schedule}</span>
 						<span class="mono text-xs text-fg-subtle">{p.config.schedule}</span>
 					{:else}
-						<span class="text-sm text-fg-muted">Nur manuell</span>
+						<span class="text-sm text-fg-muted">{t('Nur manuell')}</span>
 					{/if}
 				</div>
 				<div class="flex flex-col gap-1 bg-surface px-4 py-3">
-					<span class="text-xs text-fg-subtle">Nächster Lauf</span>
+					<span class="text-xs text-fg-subtle">{t('Nächster Lauf')}</span>
 					{#if !canRun(p)}
 						<span class="text-sm text-fg-muted">–</span>
 					{:else if !p.config?.enabled}
-						<span class="text-sm text-fg-muted">Plugin inaktiv</span>
+						<span class="text-sm text-fg-muted">{t('Plugin inaktiv')}</span>
 					{:else if p.nextRun}
 						<span class="text-sm"><RelativeTime value={p.nextRun} /></span>
 						<span class="text-xs text-fg-subtle"><RelativeTime value={p.nextRun} absolute /></span>
 					{:else}
-						<span class="text-sm text-fg-muted">nicht geplant</span>
+						<span class="text-sm text-fg-muted">{t('nicht geplant')}</span>
 					{/if}
 				</div>
 				<div class="flex flex-col gap-1 bg-surface px-4 py-3">
 					{#if p.info.targets}
-						<span class="text-xs text-fg-subtle">Bereich</span>
+						<span class="text-xs text-fg-subtle">{t('Bereich')}</span>
 						<span class="text-sm">{scopeSummary(p.config?.scope, groupName)}</span>
 					{:else}
-						<span class="text-xs text-fg-subtle">Warteschlange</span>
+						<span class="text-xs text-fg-subtle">{t('Warteschlange')}</span>
 						<span class="text-sm">
 							{#if p.backlog > 0}
-								<Badge tone="warn">{formatNumber(p.backlog)} ausstehende Änderungen</Badge>
+								<Badge tone="warn"
+									>{tn(p.backlog, '{n} ausstehende Änderung', '{n} ausstehende Änderungen')}</Badge
+								>
 							{:else}
 								<span class="text-fg-muted">
-									{(p.capabilities ?? []).includes('changes') ? 'keine ausstehenden Änderungen' : '–'}
+									{(p.capabilities ?? []).includes('changes') ? t('keine ausstehenden Änderungen') : '–'}
 								</span>
 							{/if}
 						</span>
 					{/if}
 					{#if p.info.targets && p.backlog > 0}
-						<Badge tone="warn">{formatNumber(p.backlog)} ausstehende Änderungen</Badge>
+						<Badge tone="warn"
+							>{tn(p.backlog, '{n} ausstehende Änderung', '{n} ausstehende Änderungen')}</Badge
+						>
 					{/if}
 				</div>
 			</section>
 		{/if}
 
-		<Tabs items={tabs} bind:active={activeTab} onchange={selectTab} label="Plugin-Bereiche" />
+		<Tabs items={tabs} bind:active={activeTab} onchange={selectTab} label={t('Plugin-Bereiche')} />
 
 		{#if tab === 'settings'}
 			<div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings">

@@ -24,6 +24,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDate, formatDateTime, formatNumber } from '$lib/utils/format';
 	import { severityFromCvss, severityRank } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 	import { LazyData, matchTypeLabel, matchTypeTone, sourceName } from './util';
 
 	type CVEList = Response<'/api/v1/devices/{id}/cves'>;
@@ -63,15 +64,15 @@
 	const sevOf = (c: Item) => c.severity || severityFromCvss(c.cvss);
 
 	const filtered = $derived.by(() => {
-		const t = text.trim().toLowerCase();
+		const q = text.trim().toLowerCase();
 		const min = minSev ? severityRank[minSev] : -1;
 		const list = all.filter(
 			(c) =>
 				(severityRank[sevOf(c)] ?? 0) >= min &&
-				(!t ||
-					c.cve.toLowerCase().includes(t) ||
-					c.product.toLowerCase().includes(t) ||
-					(c.description ?? '').toLowerCase().includes(t))
+				(!q ||
+					c.cve.toLowerCase().includes(q) ||
+					c.product.toLowerCase().includes(q) ||
+					(c.description ?? '').toLowerCase().includes(q))
 		);
 		const desc = sort.startsWith('-');
 		const f = desc ? sort.slice(1) : sort;
@@ -141,7 +142,11 @@
 			await api.post('/api/v1/vulnerabilities/ignore', {
 				body: { deviceId, cve: c.cve, ignored, note: n.trim() || undefined }
 			});
-			toast.success(ignored ? `${c.cve} als irrelevant markiert` : `${c.cve} wieder als relevant markiert`);
+			toast.success(
+				ignored
+					? t('{cve} als irrelevant markiert', { cve: c.cve })
+					: t('{cve} wieder als relevant markiert', { cve: c.cve })
+			);
 			ignoreOpen = false;
 			data.invalidate();
 			await data.reload();
@@ -159,37 +164,37 @@
 		{ key: 'expand', label: '', width: '2.25rem', cell: expandCell },
 		{ key: 'cve', label: 'CVE', sortable: true, cell: cveCell },
 		{ key: 'cvss', label: 'CVSS', sortable: true, sortDesc: true, cell: cvssCell },
-		{ key: 'product', label: 'Produkt', sortable: true, cell: productCell },
-		{ key: 'matchType', label: 'Abgleich', hideBelow: 'md', cell: matchCell },
-		{ key: 'source', label: 'Quelle', hideBelow: 'lg', value: (c) => sourceName(c.source) },
+		{ key: 'product', label: t('Produkt'), sortable: true, cell: productCell },
+		{ key: 'matchType', label: t('Abgleich'), hideBelow: 'md', cell: matchCell },
+		{ key: 'source', label: t('Quelle'), hideBelow: 'lg', value: (c) => sourceName(c.source) },
 		{
 			key: 'firstSeen',
-			label: 'Erstsichtung',
+			label: t('Erstsichtung'),
 			sortable: true,
 			sortDesc: true,
 			hideBelow: 'lg',
 			cell: seenCell
 		},
-		{ key: 'actions', label: 'Aktion', align: 'right', cell: actionCell }
+		{ key: 'actions', label: t('Aktion'), align: 'right', cell: actionCell }
 	];
 	const columns = $derived(canManage ? allColumns : allColumns.filter((c) => c.key !== 'actions'));
 
 	const sevOptions = [
-		{ value: '', label: 'Alle Schweregrade' },
-		{ value: 'low', label: 'ab Niedrig' },
-		{ value: 'medium', label: 'ab Mittel' },
-		{ value: 'high', label: 'ab Hoch' },
-		{ value: 'critical', label: 'nur Kritisch' }
+		{ value: '', label: t('Alle Schweregrade') },
+		{ value: 'low', label: t('ab Niedrig') },
+		{ value: 'medium', label: t('ab Mittel') },
+		{ value: 'high', label: t('ab Hoch') },
+		{ value: 'critical', label: t('nur Kritisch') }
 	];
 	const sortOptions = [
-		{ value: '-priority', label: 'Dringlichkeit' },
-		{ value: '-epss', label: 'EPSS absteigend' },
-		{ value: '-cvss', label: 'CVSS absteigend' },
-		{ value: 'cvss', label: 'CVSS aufsteigend' },
-		{ value: '-published', label: 'Neueste CVEs zuerst' },
-		{ value: '-firstSeen', label: 'Zuletzt erkannt zuerst' },
-		{ value: 'product', label: 'Produkt' },
-		{ value: 'cve', label: 'CVE-ID' }
+		{ value: '-priority', label: t('Dringlichkeit') },
+		{ value: '-epss', label: t('EPSS absteigend') },
+		{ value: '-cvss', label: t('CVSS absteigend') },
+		{ value: 'cvss', label: t('CVSS aufsteigend') },
+		{ value: '-published', label: t('Neueste CVEs zuerst') },
+		{ value: '-firstSeen', label: t('Zuletzt erkannt zuerst') },
+		{ value: 'product', label: t('Produkt') },
+		{ value: 'cve', label: t('CVE-ID') }
 	];
 </script>
 
@@ -198,7 +203,7 @@
 		size="xs"
 		variant="ghost"
 		icon={open[c.id] ? 'chevron-down' : 'chevron-right'}
-		label={open[c.id] ? 'Details ausblenden' : 'Details anzeigen'}
+		label={open[c.id] ? t('Details ausblenden') : t('Details anzeigen')}
 		aria-expanded={!!open[c.id]}
 		onclick={() => (open[c.id] = !open[c.id])}
 	/>
@@ -211,7 +216,7 @@
 		<ExploitBadges x={c} />
 	</span>
 	{#if c.published}<span class="hidden text-xs text-fg-subtle sm:block"
-			>veröffentlicht {formatDate(c.published)}</span
+			>{t('veröffentlicht {date}', { date: formatDate(c.published) })}</span
 		>{/if}
 {/snippet}
 {#snippet cvssCell(c: Item)}
@@ -232,16 +237,17 @@
 		<Button
 			size="xs"
 			icon="eye"
-			label="Wieder als relevant markieren"
+			label={t('Wieder als relevant markieren')}
 			disabled={busy}
-			onclick={() => setIgnored(c, false)}><span class="hidden sm:inline">Wieder relevant</span></Button
+			onclick={() => setIgnored(c, false)}
+			><span class="hidden sm:inline">{t('Wieder relevant')}</span></Button
 		>
 	{:else}
 		<Button
 			size="xs"
 			variant="ghost"
 			icon="eye-off"
-			label="Als irrelevant markieren"
+			label={t('Als irrelevant markieren')}
 			disabled={busy}
 			onclick={() => askIgnore(c)}><span class="hidden sm:inline">Irrelevant</span></Button
 		>
@@ -250,7 +256,7 @@
 
 <div class="flex flex-col gap-3">
 	{#if data.data?.disclaimer}
-		<Alert tone="warn" title="Heuristischer Abgleich – Treffer prüfen">
+		<Alert tone="warn" title={t('Heuristischer Abgleich – Treffer prüfen')}>
 			<p class="text-sm">{data.data.disclaimer}</p>
 		</Alert>
 	{/if}
@@ -261,21 +267,21 @@
 			icon="search"
 			type="search"
 			bind:value={text}
-			placeholder="CVE, Produkt oder Beschreibung"
-			aria-label="CVEs durchsuchen"
+			placeholder={t('CVE, Produkt oder Beschreibung')}
+			aria-label={t('CVEs durchsuchen')}
 			class="lg:w-72"
 		/>
 		<Select
 			size="sm"
 			bind:value={minSev}
 			options={sevOptions}
-			aria-label="Mindest-Schweregrad"
+			aria-label={t('Mindest-Schweregrad')}
 			class="lg:w-44"
 		/>
-		<Select size="sm" bind:value={sort} options={sortOptions} aria-label="Sortierung" class="lg:w-52" />
+		<Select size="sm" bind:value={sort} options={sortOptions} aria-label={t('Sortierung')} class="lg:w-52" />
 		<Checkbox
 			bind:checked={showIgnored}
-			label="Als irrelevant markierte anzeigen"
+			label={t('Als irrelevant markierte anzeigen')}
 			class="lg:mb-1.5 lg:ml-2"
 		/>
 	</div>
@@ -289,8 +295,11 @@
 					>
 				{/if}
 			{/each}
-			{#if ignoredCount}<span>· {formatNumber(ignoredCount)} als irrelevant markiert</span>{/if}
-			{#if filtered.length !== all.length}<span>· {formatNumber(filtered.length)} angezeigt</span>{/if}
+			{#if ignoredCount}<span>· {t('{n} als irrelevant markiert', { n: formatNumber(ignoredCount) })}</span
+				>{/if}
+			{#if filtered.length !== all.length}<span
+					>· {t('{n} angezeigt', { n: formatNumber(filtered.length) })}</span
+				>{/if}
 		</p>
 	{/if}
 
@@ -307,46 +316,57 @@
 			onsort={(s) => (sort = s)}
 			loading={data.loading}
 			dense
-			caption="CVEs des Geräts"
+			caption={t('CVEs des Geräts')}
 			rowClass={(c) => (c.ignored ? 'opacity-60' : '')}
 		>
 			{#snippet expanded(c)}
 				{#if open[c.id]}
+					<!-- the CPE is set in monospace: split the sentence at its placeholder -->
+					{@const via = t('{match} über {cpe} ({source})', {
+						match: matchTypeLabel[c.matchType] ?? c.matchType,
+						source: sourceName(c.source)
+					}).split('{cpe}')}
 					<tr class="bg-surface-2">
 						<td colspan={columns.length} class="border-b border-border px-4 py-3">
 							<div class="flex max-w-4xl flex-col gap-2 text-sm">
-								<p class="break-words whitespace-pre-line">{c.description || 'Keine Beschreibung.'}</p>
+								<p class="break-words whitespace-pre-line">{c.description || t('Keine Beschreibung.')}</p>
 								<dl class="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 text-xs">
 									{#if c.vector}
-										<dt class="text-fg-subtle">Vektor</dt>
+										<dt class="text-fg-subtle">{t('Vektor')}</dt>
 										<dd class="mono break-all">
 											{c.vector}{c.cvssVersion ? ` (CVSS ${c.cvssVersion})` : ''}
 										</dd>
 									{/if}
 									{#if c.cwes?.length}
-										<dt class="text-fg-subtle">Schwäche (CWE)</dt>
+										<dt class="text-fg-subtle">{t('Schwäche (CWE)')}</dt>
 										<dd class="mono">{c.cwes.join(', ')}</dd>
 									{/if}
-									<dt class="text-fg-subtle">Abgleich</dt>
+									<dt class="text-fg-subtle">{t('Abgleich')}</dt>
 									<dd>
-										{matchTypeLabel[c.matchType] ?? c.matchType} über
-										<span class="mono break-all">{c.cpe || '–'}</span> ({sourceName(c.source)})
+										{via[0]}<span class="mono break-all">{c.cpe || '–'}</span>{via[1] ?? ''}
 									</dd>
-									<dt class="text-fg-subtle">Erkannt</dt>
-									<dd>seit {formatDateTime(c.firstSeen)} · zuletzt {formatDateTime(c.lastSeen)}</dd>
+									<dt class="text-fg-subtle">{t('Erkannt')}</dt>
+									<dd>
+										{t('seit {first} · zuletzt {last}', {
+											first: formatDateTime(c.firstSeen),
+											last: formatDateTime(c.lastSeen)
+										})}
+									</dd>
 									{#if c.ignored}
 										<dt class="text-fg-subtle">Irrelevant</dt>
 										<dd>
-											{c.ignoredBy ? `von ${c.ignoredBy}` : ''}
-											{c.ignoredAt ? `am ${formatDateTime(c.ignoredAt)}` : ''}
-											{#if c.ignoreNote}<span class="block text-fg">„{c.ignoreNote}“</span>{/if}
+											{c.ignoredBy ? t('von {user}', { user: c.ignoredBy }) : ''}
+											{c.ignoredAt ? t('am {date}', { date: formatDateTime(c.ignoredAt) }) : ''}
+											{#if c.ignoreNote}<span class="block text-fg"
+													>{t('„{note}“', { note: c.ignoreNote })}</span
+												>{/if}
 										</dd>
 									{/if}
 								</dl>
 								{#if c.refs?.length}
 									<details>
 										<summary class="cursor-pointer text-xs text-fg-subtle hover:text-fg">
-											Referenzen ({c.refs.length})
+											{t('Referenzen ({n})', { n: c.refs.length })}
 										</summary>
 										<ul class="mt-1 flex flex-col gap-0.5 text-xs">
 											{#each c.refs as r (r.url)}
@@ -358,7 +378,9 @@
 										</ul>
 									</details>
 								{/if}
-								<a href="/vulnerabilities/{c.cve}" class="link text-xs">Alle betroffenen Geräte anzeigen →</a>
+								<a href="/vulnerabilities/{c.cve}" class="link text-xs"
+									>{t('Alle betroffenen Geräte anzeigen →')}</a
+								>
 							</div>
 						</td>
 					</tr>
@@ -369,15 +391,17 @@
 					<EmptyState
 						compact
 						icon="filter"
-						title="Keine Treffer"
-						description="Keine CVE passt zu den Filtern."
+						title={t('Keine Treffer')}
+						description={t('Keine CVE passt zu den Filtern.')}
 					/>
 				{:else}
 					<EmptyState
 						compact
 						icon="shield"
-						title="Keine CVEs gefunden"
-						description="Für die erkannten Produkte und Versionen dieses Geräts liegen keine passenden Einträge in der lokalen NVD-Kopie vor."
+						title={t('Keine CVEs gefunden')}
+						description={t(
+							'Für die erkannten Produkte und Versionen dieses Geräts liegen keine passenden Einträge in der lokalen NVD-Kopie vor.'
+						)}
 					/>
 				{/if}
 			{/snippet}
@@ -390,7 +414,7 @@
 
 <Modal
 	bind:open={ignoreOpen}
-	title="Als irrelevant markieren"
+	title={t('Als irrelevant markieren')}
 	description={ignoreItem ? `${ignoreItem.cve} · ${ignoreItem.product} ${ignoreItem.version}` : ''}
 	size="sm"
 	as="form"
@@ -399,20 +423,23 @@
 >
 	<div class="flex flex-col gap-3">
 		<p class="text-sm text-fg-muted">
-			Die CVE zählt für dieses Gerät nicht mehr in Übersichten und löst keine Events mehr aus. Die Markierung
-			lässt sich jederzeit zurücknehmen.
+			{t(
+				'Die CVE zählt für dieses Gerät nicht mehr in Übersichten und löst keine Events mehr aus. Die Markierung lässt sich jederzeit zurücknehmen.'
+			)}
 		</p>
 		{#if ignoreError}<Alert tone="danger">{ignoreError}</Alert>{/if}
 		<Textarea
-			label="Begründung (optional)"
+			label={t('Begründung (optional)')}
 			bind:value={note}
 			rows={3}
 			maxlength={500}
-			placeholder="z. B. Backport im Distributionspaket, Modul nicht aktiv"
+			placeholder={t('z. B. Backport im Distributionspaket, Modul nicht aktiv')}
 		/>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (ignoreOpen = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="eye-off" loading={busy}>Als irrelevant markieren</Button>
+		<Button onclick={() => (ignoreOpen = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="eye-off" loading={busy}
+			>{t('Als irrelevant markieren')}</Button
+		>
 	{/snippet}
 </Modal>

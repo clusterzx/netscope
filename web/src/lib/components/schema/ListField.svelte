@@ -1,6 +1,7 @@
 <!-- string-list / subnet-list: one entry per line; value is string[]. -->
 <script lang="ts">
 	import Textarea from '$lib/components/ui/Textarea.svelte';
+	import { t } from '$lib/i18n';
 	import { untrack } from 'svelte';
 
 	interface Props {
@@ -50,7 +51,7 @@
 
 <Textarea
 	{label}
-	hint={hint ?? 'Ein Eintrag pro Zeile'}
+	hint={hint ?? t('Ein Eintrag pro Zeile')}
 	{error}
 	{required}
 	{id}

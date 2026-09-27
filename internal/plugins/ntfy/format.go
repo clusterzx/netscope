@@ -1,13 +1,13 @@
 package ntfy
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 )
 
@@ -49,9 +49,17 @@ func title(n *plugin.Notification) string {
 		t = "NetScope"
 	}
 	if n.Kind == plugin.NotifyEscalation {
-		t = "Eskalation – nicht quittiert: " + t
+		t = i18n.Sprintf(n.Lang, "Eskalation – nicht quittiert: %s", t)
 	}
 	return t
+}
+
+// shortTime formats an event time (the year is left out) in the language.
+func shortTime(t time.Time, lang i18n.Locale) string {
+	if lang == i18n.EN {
+		return t.Format("2 Jan 15:04")
+	}
+	return t.Format("02.01. 15:04")
 }
 
 // priority maps NetScope priorities to ntfy priorities (1 = min … 5 = max).
@@ -127,7 +135,7 @@ func render(n *plugin.Notification, md bool, loc *time.Location) string {
 		if shown == maxEvents {
 			break
 		}
-		blk := eventBlock(e, md, loc)
+		blk := eventBlock(e, md, loc, n.Lang)
 		if used+len(blk)+2 > maxMessageBytes-footerReserve {
 			break
 		}
@@ -136,9 +144,9 @@ func render(n *plugin.Notification, md bool, loc *time.Location) string {
 		shown++
 	}
 	if more := len(n.Events) - shown; more > 0 {
-		parts = append(parts, moreLine(more, n.Link, md))
+		parts = append(parts, moreLine(more, n.Link, md, n.Lang))
 	} else if len(n.Events) > 1 {
-		if l := linkLine("In NetScope öffnen", n.Link, md); l != "" {
+		if l := linkLine(i18n.T(n.Lang, "In NetScope öffnen"), n.Link, md); l != "" {
 			parts = append(parts, l)
 		}
 	}
@@ -152,7 +160,7 @@ func render(n *plugin.Notification, md bool, loc *time.Location) string {
 	return msg
 }
 
-func eventBlock(e plugin.EventView, md bool, loc *time.Location) string {
+func eventBlock(e plugin.EventView, md bool, loc *time.Location, lang i18n.Locale) string {
 	t := clip(oneLine(e.Title), maxEventRunes)
 	if t == "" {
 		t = clip(oneLine(e.Label), maxEventRunes)
@@ -168,23 +176,24 @@ func eventBlock(e plugin.EventView, md bool, loc *time.Location) string {
 		info = append(info, ip)
 	}
 	if site := clip(oneLine(e.Site), maxNameRunes); site != "" {
-		info = append(info, "Standort "+site)
+		info = append(info, i18n.Sprintf(lang, "Standort %s", site))
 	}
 	if !e.At.IsZero() {
-		info = append(info, e.At.In(loc).Format("02.01. 15:04"))
+		info = append(info, shortTime(e.At.In(loc), lang))
 	}
 	msg := clip(e.Message, maxMessageRunes)
 	var marks []string
 	if e.Escalated {
-		marks = append(marks, "⏰ eskaliert")
+		marks = append(marks, "⏰ "+i18n.T(lang, "eskaliert"))
 	}
 	if e.Acknowledged {
-		marks = append(marks, "✅ quittiert")
+		marks = append(marks, "✅ "+i18n.T(lang, "quittiert"))
 	}
+	sev := e.Severity.LabelIn(lang)
 
 	var lines []string
 	if md {
-		lines = append(lines, "**"+escapeMD(t)+"** ("+escapeMD(e.Severity.Label())+")")
+		lines = append(lines, "**"+escapeMD(t)+"** ("+escapeMD(sev)+")")
 		if len(info) > 0 {
 			lines = append(lines, escapeMD(strings.Join(info, " · ")))
 		}
@@ -193,7 +202,7 @@ func eventBlock(e plugin.EventView, md bool, loc *time.Location) string {
 		}
 		var tail []string
 		if validURL(e.Link) {
-			tail = append(tail, "[Öffnen]("+mdURL(e.Link)+")")
+			tail = append(tail, "["+escapeMD(i18n.T(lang, "Öffnen"))+"]("+mdURL(e.Link)+")")
 		}
 		tail = append(tail, marks...)
 		if len(tail) > 0 {
@@ -202,7 +211,7 @@ func eventBlock(e plugin.EventView, md bool, loc *time.Location) string {
 		// Two trailing spaces force a line break in Markdown.
 		return strings.Join(lines, "  \n")
 	}
-	lines = append(lines, "["+e.Severity.Label()+"] "+clean(t))
+	lines = append(lines, "["+sev+"] "+clean(t))
 	if len(info) > 0 {
 		lines = append(lines, clean(strings.Join(info, " · ")))
 	}
@@ -218,10 +227,10 @@ func eventBlock(e plugin.EventView, md bool, loc *time.Location) string {
 	return strings.Join(lines, "\n")
 }
 
-func moreLine(more int, link string, md bool) string {
-	s := "… und 1 weiteres Ereignis"
+func moreLine(more int, link string, md bool, lang i18n.Locale) string {
+	s := i18n.T(lang, "… und 1 weiteres Ereignis")
 	if more > 1 {
-		s = fmt.Sprintf("… und %d weitere Ereignisse", more)
+		s = i18n.Sprintf(lang, "… und %d weitere Ereignisse", more)
 	}
 	if !md {
 		if validURL(link) {
@@ -231,7 +240,7 @@ func moreLine(more int, link string, md bool) string {
 	}
 	s = escapeMD(s)
 	if validURL(link) {
-		s += " – [Alle anzeigen](" + mdURL(link) + ")"
+		s += " – [" + escapeMD(i18n.T(lang, "Alle anzeigen")) + "](" + mdURL(link) + ")"
 	}
 	return s
 }

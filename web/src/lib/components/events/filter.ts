@@ -1,5 +1,6 @@
 // Event list filter: URL <-> state, API query and a client-side matcher for live events.
 import type { Event } from '$lib/api';
+import { t } from '$lib/i18n';
 import { severityRank } from '$lib/utils/labels';
 import { intParam, listParam } from '$lib/utils/url';
 
@@ -29,10 +30,10 @@ export interface EventFilter {
 }
 
 export const RANGES: { value: string; label: string; ms: number }[] = [
-	{ value: '1h', label: 'Letzte Stunde', ms: 3600e3 },
-	{ value: '24h', label: 'Letzte 24 h', ms: 86400e3 },
-	{ value: '7d', label: 'Letzte 7 Tage', ms: 7 * 86400e3 },
-	{ value: '30d', label: 'Letzte 30 Tage', ms: 30 * 86400e3 }
+	{ value: '1h', label: t('Letzte Stunde'), ms: 3600e3 },
+	{ value: '24h', label: t('Letzte 24 h'), ms: 86400e3 },
+	{ value: '7d', label: t('Letzte 7 Tage'), ms: 7 * 86400e3 },
+	{ value: '30d', label: t('Letzte 30 Tage'), ms: 30 * 86400e3 }
 ];
 
 /** Reads the filter from the URL (?type&category&severity&acked&device&run&q&range&from&to). */

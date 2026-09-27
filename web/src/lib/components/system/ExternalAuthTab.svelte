@@ -3,6 +3,7 @@
 	import { api } from '$lib/api';
 	import type { ApiExternalAuthResponse } from '$lib/api/generated';
 	import { Alert, Card, ErrorState, Skeleton } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import LdapForm from './auth/LdapForm.svelte';
 	import OidcForm from './auth/OidcForm.svelte';
@@ -21,11 +22,10 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<Alert tone="info" title="Wie Konten entstehen">
-		Wer sich zum ersten Mal über LDAP oder OIDC anmeldet, bekommt automatisch ein Konto – mit der Rolle aus
-		seinen Gruppen. Solche Konten haben kein NetScope-Passwort und lassen sich unter „Benutzer“ deaktivieren.
-		Mindestens ein lokaler Administrator bleibt immer bestehen: Er ist der Notzugang, wenn der
-		Verzeichnisdienst ausfällt.
+	<Alert tone="info" title={t('Wie Konten entstehen')}>
+		{t(
+			'Wer sich zum ersten Mal über LDAP oder OIDC anmeldet, bekommt automatisch ein Konto – mit der Rolle aus seinen Gruppen. Solche Konten haben kein NetScope-Passwort und lassen sich unter „Benutzer“ deaktivieren. Mindestens ein lokaler Administrator bleibt immer bestehen: Er ist der Notzugang, wenn der Verzeichnisdienst ausfällt.'
+		)}
 	</Alert>
 	{#if data.error && !data.data}
 		<ErrorState error={data.error} onretry={() => data.reload()} />

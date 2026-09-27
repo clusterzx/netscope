@@ -5,6 +5,7 @@
 <script lang="ts">
 	import type { GraphEdge, GraphNode } from '$lib/api';
 	import { Badge, Button, Icon, StatusDot } from '$lib/components/ui';
+	import { intlLocale, t } from '$lib/i18n';
 	import { deviceTypeName, label, relationKindLabel, stateLabel, stateTone } from '$lib/utils/labels';
 	import { edgeLabel, edgeStyle, typeIcon } from './graph';
 
@@ -55,7 +56,7 @@
 				(a, b) =>
 					Number(b.edge.origin === 'manual') - Number(a.edge.origin === 'manual') ||
 					a.edge.kind.localeCompare(b.edge.kind) ||
-					name(a.other).localeCompare(name(b.other), 'de')
+					name(a.other).localeCompare(name(b.other), intlLocale)
 			);
 	});
 
@@ -95,7 +96,7 @@
 
 <section
 	class="flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-lg {klass}"
-	aria-label={node ? `Details zu ${node.label}` : 'Details zur Verbindung'}
+	aria-label={node ? t('Details zu {name}', { name: node.label }) : t('Details zur Verbindung')}
 >
 	{#if node}
 		<header class="flex items-start gap-2.5 border-b border-border px-4 py-3">
@@ -113,8 +114,8 @@
 						status={node.online ? 'online' : 'offline'}
 						label={node.kind === 'container'
 							? node.online
-								? 'läuft'
-								: 'gestoppt'
+								? t('läuft')
+								: t('gestoppt')
 							: node.online
 								? 'Online'
 								: 'Offline'}
@@ -122,10 +123,10 @@
 					{#if node.state && node.kind !== 'container'}
 						<Badge tone={stateTone(node.state)}>{label(stateLabel, node.state)}</Badge>
 					{/if}
-					{#if pinned}<Badge tone="neutral">Fixiert</Badge>{/if}
+					{#if pinned}<Badge tone="neutral">{t('Fixiert')}</Badge>{/if}
 				</div>
 			</div>
-			<Button variant="ghost" size="sm" icon="x" label="Auswahl schließen" onclick={onclose} />
+			<Button variant="ghost" size="sm" icon="x" label={t('Auswahl schließen')} onclick={onclose} />
 		</header>
 
 		<div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -144,11 +145,11 @@
 				{:else}
 					<dt class="text-fg-subtle">IP</dt>
 					<dd class="mono text-fg">{node.ip || '–'}</dd>
-					<dt class="text-fg-subtle">Typ</dt>
+					<dt class="text-fg-subtle">{t('Typ')}</dt>
 					<dd class="text-fg">{deviceTypeName(node.type)}</dd>
-					<dt class="text-fg-subtle">Hersteller</dt>
+					<dt class="text-fg-subtle">{t('Hersteller')}</dt>
 					<dd class="min-w-0 break-words text-fg">{node.vendor || '–'}</dd>
-					<dt class="text-fg-subtle">Subnetz</dt>
+					<dt class="text-fg-subtle">{t('Subnetz')}</dt>
 					<dd class="mono text-fg">{node.subnet || '–'}</dd>
 					{#if node.tags?.length}
 						<dt class="text-fg-subtle">Tags</dt>
@@ -162,27 +163,27 @@
 			<div class="mt-3 flex flex-wrap gap-2">
 				{#if node.deviceId}
 					<Button variant="primary" size="sm" icon="external" href="/devices/{node.deviceId}"
-						>Gerät öffnen</Button
+						>{t('Gerät öffnen')}</Button
 					>
 				{:else if host?.deviceId}
 					<Button variant="primary" size="sm" icon="external" href="/devices/{host.deviceId}"
-						>Host öffnen</Button
+						>{t('Host öffnen')}</Button
 					>
 				{/if}
-				<Button size="sm" icon="crosshair" onclick={() => oncenter(node.id)}>Zentrieren</Button>
+				<Button size="sm" icon="crosshair" onclick={() => oncenter(node.id)}>{t('Zentrieren')}</Button>
 				{#if pinned}
-					<Button size="sm" icon="pin" onclick={() => onunpin(node.id)}>Fixierung lösen</Button>
+					<Button size="sm" icon="pin" onclick={() => onunpin(node.id)}>{t('Fixierung lösen')}</Button>
 				{/if}
 				{#if canWrite && node.deviceId}
-					<Button size="sm" icon="link" onclick={() => onconnect(node.id)}>Verbindung anlegen</Button>
+					<Button size="sm" icon="link" onclick={() => onconnect(node.id)}>{t('Verbindung anlegen')}</Button>
 				{/if}
 			</div>
 
 			<h3 class="mt-4 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-				Verbindungen ({nodeEdges.length})
+				{t('Verbindungen ({n})', { n: nodeEdges.length })}
 			</h3>
 			{#if nodeEdges.length === 0}
-				<p class="text-sm text-fg-muted">Keine Verbindungen im aktuellen Ausschnitt.</p>
+				<p class="text-sm text-fg-muted">{t('Keine Verbindungen im aktuellen Ausschnitt.')}</p>
 			{:else}
 				<ul class="-mx-2 flex flex-col">
 					{#each nodeEdges as { edge: e, other, up } (e.id)}
@@ -194,7 +195,7 @@
 										name={up ? 'arrow-up' : 'arrow-down'}
 										size={12}
 										class="text-fg-subtle"
-										label={up ? 'übergeordnet' : 'untergeordnet'}
+										label={up ? t('übergeordnet') : t('untergeordnet')}
 									/>
 									<button
 										type="button"
@@ -214,7 +215,7 @@
 									</button>{#if portText(e, up)}{' · '}<span class="mono">{portText(e, up)}</span
 										>{/if}{#if edgeLabel(e)}{' · '}{edgeLabel(
 											e
-										)}{/if}{#if e.origin === 'manual' && e.kind !== 'manual'}{' · manuell'}{/if}
+										)}{/if}{#if e.origin === 'manual' && e.kind !== 'manual'}{' · '}{t('manuell')}{/if}
 								</div>
 							</div>
 							{#if canWrite && deletable(e)}
@@ -222,7 +223,7 @@
 									variant="ghost"
 									size="xs"
 									icon="trash"
-									label="Verbindung zu {name(other)} löschen"
+									label={t('Verbindung zu {name} löschen', { name: name(other) })}
 									onclick={() => ondeleteedge(e)}
 								/>
 							{/if}
@@ -238,16 +239,16 @@
 				<h2 class="truncate text-sm font-semibold text-fg">{label(relationKindLabel, edge.kind)}</h2>
 				<div class="mt-0.5 flex flex-wrap gap-1.5 text-xs">
 					<Badge tone={edge.origin === 'manual' ? 'ok' : 'neutral'}>
-						{edge.origin === 'manual' ? 'Manuell angelegt' : 'Automatisch erkannt'}
+						{edge.origin === 'manual' ? t('Manuell angelegt') : t('Automatisch erkannt')}
 					</Badge>
-					{#if edge.protected}<Badge tone="accent">Geschützt</Badge>{/if}
+					{#if edge.protected}<Badge tone="accent">{t('Geschützt')}</Badge>{/if}
 				</div>
 			</div>
-			<Button variant="ghost" size="sm" icon="x" label="Auswahl schließen" onclick={onclose} />
+			<Button variant="ghost" size="sm" icon="x" label={t('Auswahl schließen')} onclick={onclose} />
 		</header>
 		<div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
 			<dl class="grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-1.5 text-sm">
-				<dt class="text-fg-subtle">Übergeordnet</dt>
+				<dt class="text-fg-subtle">{t('Übergeordnet')}</dt>
 				<dd class="min-w-0">
 					<button type="button" class="link truncate text-left" onclick={() => onselectnode(edge.source)}>
 						{name(edge.source)}
@@ -256,7 +257,7 @@
 						<span class="block text-xs text-fg-muted">Port <span class="mono">{edge.parentPort}</span></span>
 					{/if}
 				</dd>
-				<dt class="text-fg-subtle">Untergeordnet</dt>
+				<dt class="text-fg-subtle">{t('Untergeordnet')}</dt>
 				<dd class="min-w-0">
 					<button type="button" class="link truncate text-left" onclick={() => onselectnode(edge.target)}>
 						{name(edge.target)}
@@ -265,23 +266,25 @@
 						<span class="block text-xs text-fg-muted">Port <span class="mono">{edge.childPort}</span></span>
 					{/if}
 				</dd>
-				<dt class="text-fg-subtle">Beschriftung</dt>
+				<dt class="text-fg-subtle">{t('Beschriftung')}</dt>
 				<dd class="min-w-0 break-words text-fg">{edgeLabel(edge) || '–'}</dd>
-				<dt class="text-fg-subtle">Quelle</dt>
-				<dd class="text-fg">{edge.origin === 'manual' ? 'Manuell angelegt' : edge.origin}</dd>
+				<dt class="text-fg-subtle">{t('Quelle')}</dt>
+				<dd class="text-fg">{edge.origin === 'manual' ? t('Manuell angelegt') : edge.origin}</dd>
 			</dl>
 			{#if deletable(edge)}
 				{#if canWrite}
 					<div class="mt-4">
 						<Button variant="danger" size="sm" icon="trash" onclick={() => ondeleteedge(edge)}>
-							Verbindung löschen
+							{t('Verbindung löschen')}
 						</Button>
 					</div>
 				{/if}
 			{:else}
 				<p class="mt-4 text-xs text-fg-muted">
-					Automatisch erkannte Verbindung – sie wird bei jedem Lauf von „{edge.origin}“ neu bestimmt und kann
-					hier nicht gelöscht werden.
+					{t(
+						'Automatisch erkannte Verbindung – sie wird bei jedem Lauf von „{plugin}“ neu bestimmt und kann hier nicht gelöscht werden.',
+						{ plugin: edge.origin }
+					)}
 				</p>
 			{/if}
 		</div>

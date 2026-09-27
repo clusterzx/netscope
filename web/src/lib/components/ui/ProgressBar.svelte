@@ -3,6 +3,8 @@
 	<ProgressBar done={3} total={10} label="Fortschritt" />
 -->
 <script lang="ts">
+	import { t } from '$lib/i18n';
+
 	interface Props {
 		done?: number;
 		total?: number;
@@ -11,7 +13,7 @@
 		class?: string;
 	}
 
-	let { done = 0, total = 0, label = 'Fortschritt', tone = 'accent', class: klass = '' }: Props = $props();
+	let { done = 0, total = 0, label = t('Fortschritt'), tone = 'accent', class: klass = '' }: Props = $props();
 	const pct = $derived(total > 0 ? Math.min(100, Math.round((done / total) * 100)) : null);
 	const fill = { accent: 'bg-accent', live: 'bg-live', ok: 'bg-ok', warn: 'bg-warn', danger: 'bg-danger' };
 </script>

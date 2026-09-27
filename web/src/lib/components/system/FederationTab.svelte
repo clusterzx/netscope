@@ -15,14 +15,15 @@
 		RelativeTime,
 		Skeleton
 	} from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatDateTime } from '$lib/utils/format';
-	import { apiErrors } from './system';
+	import { formatDateTime, formatNumber } from '$lib/utils/format';
+	import { apiErrors, markupParts } from './system';
 
 	const data = new AsyncData<FederationView>();
 	$effect(() => {
@@ -35,8 +36,8 @@
 		})
 	);
 	$effect(() => {
-		const t = setInterval(() => data.reload(), 30_000);
-		return () => clearInterval(t);
+		const timer = setInterval(() => data.reload(), 30_000);
+		return () => clearInterval(timer);
 	});
 
 	let role = $state<FederationRole>('standalone');
@@ -80,18 +81,27 @@
 	const site = $derived(data.data?.site);
 
 	const ROLES: { value: FederationRole; label: string; text: string }[] = [
-		{ value: 'standalone', label: 'Eigenständig', text: 'Diese Instanz arbeitet für sich (Standard).' },
+		{
+			value: 'standalone',
+			label: t('Eigenständig'),
+			text: t('Diese Instanz arbeitet für sich (Standard).')
+		},
 		{
 			value: 'site',
-			label: 'Standort',
-			text: 'Scannt ihr eigenes Netz und liefert alles an eine Zentrale. Zugangsdaten bleiben hier.'
+			label: t('Standort'),
+			text: t('Scannt ihr eigenes Netz und liefert alles an eine Zentrale. Zugangsdaten bleiben hier.')
 		},
 		{
 			value: 'central',
-			label: 'Zentrale',
-			text: 'Nimmt die Daten von Standorten an und zeigt alle Netze gemeinsam oder einzeln.'
+			label: t('Zentrale'),
+			text: t('Nimmt die Daten von Standorten an und zeigt alle Netze gemeinsam oder einzeln.')
 		}
 	];
+
+	// the link to the sites page sits inside the sentence
+	const sitesHint = markupParts(
+		t('Standorte werden unter {link} angelegt; dort gibt es das Token für die Anbindung.')
+	);
 
 	function validate(): Record<string, string> {
 		const e: Record<string, string> = {};
@@ -100,13 +110,13 @@
 				const u = new URL(centralUrl.trim());
 				if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.host) throw new Error();
 			} catch {
-				e.centralUrl = 'Adresse der Zentrale, z. B. https://netscope.example.org';
+				e.centralUrl = t('Adresse der Zentrale, z. B. https://netscope.example.org');
 			}
-			if (!token.trim() && !current?.hasToken) e.token = 'Token des Standorts aus der Zentrale einfügen';
+			if (!token.trim() && !current?.hasToken) e.token = t('Token des Standorts aus der Zentrale einfügen');
 			else if (token.trim() && !token.trim().startsWith('nss_'))
-				e.token = 'Standort-Tokens beginnen mit nss_';
+				e.token = t('Standort-Tokens beginnen mit nss_');
 			const fp = fingerprint.trim().toLowerCase().replace(/[:\s]/g, '');
-			if (fp && !/^[0-9a-f]{64}$/.test(fp)) e.fingerprint = 'SHA-256-Fingerprint: 64 Hex-Zeichen';
+			if (fp && !/^[0-9a-f]{64}$/.test(fp)) e.fingerprint = t('SHA-256-Fingerprint: 64 Hex-Zeichen');
 		}
 		return e;
 	}
@@ -118,10 +128,11 @@
 		if (Object.keys(errors).length) return;
 		if (current?.role === 'central' && role !== 'central' && (data.data?.sites.length ?? 0) > 0) {
 			const ok = await confirm({
-				title: 'Rolle „Zentrale“ aufgeben?',
-				message:
-					'Die Standorte können dann nichts mehr einliefern. Ihre bisher gelieferten Geräte und Events bleiben erhalten.',
-				confirmLabel: 'Rolle ändern',
+				title: t('Rolle „Zentrale“ aufgeben?'),
+				message: t(
+					'Die Standorte können dann nichts mehr einliefern. Ihre bisher gelieferten Geräte und Events bleiben erhalten.'
+				),
+				confirmLabel: t('Rolle ändern'),
 				danger: true
 			});
 			if (!ok) return;
@@ -138,7 +149,7 @@
 			const saved = await api.put('/api/v1/federation', { body });
 			data.set(saved);
 			federation.refresh().catch(() => {});
-			toast.success('Verbund-Einstellungen gespeichert');
+			toast.success(t('Verbund-Einstellungen gespeichert'));
 			if (saved.settings.role === 'site') runTest();
 		} catch (e) {
 			({ errors, general } = apiErrors(e, ['role', 'localName', 'centralUrl', 'token', 'fingerprint']));
@@ -162,16 +173,17 @@
 
 	async function resync() {
 		const ok = await confirm({
-			title: 'Vollständigen Abgleich anstoßen?',
-			message:
-				'Der Standort schickt den kompletten Bestand erneut an die Zentrale. Das ist nur nötig, wenn die Zentrale einen Stand verloren hat (z. B. nach einer Wiederherstellung dort).',
-			confirmLabel: 'Abgleich starten'
+			title: t('Vollständigen Abgleich anstoßen?'),
+			message: t(
+				'Der Standort schickt den kompletten Bestand erneut an die Zentrale. Das ist nur nötig, wenn die Zentrale einen Stand verloren hat (z. B. nach einer Wiederherstellung dort).'
+			),
+			confirmLabel: t('Abgleich starten')
 		});
 		if (!ok) return;
 		syncing = true;
 		try {
 			await api.post('/api/v1/federation/resync');
-			toast.success('Vollständiger Abgleich vorbereitet');
+			toast.success(t('Vollständiger Abgleich vorbereitet'));
 			data.reload();
 		} catch (e) {
 			toast.error(e);
@@ -195,22 +207,23 @@
 			}}
 			class="flex flex-col gap-4"
 		>
-			{#if general}<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>{/if}
+			{#if general}<Alert tone="danger" title={t('Speichern fehlgeschlagen')}>{general}</Alert>{/if}
 			{#if managed}
-				<Alert tone="info" title="Über Umgebungsvariablen festgelegt">
-					Die Anbindung an die Zentrale kommt aus NETSCOPE_CENTRAL_URL und NETSCOPE_CENTRAL_TOKEN und kann
-					hier nicht geändert werden.
+				<Alert tone="info" title={t('Über Umgebungsvariablen festgelegt')}>
+					{t(
+						'Die Anbindung an die Zentrale kommt aus NETSCOPE_CENTRAL_URL und NETSCOPE_CENTRAL_TOKEN und kann hier nicht geändert werden.'
+					)}
 				</Alert>
 			{:else if !canManage}
 				<p class="text-xs text-fg-subtle">
-					Nur lesen – dafür fehlt die Berechtigung „Verbund und Standorte verwalten“.
+					{t('Nur lesen – dafür fehlt die Berechtigung „Verbund und Standorte verwalten“.')}
 				</p>
 			{/if}
 
 			<fieldset disabled={!canManage} class="contents">
-				<Card title="Rolle dieser Instanz" icon="globe">
+				<Card title={t('Rolle dieser Instanz')} icon="globe">
 					<fieldset disabled={managed}>
-						<legend class="sr-only">Rolle</legend>
+						<legend class="sr-only">{t('Rolle')}</legend>
 						<div class="grid grid-cols-1 gap-2 md:grid-cols-3">
 							{#each ROLES as r (r.value)}
 								<label
@@ -235,51 +248,56 @@
 					{#if role === 'central'}
 						<div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
 							<Input
-								label="Name dieser Instanz"
+								label={t('Name dieser Instanz')}
 								bind:value={localName}
 								maxlength={64}
-								placeholder="Zentrale"
-								hint="So heißt diese Instanz in der Standort-Auswahl (z. B. „Zuhause“)."
+								placeholder={t('Zentrale')}
+								hint={t('So heißt diese Instanz in der Standort-Auswahl (z. B. „Zuhause“).')}
 								error={errors.localName}
 							/>
 						</div>
 						<p class="mt-3 text-sm text-fg-muted">
-							Standorte werden unter <a href="/sites" class="text-accent hover:underline">Standorte</a> angelegt;
-							dort gibt es das Token für die Anbindung.
+							{#each sitesHint as part, k (k)}{#if k % 2}<a href="/sites" class="text-accent hover:underline"
+										>{t('Standorte')}</a
+									>{:else}{part}{/if}{/each}
 						</p>
 					{/if}
 				</Card>
 
 				{#if role === 'site'}
-					<Card title="Zentrale" icon="send">
+					<Card title={t('Zentrale')} icon="send">
 						<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 							<Input
-								label="Adresse der Zentrale"
+								label={t('Adresse der Zentrale')}
 								type="url"
 								bind:value={centralUrl}
 								placeholder="https://netscope.example.org"
-								hint="Der Standort baut die Verbindung auf; hier sind keine Freigaben nötig."
+								hint={t('Der Standort baut die Verbindung auf; hier sind keine Freigaben nötig.')}
 								error={errors.centralUrl}
 								disabled={managed}
 								required
 								class="md:col-span-2"
 							/>
 							<Input
-								label="Token des Standorts"
+								label={t('Token des Standorts')}
 								type="password"
 								autocomplete="off"
 								bind:value={token}
-								placeholder={current?.hasToken ? 'gespeichert – leer lassen, um es zu behalten' : 'nss_…'}
-								hint="Wird in der Zentrale beim Anlegen des Standorts einmalig angezeigt. Es erlaubt nur das Einliefern."
+								placeholder={current?.hasToken ? t('gespeichert – leer lassen, um es zu behalten') : 'nss_…'}
+								hint={t(
+									'Wird in der Zentrale beim Anlegen des Standorts einmalig angezeigt. Es erlaubt nur das Einliefern.'
+								)}
 								error={errors.token}
 								disabled={managed}
 								mono
 							/>
 							<Input
-								label="Zertifikat-Fingerprint (optional)"
+								label={t('Zertifikat-Fingerprint (optional)')}
 								bind:value={fingerprint}
-								placeholder="SHA-256, z. B. 3a:9f:…"
-								hint="Nur für selbst signierte Zertifikate: dann gilt genau dieses Zertifikat statt der üblichen Prüfung."
+								placeholder={t('SHA-256, z. B. 3a:9f:…')}
+								hint={t(
+									'Nur für selbst signierte Zertifikate: dann gilt genau dieses Zertifikat statt der üblichen Prüfung.'
+								)}
 								error={errors.fingerprint}
 								disabled={managed}
 								mono
@@ -295,22 +313,22 @@
 						{dirty ? 'sticky bottom-2 shadow-md' : ''}"
 				>
 					<span class="mr-auto text-sm {dirty ? 'text-warn' : 'text-fg-subtle'}">
-						{dirty ? 'Ungespeicherte Änderungen' : 'Alle Änderungen gespeichert'}
+						{dirty ? t('Ungespeicherte Änderungen') : t('Alle Änderungen gespeichert')}
 					</span>
 					<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!dirty}
-						>Speichern</Button
+						>{t('Speichern')}</Button
 					>
 				</div>
 			{/if}
 		</form>
 
 		{#if current?.role === 'site'}
-			<Card title="Verbindung zur Zentrale" icon="activity">
+			<Card title={t('Verbindung zur Zentrale')} icon="activity">
 				{#snippet actions()}
 					{#if canManage}
-						<Button size="sm" icon="refresh" onclick={resync} loading={syncing}>Vollabgleich</Button>
+						<Button size="sm" icon="refresh" onclick={resync} loading={syncing}>{t('Vollabgleich')}</Button>
 						<Button size="sm" variant="primary" icon="zap" onclick={runTest} loading={testing}
-							>Verbindung testen</Button
+							>{t('Verbindung testen')}</Button
 						>
 					{/if}
 				{/snippet}
@@ -318,10 +336,13 @@
 					<Alert
 						tone={test.ok ? 'ok' : 'danger'}
 						class="mb-4"
-						title={test.ok ? 'Verbunden' : 'Keine Verbindung'}
+						title={test.ok ? t('Verbunden') : t('Keine Verbindung')}
 					>
 						{#if test.ok}
-							Die Zentrale kennt diesen Standort als „{test.site}“ (Antwort in {test.durationMs} ms).
+							{t('Die Zentrale kennt diesen Standort als „{site}“ (Antwort in {ms} ms).', {
+								site: test.site,
+								ms: formatNumber(test.durationMs)
+							})}
 						{:else}
 							{test.error}
 						{/if}
@@ -329,42 +350,46 @@
 				{/if}
 				{#if site}
 					<DescList cols={3}>
-						<DescItem label="Zustand">
+						<DescItem label={t('Zustand')}>
 							{#if site.connected}
-								<Badge tone="ok" dot>verbunden</Badge>
+								<Badge tone="ok" dot>{t('verbunden')}</Badge>
 							{:else if site.lastAttempt}
-								<Badge tone="danger" dot>getrennt</Badge>
+								<Badge tone="danger" dot>{t('getrennt')}</Badge>
 							{:else}
-								<Badge tone="neutral">noch kein Kontakt</Badge>
+								<Badge tone="neutral">{t('noch kein Kontakt')}</Badge>
 							{/if}
-							{#if site.syncing}<Badge tone="info" class="ml-1">Abgleich läuft</Badge>{/if}
+							{#if site.syncing}<Badge tone="info" class="ml-1">{t('Abgleich läuft')}</Badge>{/if}
 						</DescItem>
-						<DescItem label="Name in der Zentrale" value={site.siteName} />
-						<DescItem label="Letzte Zustellung">
+						<DescItem label={t('Name in der Zentrale')} value={site.siteName} />
+						<DescItem label={t('Letzte Zustellung')}>
 							{#if site.lastSuccess}<RelativeTime value={site.lastSuccess} />{:else}<span
 									class="text-fg-subtle">–</span
 								>{/if}
 						</DescItem>
-						<DescItem label="Im Puffer" hint={site.buffered ? 'Einträge warten auf Zustellung' : undefined}>
-							<span class="tabular">{site.buffered.toLocaleString('de-DE')}</span>
+						<DescItem
+							label={t('Im Puffer')}
+							hint={site.buffered ? t('Einträge warten auf Zustellung') : undefined}
+						>
+							<span class="tabular">{formatNumber(site.buffered)}</span>
 						</DescItem>
-						<DescItem label="Ältester Eintrag">
+						<DescItem label={t('Ältester Eintrag')}>
 							{#if site.oldestItem}<RelativeTime value={site.oldestItem} />{:else}<span class="text-fg-subtle"
 									>–</span
 								>{/if}
 						</DescItem>
-						<DescItem label="Nächster Versuch">
+						<DescItem label={t('Nächster Versuch')}>
 							{#if site.nextAttempt}{formatDateTime(site.nextAttempt)}{:else}<span class="text-fg-subtle"
 									>–</span
 								>{/if}
 						</DescItem>
 					</DescList>
 					{#if site.lastError}
-						<Alert tone="warn" class="mt-4" title="Letzter Fehler">{site.lastError}</Alert>
+						<Alert tone="warn" class="mt-4" title={t('Letzter Fehler')}>{site.lastError}</Alert>
 					{/if}
 					<p class="mt-4 text-xs text-fg-subtle">
-						Ist die Zentrale nicht erreichbar, sammelt der Standort Beobachtungen und Events und liefert sie
-						nach. Dieser Standort arbeitet unabhängig davon vollständig weiter.
+						{t(
+							'Ist die Zentrale nicht erreichbar, sammelt der Standort Beobachtungen und Events und liefert sie nach. Dieser Standort arbeitet unabhängig davon vollständig weiter.'
+						)}
 					</p>
 				{/if}
 			</Card>

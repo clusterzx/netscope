@@ -3,6 +3,7 @@
 	import { api } from '$lib/api';
 	import { apiErrors } from '$lib/components/system/system';
 	import { Alert, Button, Input } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 
 	interface Props {
@@ -34,15 +35,15 @@
 		if (/[^A-Za-z0-9]/.test(p)) s++;
 		return p.length < MIN ? 0 : Math.min(4, s);
 	});
-	const strengthText = ['zu kurz', 'schwach', 'mittel', 'gut', 'stark'];
+	const strengthText = [t('zu kurz'), t('schwach'), t('mittel'), t('gut'), t('stark')];
 	const strengthColor = ['bg-danger', 'bg-danger', 'bg-warn', 'bg-ok', 'bg-ok'];
 
 	function validate(): Record<string, string> {
 		const e: Record<string, string> = {};
-		if (!current) e.current = start ? 'Start-Passwort eingeben' : 'Aktuelles Passwort eingeben';
-		if (next.length < MIN) e.new = `Mindestens ${MIN} Zeichen`;
-		else if (next === current) e.new = 'Das neue Passwort muss sich vom bisherigen unterscheiden';
-		if (!e.new && confirm !== next) e.confirm = 'Passwörter stimmen nicht überein';
+		if (!current) e.current = start ? t('Start-Passwort eingeben') : t('Aktuelles Passwort eingeben');
+		if (next.length < MIN) e.new = t('Mindestens {n} Zeichen', { n: MIN });
+		else if (next === current) e.new = t('Das neue Passwort muss sich vom bisherigen unterscheiden');
+		if (!e.new && confirm !== next) e.confirm = t('Passwörter stimmen nicht überein');
 		return e;
 	}
 
@@ -83,7 +84,7 @@
 		readonly
 	/>
 	<Input
-		label={start ? 'Start-Passwort' : 'Aktuelles Passwort'}
+		label={start ? t('Start-Passwort') : t('Aktuelles Passwort')}
 		type={show ? 'text' : 'password'}
 		autocomplete="current-password"
 		bind:value={current}
@@ -93,12 +94,12 @@
 	/>
 	<div class="flex flex-col gap-1">
 		<Input
-			label="Neues Passwort"
+			label={t('Neues Passwort')}
 			type={show ? 'text' : 'password'}
 			autocomplete="new-password"
 			bind:value={next}
 			error={errors.new}
-			hint="Mindestens {MIN} Zeichen"
+			hint={t('Mindestens {n} Zeichen', { n: MIN })}
 			required
 			oninput={() => delete errors.new}
 		/>
@@ -118,7 +119,7 @@
 		{/if}
 	</div>
 	<Input
-		label="Neues Passwort wiederholen"
+		label={t('Neues Passwort wiederholen')}
 		type={show ? 'text' : 'password'}
 		autocomplete="new-password"
 		bind:value={confirm}
@@ -127,9 +128,10 @@
 		oninput={() => delete errors.confirm}
 	/>
 	<label class="inline-flex items-center gap-2 text-sm text-fg-muted">
-		<input type="checkbox" bind:checked={show} class="h-4 w-4 accent-(--accent)" /> Passwörter anzeigen
+		<input type="checkbox" bind:checked={show} class="h-4 w-4 accent-(--accent)" />
+		{t('Passwörter anzeigen')}
 	</label>
 	<div>
-		<Button type="submit" variant="primary" icon="save" loading={saving}>Passwort ändern</Button>
+		<Button type="submit" variant="primary" icon="save" loading={saving}>{t('Passwort ändern')}</Button>
 	</div>
 </form>

@@ -1,5 +1,6 @@
 <!-- Internal: one node of JsonView (recursive). -->
 <script lang="ts">
+	import { tn } from '$lib/i18n';
 	import Self from './JsonNode.svelte';
 
 	interface Props {
@@ -53,7 +54,11 @@
 				><span class="text-fg-subtle">:</span>{/if}
 			<span class="text-fg-subtle"
 				>{isArr ? '[' : '{'}{#if !expanded}
-					<span class="text-fg-subtle italic">{entries.length} {isArr ? 'Einträge' : 'Felder'}</span>
+					<span class="text-fg-subtle italic"
+						>{isArr
+							? tn(entries.length, '{n} Eintrag', '{n} Einträge')
+							: tn(entries.length, '{n} Feld', '{n} Felder')}</span
+					>
 					{isArr ? ']' : '}'}{last ? '' : ','}{/if}</span
 			>
 		</button>

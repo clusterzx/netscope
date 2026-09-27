@@ -5,6 +5,8 @@
 	<Skeleton rows={8} />                    table rows
 -->
 <script lang="ts">
+	import { t } from '$lib/i18n';
+
 	interface Props {
 		lines?: number;
 		rows?: number;
@@ -15,7 +17,7 @@
 	const bar = 'ns-skeleton';
 </script>
 
-<div role="status" aria-label="Lädt …" class="w-full">
+<div role="status" aria-label={t('Lädt …')} class="w-full">
 	{#if rows > 0}
 		<div class="flex flex-col gap-2">
 			{#each Array(rows) as _, i (i)}

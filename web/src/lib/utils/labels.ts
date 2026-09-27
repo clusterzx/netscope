@@ -1,5 +1,6 @@
-// German labels and colour tones for enum values used across the UI.
+// Labels (in the UI language) and colour tones for enum values used across the UI.
 import type { Severity } from '$lib/api/types';
+import { t } from '$lib/i18n';
 
 /** Badge tones (see Badge.svelte). */
 export type Tone =
@@ -17,10 +18,10 @@ export type Tone =
 
 export const severityLabel: Record<string, string> = {
 	info: 'Info',
-	low: 'Niedrig',
-	medium: 'Mittel',
-	high: 'Hoch',
-	critical: 'Kritisch'
+	low: t('Niedrig'),
+	medium: t('Mittel'),
+	high: t('Hoch'),
+	critical: t('Kritisch')
 };
 
 export const severityRank: Record<string, number> = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
@@ -39,9 +40,9 @@ export function severityFromCvss(score: number | null | undefined): Severity {
 }
 
 export const stateLabel: Record<string, string> = {
-	known: 'Bekannt',
-	unknown: 'Unbekannt',
-	ignored: 'Ignoriert'
+	known: t('Bekannt'),
+	unknown: t('Unbekannt'),
+	ignored: t('Ignoriert')
 };
 
 export function stateTone(s: string | undefined | null): Tone {
@@ -49,10 +50,10 @@ export function stateTone(s: string | undefined | null): Tone {
 }
 
 export const criticalityLabel: Record<string, string> = {
-	low: 'Niedrig',
+	low: t('Niedrig'),
 	normal: 'Normal',
-	high: 'Hoch',
-	critical: 'Kritisch'
+	high: t('Hoch'),
+	critical: t('Kritisch')
 };
 export const CRITICALITIES = ['low', 'normal', 'high', 'critical'] as const;
 
@@ -68,12 +69,12 @@ export const pluginKindLabel: Record<string, string> = {
 };
 
 export const runStatusLabel: Record<string, string> = {
-	queued: 'Wartend',
-	running: 'Läuft',
-	success: 'Erfolgreich',
-	failed: 'Fehlgeschlagen',
-	timeout: 'Zeitüberschreitung',
-	cancelled: 'Abgebrochen'
+	queued: t('Wartend'),
+	running: t('Läuft'),
+	success: t('Erfolgreich'),
+	failed: t('Fehlgeschlagen'),
+	timeout: t('Zeitüberschreitung'),
+	cancelled: t('Abgebrochen')
 };
 
 export function runStatusTone(s: string | undefined | null): Tone {
@@ -92,19 +93,19 @@ export function runStatusTone(s: string | undefined | null): Tone {
 }
 
 export const runTriggerLabel: Record<string, string> = {
-	schedule: 'Zeitplan',
-	manual: 'Manuell',
-	device: 'Gerät',
-	retry: 'Wiederholung',
-	action: 'Aktion',
-	hook: 'Folgelauf'
+	schedule: t('Zeitplan'),
+	manual: t('Manuell'),
+	device: t('Gerät'),
+	retry: t('Wiederholung'),
+	action: t('Aktion'),
+	hook: t('Folgelauf')
 };
 
 export const healthStateLabel: Record<string, string> = {
 	up: 'Up',
 	down: 'Down',
-	degraded: 'Beeinträchtigt',
-	unknown: 'Unbekannt'
+	degraded: t('Beeinträchtigt'),
+	unknown: t('Unbekannt')
 };
 
 export function healthTone(s: string | undefined | null): Tone {
@@ -123,18 +124,18 @@ export const deviceTypeLabel: Record<string, string> = {
 	nas: 'NAS',
 	desktop: 'Desktop',
 	laptop: 'Laptop',
-	phone: 'Telefon',
+	phone: t('Telefon'),
 	tablet: 'Tablet',
 	tv: 'TV',
-	'media-player': 'Mediaplayer',
-	speaker: 'Lautsprecher',
-	printer: 'Drucker',
-	camera: 'Kamera',
+	'media-player': t('Mediaplayer'),
+	speaker: t('Lautsprecher'),
+	printer: t('Drucker'),
+	camera: t('Kamera'),
 	'smart-home': 'Smart Home',
 	iot: 'IoT',
-	'game-console': 'Spielkonsole',
-	ups: 'USV',
-	other: 'Sonstiges'
+	'game-console': t('Spielkonsole'),
+	ups: t('USV'),
+	other: t('Sonstiges')
 };
 
 export function deviceTypeName(t: string | undefined | null): string {
@@ -144,67 +145,67 @@ export function deviceTypeName(t: string | undefined | null): string {
 
 export const relationKindLabel: Record<string, string> = {
 	switch_port: 'Switch-Port',
-	lldp: 'LLDP-Nachbar',
-	l3: 'Routing (L3)',
-	runs_on: 'Läuft auf',
-	manual: 'Manuell',
+	lldp: t('LLDP-Nachbar'),
+	l3: t('Routing (L3)'),
+	runs_on: t('Läuft auf'),
+	manual: t('Manuell'),
 	container: 'Container',
-	wireless: 'WLAN'
+	wireless: t('WLAN')
 };
 
 export const diffKindLabel: Record<string, string> = {
-	device: 'Gerät',
-	ip: 'IP-Adresse',
-	mac: 'MAC-Adresse',
+	device: t('Gerät'),
+	ip: t('IP-Adresse'),
+	mac: t('MAC-Adresse'),
 	port: 'Port',
-	cert: 'Zertifikat',
+	cert: t('Zertifikat'),
 	http: 'HTTP',
-	package: 'Paket',
+	package: t('Paket'),
 	container: 'Container',
 	hostname: 'Hostname',
-	os: 'Betriebssystem',
-	vendor: 'Hersteller',
-	type: 'Typ',
-	model: 'Modell'
+	os: t('Betriebssystem'),
+	vendor: t('Hersteller'),
+	type: t('Typ'),
+	model: t('Modell')
 };
 
 export const diffChangeLabel: Record<string, string> = {
-	added: 'Neu',
-	removed: 'Entfernt',
-	changed: 'Geändert'
+	added: t('Neu'),
+	removed: t('Entfernt'),
+	changed: t('Geändert')
 };
 
 export const eventCategoryLabel: Record<string, string> = {
-	device: 'Geräte',
-	port: 'Ports & Dienste',
-	cert: 'Zertifikate',
+	device: t('Geräte'),
+	port: t('Ports & Dienste'),
+	cert: t('Zertifikate'),
 	container: 'Container',
 	software: 'Software',
-	vulnerability: 'Schwachstellen',
+	vulnerability: t('Schwachstellen'),
 	health: 'Health',
-	network: 'Netzwerk',
+	network: t('Netzwerk'),
 	system: 'System'
 };
 
 export const factKindLabel: Record<string, string> = {
 	hostname: 'Hostname',
-	vendor: 'Hersteller',
-	model: 'Modell',
-	type: 'Typ',
-	os: 'Betriebssystem',
-	os_version: 'OS-Version',
+	vendor: t('Hersteller'),
+	model: t('Modell'),
+	type: t('Typ'),
+	os: t('Betriebssystem'),
+	os_version: t('OS-Version'),
 	name: 'Name',
-	serial: 'Seriennummer',
+	serial: t('Seriennummer'),
 	firmware: 'Firmware',
-	description: 'Beschreibung'
+	description: t('Beschreibung')
 };
 
 export const customFieldTypeLabel: Record<string, string> = {
 	text: 'Text',
-	number: 'Zahl',
-	date: 'Datum',
+	number: t('Zahl'),
+	date: t('Datum'),
 	url: 'URL',
-	bool: 'Ja/Nein'
+	bool: t('Ja/Nein')
 };
 
 /** Label lookup with fallback to the raw value. */

@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	"html"
 	"io"
 	"mime"
@@ -21,6 +20,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 )
 
@@ -54,6 +54,14 @@ type envelope struct {
 	Mailer string
 }
 
+// dateTime formats a timestamp for the message in the language of the notification.
+func dateTime(t time.Time, lang i18n.Locale) string {
+	if lang == i18n.EN {
+		return t.Format("2 Jan 2006 15:04")
+	}
+	return t.Format("02.01.2006 15:04")
+}
+
 // subject builds the (unencoded) subject line.
 func subject(n *plugin.Notification, prefix string) string {
 	t := oneLine(n.Title)
@@ -61,7 +69,7 @@ func subject(n *plugin.Notification, prefix string) string {
 		t = "NetScope"
 	}
 	if n.Kind == plugin.NotifyEscalation {
-		t = "Eskalation – nicht quittiert: " + t
+		t = i18n.Sprintf(n.Lang, "Eskalation – nicht quittiert: %s", t)
 	}
 	if p := oneLine(prefix); p != "" {
 		t = p + " " + t
@@ -82,13 +90,13 @@ func encodeHeader(s string) string {
 func plainText(n *plugin.Notification) string {
 	var b strings.Builder
 	if n.Kind == plugin.NotifyEscalation {
-		b.WriteString("⏰ ESKALATION – nicht quittiert\n\n")
+		b.WriteString("⏰ " + i18n.T(n.Lang, "ESKALATION – nicht quittiert") + "\n\n")
 	}
 	b.WriteString(n.PlainText())
 	for _, a := range n.Attachments {
-		b.WriteString("\nAnhang: " + a.Name + "\n")
+		b.WriteString("\n" + i18n.Sprintf(n.Lang, "Anhang: %s", a.Name) + "\n")
 	}
-	b.WriteString("\n-- \nDiese Nachricht wurde automatisch von NetScope erzeugt.\n")
+	b.WriteString("\n-- \n" + i18n.T(n.Lang, "Diese Nachricht wurde automatisch von NetScope erzeugt.") + "\n")
 	return b.String()
 }
 
@@ -277,6 +285,7 @@ const (
 // rendered from Markdown; events become a table with severity badges.
 func htmlBody(n *plugin.Notification, loc *time.Location) string {
 	esc := html.EscapeString
+	lang := n.Lang
 	var b strings.Builder
 	title := oneLine(n.Title)
 	if title == "" {
@@ -286,8 +295,13 @@ func htmlBody(n *plugin.Notification, loc *time.Location) string {
 	if kind == "" {
 		kind = "Benachrichtigung"
 	}
+	kind = i18n.T(lang, kind)
 	side := `border-left:1px solid ` + mBorder + `;border-right:1px solid ` + mBorder + `;`
-	b.WriteString("<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n<meta charset=\"utf-8\">\n")
+	htmlLang := "de"
+	if lang == i18n.EN {
+		htmlLang = "en"
+	}
+	b.WriteString("<!DOCTYPE html>\n<html lang=\"" + htmlLang + "\">\n<head>\n<meta charset=\"utf-8\">\n")
 	b.WriteString("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
 	b.WriteString("<meta name=\"color-scheme\" content=\"light\">\n<meta name=\"supported-color-schemes\" content=\"light\">\n")
 	b.WriteString("<title>" + esc(title) + "</title>\n")
@@ -313,7 +327,7 @@ func htmlBody(n *plugin.Notification, loc *time.Location) string {
 
 	if n.Kind == plugin.NotifyEscalation {
 		b.WriteString(`<tr><td style="padding:12px 28px;background-color:#be123c;color:#ffffff;font-size:15px;font-weight:700;">` +
-			"&#9200; Eskalation – nicht quittiert</td></tr>\n")
+			"&#9200; " + esc(i18n.T(lang, "Eskalation – nicht quittiert")) + "</td></tr>\n")
 	}
 
 	// title
@@ -321,16 +335,16 @@ func htmlBody(n *plugin.Notification, loc *time.Location) string {
 	b.WriteString(`<h1 class="ns-title" style="margin:0;font-size:22px;line-height:1.3;font-weight:700;color:` + mFg + `;">` + esc(title) + "</h1>\n")
 	var meta []string
 	if p, ok := priorityLabels[n.Priority]; ok && n.Priority != plugin.PrioNormal && n.Priority != plugin.PrioLow {
-		meta = append(meta, "Priorität: "+p)
+		meta = append(meta, i18n.Sprintf(lang, "Priorität: %s", i18n.T(lang, p)))
 	}
 	if n.RuleName != "" {
-		meta = append(meta, "Regel: "+oneLine(n.RuleName))
+		meta = append(meta, i18n.Sprintf(lang, "Regel: %s", oneLine(n.RuleName)))
 	}
 	if len(n.Events) > 0 {
-		meta = append(meta, countLabel(len(n.Events)))
+		meta = append(meta, countLabel(len(n.Events), lang))
 	}
 	if !n.CreatedAt.IsZero() {
-		meta = append(meta, n.CreatedAt.In(loc).Format("02.01.2006 15:04"))
+		meta = append(meta, dateTime(n.CreatedAt.In(loc), lang))
 	}
 	if len(meta) > 0 {
 		b.WriteString(`<div style="margin-top:6px;font-size:13px;color:` + mSubtle + `;">` + esc(strings.Join(meta, " · ")) + "</div>\n")
@@ -346,7 +360,7 @@ func htmlBody(n *plugin.Notification, loc *time.Location) string {
 		b.WriteString(markdownHTML(body))
 	}
 	if len(n.Events) > 0 {
-		b.WriteString(eventTable(n.Events, loc))
+		b.WriteString(eventTable(n.Events, loc, lang))
 	}
 	if len(n.Attachments) > 0 {
 		names := make([]string, len(n.Attachments))
@@ -354,7 +368,7 @@ func htmlBody(n *plugin.Notification, loc *time.Location) string {
 			names[i] = esc(a.Name)
 		}
 		b.WriteString(`<div style="margin-top:20px;padding:10px 14px;border-radius:8px;background-color:` + mSurface + `;font-size:13px;color:` + mMuted +
-			`;">&#128206; Im Anhang: <strong style="color:` + mFg + `;">` + strings.Join(names, ", ") + "</strong></div>\n")
+			`;">&#128206; ` + esc(i18n.T(lang, "Im Anhang:")) + ` <strong style="color:` + mFg + `;">` + strings.Join(names, ", ") + "</strong></div>\n")
 	}
 	b.WriteString("</td></tr>\n")
 
@@ -362,9 +376,9 @@ func htmlBody(n *plugin.Notification, loc *time.Location) string {
 	b.WriteString(`<tr><td class="ns-pad" style="background-color:` + mSurface + `;padding:18px 28px;border:1px solid ` + mBorder + `;border-radius:0 0 12px 12px;font-size:12px;line-height:1.5;color:` + mSubtle + `;">`)
 	if u, ok := safeURL(n.Link); ok {
 		b.WriteString(`<a href="` + esc(u) + `" style="display:inline-block;margin-bottom:10px;padding:9px 16px;border-radius:8px;background-color:` + mAccent +
-			`;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;">In NetScope öffnen</a><br>`)
+			`;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;">` + esc(i18n.T(lang, "In NetScope öffnen")) + `</a><br>`)
 	}
-	b.WriteString("Diese Nachricht wurde automatisch von NetScope erzeugt.</td></tr>\n")
+	b.WriteString(esc(i18n.T(lang, "Diese Nachricht wurde automatisch von NetScope erzeugt.")) + "</td></tr>\n")
 	b.WriteString("</table>\n</td></tr>\n</table>\n</body>\n</html>\n")
 	return b.String()
 }
@@ -378,16 +392,17 @@ var severityTones = map[plugin.Severity][2]string{
 	plugin.SevInfo:     {"#5b6577", "#eef0f3"},
 }
 
-func eventTable(events []plugin.EventView, loc *time.Location) string {
+func eventTable(events []plugin.EventView, loc *time.Location, lang i18n.Locale) string {
 	esc := html.EscapeString
+	tr := func(s string) string { return esc(i18n.T(lang, s)) }
 	const (
 		th   = `<th align="left" style="padding:8px 10px;background-color:` + mSurface + `;border-bottom:1px solid ` + mBorder + `;font-size:11px;font-weight:600;color:` + mSubtle + `;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;">`
 		cell = `<td valign="top" style="padding:10px;border-bottom:1px solid ` + mLine + `;overflow-wrap:anywhere;word-break:break-word;`
 	)
 	var b strings.Builder
 	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px;line-height:1.45;border:1px solid ` + mBorder + `;">` + "\n")
-	b.WriteString("<tr>" + th + "Schwere</th>" + th + "Ereignis</th>" + th + "Gerät</th>" +
-		strings.Replace(th, "<th ", `<th class="ns-sm-hide" `, 1) + "Zeit</th></tr>\n")
+	b.WriteString("<tr>" + th + tr("Schwere") + "</th>" + th + tr("Ereignis") + "</th>" + th + tr("Gerät") + "</th>" +
+		strings.Replace(th, "<th ", `<th class="ns-sm-hide" `, 1) + tr("Zeit") + "</th></tr>\n")
 	shown := events
 	if len(shown) > maxHTMLEvents {
 		shown = shown[:maxHTMLEvents]
@@ -399,7 +414,7 @@ func eventTable(events []plugin.EventView, loc *time.Location) string {
 		}
 		b.WriteString("<tr>")
 		b.WriteString(cell + `white-space:nowrap;"><span style="display:inline-block;padding:2px 9px;border-radius:10px;background-color:` + tn[1] +
-			`;color:` + tn[0] + `;font-size:12px;font-weight:600;">` + esc(e.Severity.Label()) + "</span></td>")
+			`;color:` + tn[0] + `;font-size:12px;font-weight:600;">` + esc(e.Severity.LabelIn(lang)) + "</span></td>")
 		t := oneLine(e.Title)
 		if t == "" {
 			t = oneLine(e.Label)
@@ -421,10 +436,10 @@ func eventTable(events []plugin.EventView, loc *time.Location) string {
 		}
 		var marks []string
 		if e.Escalated {
-			marks = append(marks, "&#9200; eskaliert")
+			marks = append(marks, "&#9200; "+tr("eskaliert"))
 		}
 		if e.Acknowledged {
-			marks = append(marks, "&#9989; quittiert")
+			marks = append(marks, "&#9989; "+tr("quittiert"))
 		}
 		if len(marks) > 0 {
 			b.WriteString(`<div style="margin-top:4px;font-size:12px;color:` + mSubtle + `;">` + strings.Join(marks, " · ") + "</div>")
@@ -447,20 +462,20 @@ func eventTable(events []plugin.EventView, loc *time.Location) string {
 			b.WriteString(`<div style="font-family:` + mMono + `;font-size:12px;color:` + mSubtle + `;">` + esc(e.DeviceIP) + "</div>")
 		}
 		if e.Site != "" {
-			b.WriteString(`<div style="font-size:12px;color:` + mSubtle + `;">Standort ` + esc(e.Site) + "</div>")
+			b.WriteString(`<div style="font-size:12px;color:` + mSubtle + `;">` + esc(i18n.Sprintf(lang, "Standort %s", e.Site)) + "</div>")
 		}
 		b.WriteString("</td>")
 		at := ""
 		if !e.At.IsZero() {
-			at = e.At.In(loc).Format("02.01.2006 15:04")
+			at = dateTime(e.At.In(loc), lang)
 		}
 		b.WriteString(strings.Replace(cell, "<td ", `<td class="ns-sm-hide" `, 1) + `white-space:nowrap;color:` + mMuted + `;font-size:13px;">` + esc(at) + "</td>")
 		b.WriteString("</tr>\n")
 	}
 	b.WriteString("</table>\n")
 	if more := len(events) - len(shown); more > 0 {
-		b.WriteString(`<div style="margin-top:8px;font-size:13px;color:` + mMuted + `;">… und ` + strconv.Itoa(more) +
-			" weitere Ereignisse (vollständige Liste im Textteil)</div>\n")
+		b.WriteString(`<div style="margin-top:8px;font-size:13px;color:` + mMuted + `;">` +
+			esc(i18n.Sprintf(lang, "… und %d weitere Ereignisse (vollständige Liste im Textteil)", more)) + "</div>\n")
 	}
 	return b.String()
 }
@@ -542,11 +557,11 @@ func safeURL(s string) (string, bool) {
 	return u.String(), true
 }
 
-func countLabel(n int) string {
+func countLabel(n int, lang i18n.Locale) string {
 	if n == 1 {
-		return "1 Ereignis"
+		return i18n.T(lang, "1 Ereignis")
 	}
-	return fmt.Sprintf("%d Ereignisse", n)
+	return i18n.Sprintf(lang, "%d Ereignisse", n)
 }
 
 // oneLine collapses whitespace and removes control characters.

@@ -8,6 +8,7 @@
 	import { Icon, MultiSelect } from '$lib/components/ui';
 	import type { MultiOption } from '$lib/components/ui';
 	import { eventTypes } from '$lib/stores/catalog.svelte';
+	import { t } from '$lib/i18n';
 	import { eventCategoryLabel } from '$lib/utils/labels';
 	import { eventTypeName, typePatterns } from './rule';
 
@@ -19,7 +20,7 @@
 		id?: string;
 	}
 
-	let { value = $bindable([]), label = 'Event-Typen', hint, error, id }: Props = $props();
+	let { value = $bindable([]), label = t('Event-Typen'), hint, error, id }: Props = $props();
 
 	onMount(() => {
 		eventTypes.load().catch(() => {});
@@ -29,12 +30,12 @@
 
 	const options = $derived.by((): MultiOption[] => {
 		const out: MultiOption[] = [
-			{ value: '*', label: 'Alle Events', description: '*', group: 'Muster' },
+			{ value: '*', label: eventTypeName('*', catalog), description: '*', group: t('Muster') },
 			...typePatterns(catalog).map((p) => ({
 				value: p,
 				label: eventTypeName(p, catalog),
 				description: p,
-				group: 'Muster'
+				group: t('Muster')
 			}))
 		];
 		const cats = [...new Set(catalog.map((e) => e.category))];
@@ -44,25 +45,34 @@
 		// keep unknown stored values visible
 		for (const v of value ?? [])
 			if (!out.some((o) => typeof o !== 'string' && o.value === v))
-				out.push({ value: v, label: v, description: 'unbekannt', group: 'Sonstige' });
+				out.push({ value: v, label: v, description: t('unbekannt'), group: t('Sonstige') });
 		return out;
 	});
 </script>
 
 <div class="flex flex-col gap-1.5">
-	<MultiSelect {id} {label} {hint} {error} bind:value {options} searchable placeholder="Alle Event-Typen" />
+	<MultiSelect
+		{id}
+		{label}
+		{hint}
+		{error}
+		bind:value
+		{options}
+		searchable
+		placeholder={t('Alle Event-Typen')}
+	/>
 	{#if (value ?? []).length > 2}
-		<ul class="flex flex-wrap gap-1" aria-label="Ausgewählte Event-Typen">
-			{#each value as t (t)}
+		<ul class="flex flex-wrap gap-1" aria-label={t('Ausgewählte Event-Typen')}>
+			{#each value as type (type)}
 				<li
 					class="inline-flex items-center gap-0.5 rounded bg-surface-3 py-0.5 pr-0.5 pl-1.5 text-[0.8125rem] text-fg"
 				>
-					{eventTypeName(t, catalog)}
+					{eventTypeName(type, catalog)}
 					<button
 						type="button"
 						class="rounded p-0.5 text-fg-subtle hover:bg-border hover:text-fg"
-						aria-label="{eventTypeName(t, catalog)} entfernen"
-						onclick={() => (value = value.filter((x) => x !== t))}
+						aria-label={t('{name} entfernen', { name: eventTypeName(type, catalog) })}
+						onclick={() => (value = value.filter((x) => x !== type))}
 					>
 						<Icon name="x" size={12} />
 					</button>

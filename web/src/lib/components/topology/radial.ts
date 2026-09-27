@@ -3,6 +3,7 @@
 // of a child leaves a wedge free towards its parent, so edges do not cut through siblings.
 // Separate trees and the devices without any edge are placed as round groups around the
 // largest tree. Deterministic: the same graph always gives the same picture.
+import { intlLocale } from '$lib/i18n';
 import type { TLink, TNode } from './graph';
 
 const TAU = Math.PI * 2;
@@ -35,7 +36,7 @@ const gap = (n: TNode) => (n.container ? CONTAINER_GAP : GAP);
 /** own radius incl. room for the label below the node */
 const own = (n: TNode) => n.r + (n.container ? 3 : 9);
 const byLabel = (a: TNode, b: TNode) =>
-	a.data.label.localeCompare(b.data.label, 'de', { numeric: true }) || a.id.localeCompare(b.id);
+	a.data.label.localeCompare(b.data.label, intlLocale, { numeric: true }) || a.id.localeCompare(b.id);
 
 export function radialLayout(nodes: TNode[], links: TLink[]): RadialLayout {
 	// one parent per node: the most specific edge (container > runs_on > switch port … > l3)

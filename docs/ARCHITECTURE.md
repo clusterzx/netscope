@@ -56,6 +56,7 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `internal/agent` | Agent-Dienst: Installations-Tokens, Anmeldung, Long Poll, Inventar und Messwerte als Beobachtungen, Offline-Erkennung, Auslieferung der Builds; `agent/proto` = Protokoll, `agent/wininv` = Windows-Inventar (JSON → Beobachtung, OS-CPE, DHCP-Leases) |
 | `internal/hostscript` | feste Liste der Lesebefehle für das Linux-Inventar und Zerlegung ihrer Ausgabe (SSH-Inventar und Agent); `windows.ps1` = Leseskript des Windows-Agents |
 | `internal/dockercli` | Parser für `docker ps`/`docker images` (SSH-Inventar, Docker in Proxmox-LXCs) |
+| `internal/i18n` | Sprachen: Kataloge (deutscher Text → Englisch), Muster für formatierte Texte, Sprache einer Anfrage (siehe „Sprachen“) |
 | `internal/sshx`, `internal/execx`, `internal/netutil` | gemeinsame Helfer (SSH mit TOFU, Prozesse streamend, Adressen) |
 | `web/` | SvelteKit-Quellen (TypeScript, Tailwind) |
 | `scripts/` | `smoke.sh` (End-to-End-Test), `deploy.sh` (Deployment per SSH) |
@@ -69,7 +70,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 
 | Bereich | Tabellen |
 |---|---|
-| System | `settings`, `users` (Rolle, deaktiviert, Passwort-Änderung offen, TOTP verschlüsselt, Herkunft `auth_source`/`external_id` für LDAP und OIDC), `roles` (Rechte als JSON-Liste, 2FA-Pflicht), `user_passkeys`, `user_recovery_codes` (Hash), `sessions`, `api_tokens`, `audit_log` |
+| System | `settings`, `users` (Rolle, deaktiviert, Passwort-Änderung offen, TOTP verschlüsselt, Herkunft `auth_source`/`external_id` für LDAP und OIDC, Sprache `locale`), `roles` (Rechte als JSON-Liste, 2FA-Pflicht), `user_passkeys`, `user_recovery_codes` (Hash), `sessions`, `api_tokens`, `audit_log` |
 | Verbund | `sites` (Zentrale: Standorte mit Token-Hash, Stream, letzter Meldung und Status), `site_devices` (Geräte-ID am Standort → Gerät hier), `federation_outbox` (Standort: Puffer) |
 | Agents | `agent_enrollments` (Installations-Tokens als Hash, Tags, Nutzungen, Ablauf), `agents` (Host, Version, Secret-Hash, Gerät, letzter Kontakt, Inventar/Messwerte, volle Dateisysteme) |
 | Vault | `vault_meta` (Key-Prüfwert), `credentials` (öffentliche Felder + AES-GCM-Blob + Geltungsbereich `scope`) |
@@ -313,7 +314,9 @@ aktiv, Cron-Zeitplan, Timeout, Wiederholungen + Backoff, Parallelität, Scope
 | `interface.up` | Port wieder verbunden | info | snmp_traffic |
 | `interface.saturated` | Port überlastet (Schwelle einstellbar, Standard 90 %) | medium | snmp_traffic |
 
-Payload-Felder je Typ: `GET /api/v1/events/types` bzw. `internal/plugin/events.go`.
+Payload-Felder je Typ: `GET /api/v1/events/types` bzw. `internal/plugin/events.go` (Labels und
+Beschreibungen in der Sprache der Anfrage; Payload-Werte bleiben unverändert, z. B.
+`direction: eingehend`, damit Regeln unabhängig von der Sprache greifen).
 
 ## Benutzer und Rechte
 
@@ -361,6 +364,61 @@ Settings `auth.oidc` / `auth.ldap`, Client-Secret und Bind-Passwort in `auth.*.s
 (vault-verschlüsselt, von der Key-Rotation erfasst). `adminsLeft` verlangt beim Entfernen,
 Deaktivieren oder Herabstufen eines lokalen Administrators einen anderen aktiven lokalen.
 
+## Sprachen (Deutsch und Englisch)
+
+Deutsch ist die Quellsprache: Jeder Text steht im Code auf Deutsch, Englisch kommt als
+Katalog „deutscher Text → englischer Text“ dazu. Es gibt keine Schlüssel wie
+`devices.delete.title` – der deutsche Text ist der Schlüssel, der Code bleibt lesbar.
+
+**Server** (`internal/i18n`): Jedes Paket registriert seine Übersetzungen in `i18n_en.go`
+(`i18n.Register` in `init()`). Schlüssel mit `fmt`-Verben sind Muster, die den fertigen Text
+übersetzen: `"Neues Gerät: %s"` → `"New device: %s"`, `"%s auf %s ausgelastet"` →
+`"%[2]s: %[1]s saturated"`. `%w`/`%v` (Fehler) werden rekursiv mitübersetzt, `%s`-Argumente
+nur über spezifische Muster (mindestens sechs feste Zeichen), Namen und Adressen bleiben
+unverändert. `i18n.T` sucht exakt, dann in den Mustern (das mit dem meisten festen Text
+zuerst, Vorfilter über das längste feste Stück, Ergebnis-Cache), dann Zeile für Zeile;
+`i18n.Err` übersetzt zusätzlich die Glieder einer Fehlerkette („Kontext: Ursache“) einzeln.
+Ein Text ohne Übersetzung bleibt, wie er ist.
+
+**Sprache einer Anfrage** (`requestLocale`): Einstellung des Benutzers (`users.locale`, auch
+bei API-Tokens), sonst `Accept-Language`, sonst Deutsch. `withAuth` hängt den Principal vor
+den Rechteprüfungen an, damit auch deren Fehler in der Sprache des Benutzers kommen.
+
+**Was die API übersetzt:** Fehlermeldungen und Feldfehler (`writeError`), Plugin-Info,
+Settings-Schema und Aktionen (`Schema.Localize` usw.), Event-Katalog, Credential-Typen,
+Berechtigungen, Filterfelder, Schweregrade, Cron-Beschreibungen (`cron.DescribeIn`), die
+OpenAPI-Spezifikation und die Doku-Seite. Texte, die zur Laufzeit auf Deutsch entstehen und
+gespeichert werden – Event-Titel und -Nachrichten, Lauf-Fehler, Aktionsergebnisse, Run-Logs
+und Server-Log, Audit-Zusammenfassungen, Health-Fehler, Benachrichtigungsverlauf, Zustände
+von Tunneln, Agents und Standorten – übersetzt die API beim Lesen über die Muster
+(`internal/api/localize.go`), ebenso die Live-Updates per SSE je Verbindung. Dadurch
+erscheinen auch Events, die vor der Übersetzung gespeichert wurden, auf Englisch; passt kein
+Muster, bleibt der gespeicherte Text. Gesucht (`q`) wird weiter im deutschen Text.
+
+**Benachrichtigungen und geplante Berichte** gehen an Empfänger ohne Sitzung und haben eine
+Sprache für die ganze Instanz (`settings.System.Language`, an Plugins als `Env.Language`).
+Der Host übersetzt vor dem Versand Titel, Events und Text der Benachrichtigung
+(`pluginhost.LocalizeNotification`) und setzt `Notification.Lang`; die Publisher schreiben
+ihre eigenen Texte mit `i18n.T(n.Lang, …)`. `internal/reports` erhält die Sprache als
+Parameter (geplante Berichte: Systemeinstellung, Downloads: Sprache der Anfrage).
+
+**Oberfläche** (`web/src/lib/i18n`): `t('Gerät löschen')` mit den Katalogen
+`en/*.json`; `t()` ist typisiert, ein fehlender Eintrag ist ein Fehler in `npm run check`.
+Die Sprache steht beim Laden der Seite fest (gespeicherte Einstellung des Benutzers, sonst
+Browser, sonst Deutsch; die Anmeldeseite folgt immer dem Browser) und wird per
+`Accept-Language` an jede Anfrage gehängt; eine Änderung lädt die Seite neu. Formate über
+`Intl` (Englisch: Variante des Browsers, sonst en-GB).
+
+**Prüfungen:** `go test ./internal/i18n/` verlangt für jedes Label, jede Beschreibung und
+Option der ausgelieferten Kataloge (Plugins, Aktionen, Events, Credential-Typen,
+Berechtigungen, Filterfelder) eine Übersetzung und sucht im Quelltext deutsch aussehende
+Literale ohne Eintrag (Umlaute, typische deutsche Wörter; Verkettungen als Muster mit `%s`;
+Schlüssel von Log-Attributen und Map-Indizes ausgenommen; bewusst deutsche Daten mit
+`// i18n:ignore`). Konflikte (gleicher deutscher Text, verschiedene Übersetzungen) und Muster
+mit abweichenden Argumenten meldet `TestCatalogProblems`. `cmd/netscope` prüft die CLI-Texte
+selbst; die CLI spricht Englisch mit `LANG=en_…`. Frontend: `scripts/i18n-check.mjs` in
+`npm run check`.
+
 ## API
 
 JSON unter `/api/v1`, generierte OpenAPI-Spezifikation unter `/api/openapi.json`,
@@ -369,7 +427,7 @@ Prometheus-Metriken unter `/metrics`.
 
 | Bereich | Endpunkte |
 |---|---|
-| Auth | `POST /auth/login` (+ `/login/totp`, `/login/recovery`, `/login/passkey/options`, `/login/passkey`), `POST /auth/logout`, `GET /auth/me` (Benutzer, Rolle, Rechte), `PUT /auth/password`, `GET /auth/2fa`, `POST /auth/2fa/totp` (+ `/confirm`, `/disable`), `POST /auth/2fa/recovery`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `PATCH/DELETE /auth/passkeys/{id}`, `GET/POST /tokens` (eigene; mit `users.manage` alle), `DELETE /tokens/{id}`, `GET /auth/providers`, `GET /auth/oidc/start`, `GET /auth/oidc/callback`; mit `users.manage`: `GET /system/auth`, `PUT /system/auth/oidc`, `PUT /system/auth/ldap`, `POST /system/auth/oidc/test`, `POST /system/auth/ldap/test` |
+| Auth | `POST /auth/login` (+ `/login/totp`, `/login/recovery`, `/login/passkey/options`, `/login/passkey`), `POST /auth/logout`, `GET /auth/me` (Benutzer, Rolle, Rechte, Sprache), `PUT /auth/password`, `PUT /auth/preferences` (eigene Sprache), `GET /auth/2fa`, `POST /auth/2fa/totp` (+ `/confirm`, `/disable`), `POST /auth/2fa/recovery`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `PATCH/DELETE /auth/passkeys/{id}`, `GET/POST /tokens` (eigene; mit `users.manage` alle), `DELETE /tokens/{id}`, `GET /auth/providers`, `GET /auth/oidc/start`, `GET /auth/oidc/callback`; mit `users.manage`: `GET /system/auth`, `PUT /system/auth/oidc`, `PUT /system/auth/ldap`, `POST /system/auth/oidc/test`, `POST /system/auth/ldap/test` |
 | Benutzer | `GET/POST /users`, `GET/PUT/DELETE /users/{id}`, `POST /users/{id}/password` (neues Start-Passwort), `POST /users/{id}/2fa/reset`, `GET/POST /roles`, `PUT/DELETE /roles/{id}`, `GET /permissions` |
 | Geräte | `GET/POST /devices`, `GET/PATCH/DELETE /devices/{id}`, `POST /devices/bulk`, `POST /devices/merge`, `POST /devices/{id}/split`, `POST /devices/{id}/ips` / `DELETE /devices/{id}/ips/{ip}` (IP von Hand vergeben/entfernen), `POST /devices/{id}/scan`, `POST /devices/{id}/actions/{plugin}/{action}`, Tabs: `…/ports`, `…/http`, `…/certificates`, `…/packages`, `…/containers`, `…/inventory`, `…/cves`, `…/health`, `…/events`, `…/timeline`, `…/relations`, `…/observations`, `…/timeseries`, `…/credentials` (passende Zugangsdaten mit Rang und Grund); `GET /tags`, `GET /certificates` |
 | Stammdaten | `/subnets` (mit Tunnel-Zustand), `/groups` (+ `/members`), `/custom-fields`, `/views` (CRUD) |

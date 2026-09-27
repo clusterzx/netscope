@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
 	import { JsonView } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { fmtValue, jsonDiff } from './system';
 
 	interface Props {
@@ -29,9 +30,9 @@
 		same: ''
 	};
 	const kindLabel: Record<string, string> = {
-		added: 'neu',
-		removed: 'entfernt',
-		changed: 'geändert',
+		added: t('neu'),
+		removed: t('entfernt'),
+		changed: t('geändert'),
 		same: ''
 	};
 </script>
@@ -39,12 +40,16 @@
 <div class="flex flex-col gap-2">
 	<div class="flex flex-wrap items-center gap-3 text-xs">
 		<span class="text-fg-muted">
-			{#if hasBefore && hasAfter}{changed.length} geänderte Felder{:else if hasAfter}Neu angelegt{:else}Gelöscht{/if}
+			{#if hasBefore && hasAfter}{tn(
+					changed.length,
+					'{n} geändertes Feld',
+					'{n} geänderte Felder'
+				)}{:else if hasAfter}{t('Neu angelegt')}{:else}{t('Gelöscht')}{/if}
 		</span>
 		{#if hasBefore && hasAfter && rows.length !== changed.length}
 			<label class="inline-flex items-center gap-1.5 text-fg-muted">
-				<input type="checkbox" bind:checked={showAll} class="h-3.5 w-3.5 accent-(--accent)" /> unveränderte Felder
-				zeigen
+				<input type="checkbox" bind:checked={showAll} class="h-3.5 w-3.5 accent-(--accent)" />
+				{t('unveränderte Felder zeigen')}
 			</label>
 		{/if}
 		<label class="inline-flex items-center gap-1.5 text-fg-muted">
@@ -54,25 +59,25 @@
 	{#if raw}
 		<div class="grid grid-cols-1 gap-2 lg:grid-cols-2">
 			{#if hasBefore}<div>
-					<div class="mb-1 text-xs font-medium text-fg-muted">Vorher</div>
+					<div class="mb-1 text-xs font-medium text-fg-muted">{t('Vorher')}</div>
 					<JsonView value={before} openDepth={1} maxHeight="20rem" />
 				</div>{/if}
 			{#if hasAfter}<div>
-					<div class="mb-1 text-xs font-medium text-fg-muted">Nachher</div>
+					<div class="mb-1 text-xs font-medium text-fg-muted">{t('Nachher')}</div>
 					<JsonView value={after} openDepth={1} maxHeight="20rem" />
 				</div>{/if}
 		</div>
 	{:else if shown.length === 0}
-		<p class="text-xs text-fg-subtle">Keine Unterschiede.</p>
+		<p class="text-xs text-fg-subtle">{t('Keine Unterschiede.')}</p>
 	{:else}
 		<div class="overflow-x-auto rounded-md border border-border">
 			<table class="w-full text-xs">
-				<caption class="sr-only">Änderungen</caption>
+				<caption class="sr-only">{t('Änderungen')}</caption>
 				<thead class="bg-surface-2 text-fg-muted">
 					<tr>
-						<th scope="col" class="px-2 py-1 text-left font-medium">Feld</th>
-						{#if hasBefore}<th scope="col" class="px-2 py-1 text-left font-medium">Vorher</th>{/if}
-						{#if hasAfter}<th scope="col" class="px-2 py-1 text-left font-medium">Nachher</th>{/if}
+						<th scope="col" class="px-2 py-1 text-left font-medium">{t('Feld')}</th>
+						{#if hasBefore}<th scope="col" class="px-2 py-1 text-left font-medium">{t('Vorher')}</th>{/if}
+						{#if hasAfter}<th scope="col" class="px-2 py-1 text-left font-medium">{t('Nachher')}</th>{/if}
 					</tr>
 				</thead>
 				<tbody>

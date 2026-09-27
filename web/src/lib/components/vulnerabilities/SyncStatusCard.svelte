@@ -24,6 +24,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatBytes, formatDateTime, formatNumber } from '$lib/utils/format';
 	import { runStatusLabel } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 	import { feedName, feedStatusLabel, feedStatusTone, syncModeLabel } from './cve';
 
 	interface Props {
@@ -47,9 +48,9 @@
 
 	function actionOf(r: RunView): string {
 		const a = (r.params as Record<string, unknown> | undefined)?._action;
-		if (a === 'sync') return 'NVD-Synchronisation';
-		if (a === 'match') return 'Abgleich';
-		return 'Synchronisation & Abgleich';
+		if (a === 'sync') return t('NVD-Synchronisation');
+		if (a === 'match') return t('Abgleich');
+		return t('Synchronisation & Abgleich');
 	}
 
 	$effect(() =>
@@ -59,7 +60,7 @@
 			if (starting === r.id) starting = null;
 			const msg = (r.stats?.result as { message?: string } | undefined)?.message;
 			if (r.status === 'success')
-				toast.success(msg || 'Lauf abgeschlossen', { title: actionOf(r), timeout: 9000 });
+				toast.success(msg || t('Lauf abgeschlossen'), { title: actionOf(r), timeout: 9000 });
 			else toast.error(r.error || runStatusLabel[r.status] || r.status, { title: actionOf(r) });
 		})
 	);
@@ -77,12 +78,12 @@
 			// keep the buttons disabled until the run shows up in the runs store
 			starting = out.runId;
 			setTimeout(() => starting === out.runId && (starting = null), 15_000);
-			toast.info(`Lauf #${out.runId} gestartet – der Fortschritt erscheint hier.`, {
-				title: action === 'sync' ? 'NVD-Synchronisation' : 'Abgleich'
+			toast.info(t('Lauf #{id} gestartet – der Fortschritt erscheint hier.', { id: out.runId }), {
+				title: action === 'sync' ? t('NVD-Synchronisation') : t('Abgleich')
 			});
 		} catch (e) {
 			toast.error(errorMessage(e), {
-				title: action === 'sync' ? 'Synchronisation nicht gestartet' : 'Abgleich nicht gestartet'
+				title: action === 'sync' ? t('Synchronisation nicht gestartet') : t('Abgleich nicht gestartet')
 			});
 		} finally {
 			pending = null;
@@ -101,8 +102,8 @@
 </script>
 
 <Card
-	title="NVD-Spiegel"
-	description="Lokale Kopie der NVD-Datenbank und letzter Abgleich"
+	title={t('NVD-Spiegel')}
+	description={t('Lokale Kopie der NVD-Datenbank und letzter Abgleich')}
 	icon="cloud"
 	class={klass}
 >
@@ -116,31 +117,32 @@
 	{:else}
 		<div class="flex flex-col gap-4">
 			{#if status.empty}
-				<Alert tone="info" title="Die lokale NVD-Kopie ist leer">
-					Ohne Synchronisation kann der Abgleich keine CVEs finden. Der erste Import lädt alle Jahres-Feeds
-					der NVD herunter und dauert einige Minuten.
+				<Alert tone="info" title={t('Die lokale NVD-Kopie ist leer')}>
+					{t(
+						'Ohne Synchronisation kann der Abgleich keine CVEs finden. Der erste Import lädt alle Jahres-Feeds der NVD herunter und dauert einige Minuten.'
+					)}
 				</Alert>
 			{/if}
 			{#if status.syncStatus === 'error' && status.syncError}
-				<Alert tone="danger" title="Letzte Synchronisation fehlgeschlagen">{status.syncError}</Alert>
+				<Alert tone="danger" title={t('Letzte Synchronisation fehlgeschlagen')}>{status.syncError}</Alert>
 			{/if}
 			{#if status.lastMatch?.status === 'error' && status.lastMatch.error}
-				<Alert tone="danger" title="Letzter Abgleich fehlgeschlagen">{status.lastMatch.error}</Alert>
+				<Alert tone="danger" title={t('Letzter Abgleich fehlgeschlagen')}>{status.lastMatch.error}</Alert>
 			{/if}
 
 			<dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
 				<div>
-					<dt class="text-xs text-fg-subtle">CVEs im Spiegel</dt>
+					<dt class="text-xs text-fg-subtle">{t('CVEs im Spiegel')}</dt>
 					<dd class="text-lg font-semibold tabular">{formatNumber(status.cveCount)}</dd>
 				</div>
 				<div>
-					<dt class="text-xs text-fg-subtle">CPE-Einträge</dt>
+					<dt class="text-xs text-fg-subtle">{t('CPE-Einträge')}</dt>
 					<dd class="text-lg font-semibold tabular">{formatNumber(status.cpeMatchCount)}</dd>
 				</div>
 				<div>
-					<dt class="text-xs text-fg-subtle">Letzte Synchronisation</dt>
+					<dt class="text-xs text-fg-subtle">{t('Letzte Synchronisation')}</dt>
 					<dd class="flex flex-wrap items-center gap-1.5">
-						<RelativeTime value={status.lastSync} fallback="noch nie" />
+						<RelativeTime value={status.lastSync} fallback={t('noch nie')} />
 						{#if status.syncMode}<Badge>{syncModeLabel[status.syncMode] ?? status.syncMode}</Badge>{/if}
 						{#if status.syncStatus}
 							<Badge tone={feedStatusTone(status.syncStatus)}
@@ -150,19 +152,21 @@
 					</dd>
 				</div>
 				<div>
-					<dt class="text-xs text-fg-subtle">Letzter Abgleich</dt>
+					<dt class="text-xs text-fg-subtle">{t('Letzter Abgleich')}</dt>
 					<dd class="flex flex-wrap items-center gap-1.5">
-						<RelativeTime value={status.lastMatch?.at} fallback="noch nie" />
+						<RelativeTime value={status.lastMatch?.at} fallback={t('noch nie')} />
 						{#if status.lastMatch}
 							<Badge tone={status.lastMatch.status === 'ok' ? 'ok' : 'danger'}
-								>{status.lastMatch.status === 'ok' ? 'OK' : 'Fehler'}</Badge
+								>{status.lastMatch.status === 'ok' ? 'OK' : t('Fehler')}</Badge
 							>
 						{/if}
 					</dd>
 					{#if status.lastMatch}
 						<dd class="text-xs text-fg-subtle">
-							{formatNumber(status.lastMatch.devices)} Geräte · {formatNumber(status.lastMatch.activeCves)} aktive
-							Treffer
+							{t('{devices} Geräte · {hits} aktive Treffer', {
+								devices: formatNumber(status.lastMatch.devices),
+								hits: formatNumber(status.lastMatch.activeCves)
+							})}
 						</dd>
 					{/if}
 				</div>
@@ -181,7 +185,7 @@
 								<span class="ml-auto text-xs text-fg-subtle tabular">
 									{#if r.progress?.total}{formatNumber(r.progress.done)} / {formatNumber(
 											r.progress.total
-										)}{:else if r.startedAt}gestartet
+										)}{:else if r.startedAt}{t('gestartet')}
 										<RelativeTime value={r.startedAt} />{/if}
 								</span>
 							</div>
@@ -189,7 +193,7 @@
 								done={r.progress?.done}
 								total={r.progress?.total}
 								tone="live"
-								label="Fortschritt {actionOf(r)}"
+								label={t('Fortschritt {action}', { action: actionOf(r) })}
 							/>
 						</li>
 					{/each}
@@ -206,13 +210,13 @@
 						onclick={() => {
 							fullSync = false;
 							syncOpen = true;
-						}}>NVD jetzt synchronisieren</Button
+						}}>{t('NVD jetzt synchronisieren')}</Button
 					>
 					<Button
 						icon="refresh"
 						loading={pending === 'match'}
 						disabled={busy || status.empty}
-						onclick={() => runAction('match')}>Abgleich jetzt ausführen</Button
+						onclick={() => runAction('match')}>{t('Abgleich jetzt ausführen')}</Button
 					>
 				</div>
 			{/if}
@@ -225,7 +229,7 @@
 					aria-controls="{uid}-feeds"
 					onclick={() => (showFeeds = !showFeeds)}
 				>
-					{showFeeds ? 'Feeds ausblenden' : `Feeds anzeigen (${status.feeds?.length ?? 0})`}
+					{showFeeds ? t('Feeds ausblenden') : t('Feeds anzeigen ({n})', { n: status.feeds?.length ?? 0 })}
 				</button>
 				<div
 					id="{uid}-feeds"
@@ -233,14 +237,16 @@
 					class="mt-2 max-h-80 overflow-auto rounded-md border border-border"
 				>
 					<table class="w-full text-xs">
-						<caption class="sr-only">NVD-Feeds</caption>
+						<caption class="sr-only">{t('NVD-Feeds')}</caption>
 						<thead class="sticky top-0 bg-surface-2 text-fg-muted">
 							<tr>
 								<th scope="col" class="px-2 py-1.5 text-left font-medium">Feed</th>
 								<th scope="col" class="px-2 py-1.5 text-left font-medium">Status</th>
 								<th scope="col" class="px-2 py-1.5 text-right font-medium">CVEs</th>
-								<th scope="col" class="hidden px-2 py-1.5 text-right font-medium sm:table-cell">Größe</th>
-								<th scope="col" class="px-2 py-1.5 text-left font-medium">Geprüft</th>
+								<th scope="col" class="hidden px-2 py-1.5 text-right font-medium sm:table-cell"
+									>{t('Größe')}</th
+								>
+								<th scope="col" class="px-2 py-1.5 text-left font-medium">{t('Geprüft')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -253,13 +259,16 @@
 									</td>
 									<td class="px-2 py-1 text-right tabular">{formatNumber(f.cveCount)}</td>
 									<td class="hidden px-2 py-1 text-right tabular sm:table-cell">{formatBytes(f.size)}</td>
-									<td class="px-2 py-1 whitespace-nowrap" title="Stand: {f.lastModified || '–'}"
+									<td
+										class="px-2 py-1 whitespace-nowrap"
+										title={t('Stand: {date}', { date: f.lastModified || '–' })}
 										>{formatDateTime(f.syncedAt)}</td
 									>
 								</tr>
 							{:else}
 								<tr
-									><td colspan="5" class="px-2 py-3 text-center text-fg-subtle">Noch keine Feeds geladen</td
+									><td colspan="5" class="px-2 py-3 text-center text-fg-subtle"
+										>{t('Noch keine Feeds geladen')}</td
 									></tr
 								>
 							{/each}
@@ -271,25 +280,28 @@
 	{/if}
 </Card>
 
-<Modal bind:open={syncOpen} title="NVD synchronisieren" size="sm" as="form" onsubmit={startSync}>
+<Modal bind:open={syncOpen} title={t('NVD synchronisieren')} size="sm" as="form" onsubmit={startSync}>
 	<div class="flex flex-col gap-3 text-sm">
 		<p class="text-fg-muted">
-			Lädt geänderte NVD-Feeds herunter und gleicht danach alle Geräte ab. Der Lauf erscheint mit Fortschritt
-			auf dieser Seite.
+			{t(
+				'Lädt geänderte NVD-Feeds herunter und gleicht danach alle Geräte ab. Der Lauf erscheint mit Fortschritt auf dieser Seite.'
+			)}
 		</p>
 		<Checkbox
 			bind:checked={fullSync}
-			label="Alle Feeds neu laden"
-			description="Alle Jahres-Feeds unabhängig von Prüfsummen neu herunterladen und importieren (dauert mehrere Minuten)."
+			label={t('Alle Feeds neu laden')}
+			description={t(
+				'Alle Jahres-Feeds unabhängig von Prüfsummen neu herunterladen und importieren (dauert mehrere Minuten).'
+			)}
 		/>
 		{#if status?.lastSync}
 			<p class="text-xs text-fg-subtle">
-				Letzte Synchronisation {formatDateTime(status.lastSync)}
+				{t('Letzte Synchronisation {date}', { date: formatDateTime(status.lastSync) })}
 			</p>
 		{/if}
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (syncOpen = false)}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="download">Synchronisieren</Button>
+		<Button onclick={() => (syncOpen = false)}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="download">{t('Synchronisieren')}</Button>
 	{/snippet}
 </Modal>

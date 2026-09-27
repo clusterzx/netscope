@@ -21,6 +21,7 @@
 		Toggle
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { credentials as credentialCatalog, subnets as subnetCatalog } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
@@ -69,19 +70,20 @@
 	const accessOptions: { value: SubnetAccess; label: string; description: string }[] = [
 		{
 			value: 'direct',
-			label: 'Direkt angeschlossen',
-			description: 'NetScope hängt selbst in diesem Netz – ARP-Scans und MAC-Adressen.'
+			label: t('Direkt angeschlossen'),
+			description: t('NetScope hängt selbst in diesem Netz – ARP-Scans und MAC-Adressen.')
 		},
 		{
 			value: 'routed',
-			label: 'Über einen Router',
-			description:
+			label: t('Über einen Router'),
+			description: t(
 				'Erreichbar über ein Gateway, z. B. ein anderes VLAN. Kein ARP; Geräte werden über die IP erkannt.'
+			)
 		},
 		{
 			value: 'wireguard',
-			label: 'Über WireGuard-Tunnel',
-			description: 'NetScope baut selbst einen Tunnel in ein entferntes Netz auf, z. B. ins Rechenzentrum.'
+			label: t('Über WireGuard-Tunnel'),
+			description: t('NetScope baut selbst einen Tunnel in ein entferntes Netz auf, z. B. ins Rechenzentrum.')
 		}
 	];
 
@@ -150,19 +152,20 @@
 		const c = cidrError(form.cidr);
 		if (c) e.cidr = c;
 		const gw = form.gateway.trim();
-		if (gw && !isIP(gw)) e.gateway = 'Ungültige IP-Adresse';
-		else if (gw && !c && !ipInCidr(gw, form.cidr.trim())) e.gateway = 'Gateway liegt nicht im Subnetz';
+		if (gw && !isIP(gw)) e.gateway = t('Ungültige IP-Adresse');
+		else if (gw && !c && !ipInCidr(gw, form.cidr.trim())) e.gateway = t('Gateway liegt nicht im Subnetz');
 		if (form.access === 'direct') {
 			if (form.vlan !== null && (!Number.isInteger(form.vlan) || form.vlan < 1 || form.vlan > 4094))
 				e.vlan = '1–4094';
 			if (form.interface && !/^[A-Za-z0-9_.@:-]{1,32}$/.test(form.interface))
-				e.interface = 'Buchstaben, Ziffern, _ . @ : - (max. 32)';
+				e.interface = t('Buchstaben, Ziffern, _ . @ : - (max. 32)');
 		}
 		if (form.access === 'wireguard') {
-			if (form.tunnelMode === 'existing' && !form.tunnelCredentialId) e.tunnelCredentialId = 'Tunnel wählen';
+			if (form.tunnelMode === 'existing' && !form.tunnelCredentialId)
+				e.tunnelCredentialId = t('Tunnel wählen');
 			if (form.tunnelMode === 'new') {
-				if (!form.tunnelName.trim()) e.name = 'Pflichtfeld';
-				if (!form.tunnelConfig.trim()) e.config = 'Konfiguration einfügen oder aus Datei laden';
+				if (!form.tunnelName.trim()) e.name = t('Pflichtfeld');
+				if (!form.tunnelConfig.trim()) e.config = t('Konfiguration einfügen oder aus Datei laden');
 			}
 		}
 		return e;
@@ -175,7 +178,7 @@
 				body: {
 					name: form.tunnelName.trim(),
 					type: 'wireguard',
-					description: `Tunnel für ${form.cidr.trim()}`,
+					description: t('Tunnel für {cidr}', { cidr: form.cidr.trim() }),
 					values: { config: form.tunnelConfig }
 				}
 			});
@@ -213,7 +216,11 @@
 			const saved = editing
 				? await api.put('/api/v1/subnets/{id}', { path: { id: editing.id }, body })
 				: await api.post('/api/v1/subnets', { body });
-			toast.success(editing ? `Subnetz ${saved.cidr} gespeichert` : `Subnetz ${saved.cidr} angelegt`);
+			toast.success(
+				editing
+					? t('Subnetz {cidr} gespeichert', { cidr: saved.cidr })
+					: t('Subnetz {cidr} angelegt', { cidr: saved.cidr })
+			);
 			open = false;
 			list.reload();
 			subnetCatalog.refresh().catch(() => {});
@@ -235,7 +242,7 @@
 	async function toggleEnabled(s: Subnet, v: boolean) {
 		try {
 			await api.put('/api/v1/subnets/{id}', { path: { id: s.id }, body: { ...s, enabled: v } });
-			toast.success(`${s.cidr} ${v ? 'aktiviert' : 'deaktiviert'}`);
+			toast.success(v ? t('{cidr} aktiviert', { cidr: s.cidr }) : t('{cidr} deaktiviert', { cidr: s.cidr }));
 			subnetCatalog.refresh().catch(() => {});
 		} catch (e) {
 			toast.error(e);
@@ -246,21 +253,30 @@
 
 	async function remove(s: Subnet) {
 		const ok = await confirm({
-			title: `Subnetz ${s.cidr} löschen?`,
-			message:
-				(s.deviceCount > 0
-					? `${formatNumber(s.deviceCount)} Geräte sind diesem Subnetz zugeordnet. Die Geräte bleiben erhalten, werden aber nicht mehr per Subnetz gescannt und zugeordnet.`
-					: 'Das Subnetz wird nicht mehr gescannt.') +
-				(s.access === 'wireguard'
-					? ' Nutzt kein anderes Subnetz den Tunnel, wird er abgebaut; die Konfiguration bleibt unter Credentials gespeichert.'
-					: ''),
-			confirmLabel: 'Löschen',
+			title: t('Subnetz {cidr} löschen?', { cidr: s.cidr }),
+			message: [
+				s.deviceCount > 0
+					? tn(
+							s.deviceCount,
+							'{n} Gerät ist diesem Subnetz zugeordnet. Das Gerät bleibt erhalten, wird aber nicht mehr per Subnetz gescannt und zugeordnet.',
+							'{n} Geräte sind diesem Subnetz zugeordnet. Die Geräte bleiben erhalten, werden aber nicht mehr per Subnetz gescannt und zugeordnet.'
+						)
+					: t('Das Subnetz wird nicht mehr gescannt.'),
+				s.access === 'wireguard'
+					? t(
+							'Nutzt kein anderes Subnetz den Tunnel, wird er abgebaut; die Konfiguration bleibt unter Credentials gespeichert.'
+						)
+					: ''
+			]
+				.filter(Boolean)
+				.join(' '),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/subnets/{id}', { path: { id: s.id } });
-			toast.success(`Subnetz ${s.cidr} gelöscht`);
+			toast.success(t('Subnetz {cidr} gelöscht', { cidr: s.cidr }));
 			list.reload();
 			subnetCatalog.refresh().catch(() => {});
 		} catch (e) {
@@ -271,24 +287,28 @@
 	const tunnelName = (id: number | undefined) => wgCreds.find((c) => c.id === id)?.name;
 
 	const columns: Column<Subnet>[] = [
-		{ key: 'cidr', label: 'Subnetz' },
-		{ key: 'access', label: 'Erreichbarkeit', hideBelow: 'md' },
+		{ key: 'cidr', label: t('Subnetz') },
+		{ key: 'access', label: t('Erreichbarkeit'), hideBelow: 'md' },
 		{ key: 'gateway', label: 'Gateway', hideBelow: 'sm' },
-		{ key: 'devices', label: 'Geräte', align: 'right', width: '6rem' },
-		{ key: 'enabled', label: 'Aktiv', width: '5rem' },
+		{ key: 'devices', label: t('Geräte'), align: 'right', width: '6rem' },
+		{ key: 'enabled', label: t('Aktiv'), width: '5rem' },
 		{ key: 'actions', label: '', align: 'right', width: '3rem' }
 	];
 </script>
 
 <Card
-	title="Subnetze"
-	description="Aktive Subnetze werden von den Scannern abgedeckt; Adressen werden ihnen automatisch zugeordnet"
+	title={t('Subnetze')}
+	description={t(
+		'Aktive Subnetze werden von den Scannern abgedeckt; Adressen werden ihnen automatisch zugeordnet'
+	)}
 	icon="network"
 	padding="none"
 >
 	{#snippet actions()}
 		{#if canManage}
-			<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Subnetz anlegen</Button>
+			<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}
+				>{t('Subnetz anlegen')}</Button
+			>
 		{/if}
 	{/snippet}
 	{#if list.error && !list.data}
@@ -300,7 +320,7 @@
 			key={(s) => s.id}
 			loading={list.loading && !list.data}
 			class="rounded-none border-0"
-			caption="Subnetze"
+			caption={t('Subnetze')}
 			rowClass={(s) => (s.enabled ? '' : 'opacity-70')}
 		>
 			{#snippet cell(s, col)}
@@ -321,9 +341,9 @@
 							{#if s.tunnel?.error}<span class="max-w-xs text-xs text-danger">{s.tunnel.error}</span>{/if}
 						</div>
 					{:else if s.access === 'routed'}
-						<Badge tone="info">Über Router</Badge>
+						<Badge tone="info">{t('Über Router')}</Badge>
 					{:else}
-						<span class="mono">{s.interface || 'direkt'}</span>
+						<span class="mono">{s.interface || t('direkt')}</span>
 						{#if s.vlan}<Badge class="ml-1">VLAN {s.vlan}</Badge>{/if}
 					{/if}
 				{:else if col.key === 'gateway'}
@@ -336,28 +356,28 @@
 					<Toggle
 						size="sm"
 						checked={s.enabled}
-						label="{s.cidr} aktiv"
+						label={t('{cidr} aktiv', { cidr: s.cidr })}
 						hideLabel
 						disabled={!canManage}
 						onchange={(v) => toggleEnabled(s, v)}
 					/>
 				{:else if col.key === 'actions'}
 					<Menu
-						label="Aktionen für {s.cidr}"
+						label={t('Aktionen für {name}', { name: s.cidr })}
 						items={canManage
 							? [
-									{ label: 'Bearbeiten', icon: 'edit', onclick: () => openForm(s) },
+									{ label: t('Bearbeiten'), icon: 'edit', onclick: () => openForm(s) },
 									{
-										label: 'Geräte anzeigen',
+										label: t('Geräte anzeigen'),
 										icon: 'devices',
 										href: `/devices?q=${encodeURIComponent('subnet:' + s.cidr)}`
 									},
 									{ separator: true },
-									{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(s) }
+									{ label: t('Löschen'), icon: 'trash', danger: true, onclick: () => remove(s) }
 								]
 							: [
 									{
-										label: 'Geräte anzeigen',
+										label: t('Geräte anzeigen'),
 										icon: 'devices',
 										href: `/devices?q=${encodeURIComponent('subnet:' + s.cidr)}`
 									}
@@ -369,14 +389,16 @@
 				<EmptyState
 					compact
 					icon="network"
-					title="Keine Subnetze"
-					description="Ohne Subnetz scannen die Netzwerk-Scanner nichts – zuerst das lokale Netz anlegen, z. B. 192.168.1.0/24."
+					title={t('Keine Subnetze')}
+					description={t(
+						'Ohne Subnetz scannen die Netzwerk-Scanner nichts – zuerst das lokale Netz anlegen, z. B. 192.168.1.0/24.'
+					)}
 				/>
 			{/snippet}
 		</Table>
 		{#if !canManage}
 			<p class="border-t border-border px-4 py-2 text-xs text-fg-subtle">
-				Nur lesen – dafür fehlt die Berechtigung „Subnetze und Tunnel verwalten“.
+				{t('Nur lesen – dafür fehlt die Berechtigung „Subnetze und Tunnel verwalten“.')}
 			</p>
 		{/if}
 	{/if}
@@ -384,14 +406,14 @@
 
 <Modal
 	bind:open
-	title={editing ? `Subnetz ${editing.cidr} bearbeiten` : 'Subnetz anlegen'}
+	title={editing ? t('Subnetz {cidr} bearbeiten', { cidr: editing.cidr }) : t('Subnetz anlegen')}
 	size="lg"
 	as="form"
 	onsubmit={save}
 	busy={saving}
 >
 	<div class="flex flex-col gap-4">
-		{#if general}<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>{/if}
+		{#if general}<Alert tone="danger" title={t('Speichern fehlgeschlagen')}>{general}</Alert>{/if}
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input
 				label="CIDR"
@@ -399,15 +421,15 @@
 				mono
 				required
 				placeholder="192.168.1.0/24"
-				hint="IPv4 maximal /16"
+				hint={t('IPv4 maximal /16')}
 				error={errors.cidr}
 				oninput={() => delete errors.cidr}
 			/>
-			<Input label="Name" bind:value={form.name} placeholder="z. B. Heimnetz" maxlength={100} />
+			<Input label="Name" bind:value={form.name} placeholder={t('z. B. Heimnetz')} maxlength={100} />
 		</div>
 
 		<fieldset class="flex flex-col gap-2">
-			<legend class="mb-1 text-[0.8125rem] font-medium text-fg">Erreichbarkeit</legend>
+			<legend class="mb-1 text-[0.8125rem] font-medium text-fg">{t('Erreichbarkeit')}</legend>
 			<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
 				{#each accessOptions as o (o.value)}
 					{@const blocked = o.value === 'wireguard' && tunnelInfo !== null && !tunnelInfo.available}
@@ -437,7 +459,9 @@
 			{#if errors.access}<p class="text-xs text-danger">{errors.access}</p>{/if}
 			{#if tunnelInfo && !tunnelInfo.available}
 				<p class="text-xs text-fg-subtle">
-					WireGuard-Tunnel sind auf diesem Host nicht verfügbar: {tunnelInfo.reason}
+					{t('WireGuard-Tunnel sind auf diesem Host nicht verfügbar: {reason}', {
+						reason: tunnelInfo.reason
+					})}
 				</p>
 			{/if}
 		</fieldset>
@@ -462,7 +486,7 @@
 					bind:value={form.interface}
 					mono
 					placeholder="eth0"
-					hint="Für ARP-Scans (leer = automatisch)"
+					hint={t('Für ARP-Scans (leer = automatisch)')}
 					error={errors.interface}
 					oninput={() => delete errors.interface}
 				/>
@@ -482,20 +506,20 @@
 				bind:value={form.gateway}
 				mono
 				placeholder="192.168.1.1"
-				hint="Für die L3-Topologie"
+				hint={t('Für die L3-Topologie')}
 				error={errors.gateway}
 				oninput={() => delete errors.gateway}
 			/>
 			<div class="flex items-end pb-1.5">
-				<Toggle bind:checked={form.enabled} label="Aktiv" description="Von Scannern abgedeckt" />
+				<Toggle bind:checked={form.enabled} label={t('Aktiv')} description={t('Von Scannern abgedeckt')} />
 			</div>
 		</div>
-		<Textarea label="Notizen" bind:value={form.notes} rows={2} />
+		<Textarea label={t('Notizen')} bind:value={form.notes} rows={2} />
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={saving}>Abbrechen</Button>
+		<Button onclick={() => (open = false)} disabled={saving}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="primary" icon="save" loading={saving}
-			>{editing ? 'Speichern' : 'Anlegen'}</Button
+			>{editing ? t('Speichern') : t('Anlegen')}</Button
 		>
 	{/snippet}
 </Modal>

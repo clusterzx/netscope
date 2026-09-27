@@ -7,6 +7,7 @@
 	import { runs } from '$lib/stores/runs.svelte';
 	import { formatDuration } from '$lib/utils/format';
 	import { runStatusLabel, runStatusTone } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 	import type { StartedScan } from './ScanModal.svelte';
 
 	interface Props {
@@ -40,15 +41,15 @@
 	class="flex flex-col gap-2 rounded-lg border px-3 py-2.5 {done
 		? 'border-border bg-surface'
 		: 'border-accent/30 bg-accent-soft'} {klass}"
-	aria-label="Gestartete Scans"
+	aria-label={t('Gestartete Scans')}
 	aria-live="polite"
 >
 	<div class="flex items-center gap-2">
 		<h2 class="flex-1 text-sm font-medium">
-			{done ? 'Scan abgeschlossen' : 'Scan läuft …'}
+			{done ? t('Scan abgeschlossen') : t('Scan läuft …')}
 		</h2>
 		{#if done}
-			<Button size="xs" variant="ghost" icon="x" label="Ausblenden" onclick={() => (scans = [])} />
+			<Button size="xs" variant="ghost" icon="x" label={t('Ausblenden')} onclick={() => (scans = [])} />
 		{/if}
 	</div>
 	<ul class="flex flex-col gap-1.5">
@@ -69,7 +70,7 @@
 						total={r.run?.progress?.total}
 						tone="live"
 						class="w-40 max-w-full"
-						label="Fortschritt {r.name}"
+						label={t('Fortschritt {name}', { name: r.name })}
 					/>
 				{:else if FINAL.has(r.status) && r.durationMs}
 					<span class="text-xs text-fg-subtle tabular">{formatDuration(r.durationMs)}</span>
@@ -77,7 +78,7 @@
 				<a
 					href="/plugins/{encodeURIComponent(r.plugin)}/runs/{r.runId}"
 					class="mono text-xs text-fg-subtle hover:text-accent hover:underline"
-					title="Lauf mit Log anzeigen">Lauf #{r.runId}</a
+					title={t('Lauf mit Log anzeigen')}>{t('Lauf #{id}', { id: r.runId })}</a
 				>
 				{#if r.error}<span class="w-full text-xs text-danger">{r.error}</span>{/if}
 			</li>

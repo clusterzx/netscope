@@ -8,6 +8,8 @@
 	import type { DeviceRow } from '$lib/api/types';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import StatusDot from '$lib/components/ui/StatusDot.svelte';
+	import { t } from '$lib/i18n';
+	import { formatNumber } from '$lib/utils/format';
 
 	let q = $state('');
 	let results = $state<DeviceRow[]>([]);
@@ -76,8 +78,8 @@
 	}
 
 	function onGlobalKey(e: KeyboardEvent) {
-		const t = e.target as HTMLElement;
-		const typing = t.closest('input, textarea, select, [contenteditable="true"]');
+		const target = e.target as HTMLElement;
+		const typing = target.closest('input, textarea, select, [contenteditable="true"]');
 		if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !typing)) {
 			e.preventDefault();
 			input?.focus();
@@ -94,7 +96,7 @@
 
 <div class="relative w-full max-w-md">
 	<form role="search" onsubmit={(e) => (e.preventDefault(), submit())}>
-		<label for="{uid}-q" class="sr-only">Geräte suchen</label>
+		<label for="{uid}-q" class="sr-only">{t('Geräte suchen')}</label>
 		<span class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-subtle"
 			><Icon name="search" size={15} /></span
 		>
@@ -117,13 +119,13 @@
 			aria-activedescendant={active >= 0 ? `${uid}-r${active}` : undefined}
 			autocomplete="off"
 			spellcheck="false"
-			placeholder="Geräte suchen … (z. B. tag:iot port:22)"
+			placeholder={t('Geräte suchen … (z. B. tag:iot port:22)')}
 			class="h-8.5 w-full rounded-md border border-border bg-surface-2 pr-12 pl-8 text-sm text-fg placeholder:text-fg-subtle
 				focus:border-accent focus:bg-surface focus:ring-2 focus:ring-focus focus:outline-none"
 		/>
 		<kbd
 			class="pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 rounded border border-border px-1.5 text-[0.68rem] text-fg-subtle sm:block"
-			>Strg K</kbd
+			>{t('Strg K')}</kbd
 		>
 	</form>
 	{#if open && results.length > 0}
@@ -155,7 +157,7 @@
 			{/each}
 			{#if total > results.length}
 				<li class="border-t border-border px-3 py-1.5 text-xs text-fg-subtle">
-					Enter: alle {total} Treffer in der Geräteliste anzeigen
+					{t('Enter: alle {n} Treffer in der Geräteliste anzeigen', { n: formatNumber(total) })}
 				</li>
 			{/if}
 		</ul>

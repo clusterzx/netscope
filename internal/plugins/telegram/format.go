@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 )
 
@@ -139,11 +139,19 @@ func title(n *plugin.Notification) string {
 	return "NetScope"
 }
 
-func countLabel(n int) string {
+func countLabel(n int, lang i18n.Locale) string {
 	if n == 1 {
-		return "1 Ereignis"
+		return i18n.T(lang, "1 Ereignis")
 	}
-	return fmt.Sprintf("%d Ereignisse", n)
+	return i18n.Sprintf(lang, "%d Ereignisse", n)
+}
+
+// shortTime formats an event time (the year is left out) in the language.
+func shortTime(t time.Time, lang i18n.Locale) string {
+	if lang == i18n.EN {
+		return t.Format("2 Jan 15:04")
+	}
+	return t.Format("02.01. 15:04")
 }
 
 // segment is a part of a message that is never split; sep is written before it.
@@ -157,22 +165,23 @@ func render(n *plugin.Notification, loc *time.Location) []string {
 	if loc == nil {
 		loc = time.Local
 	}
+	lang := n.Lang
 	var head strings.Builder
 	if n.Kind == plugin.NotifyEscalation {
-		head.WriteString("⏰ *" + escape("Eskalation – nicht quittiert") + "*\n")
+		head.WriteString("⏰ *" + escape(i18n.T(lang, "Eskalation – nicht quittiert")) + "*\n")
 	}
 	head.WriteString(headerEmoji(n) + " *" + escape(title(n)) + "*")
 	var meta []string
 	if n.RuleName != "" {
-		meta = append(meta, "Regel: "+clip(oneLine(n.RuleName), maxNameRunes))
+		meta = append(meta, i18n.Sprintf(lang, "Regel: %s", clip(oneLine(n.RuleName), maxNameRunes)))
 	}
 	if len(n.Events) > 1 {
-		meta = append(meta, countLabel(len(n.Events)))
+		meta = append(meta, countLabel(len(n.Events), lang))
 	}
 	if len(meta) > 0 {
 		head.WriteString("\n_" + escape(strings.Join(meta, " · ")) + "_")
 	}
-	cont := headerEmoji(n) + " *" + escape(clip(title(n), 80)) + "* _" + escape("(Fortsetzung)") + "_"
+	cont := headerEmoji(n) + " *" + escape(clip(title(n), 80)) + "* _" + escape(i18n.T(lang, "(Fortsetzung)")) + "_"
 
 	var segs []segment
 	for i, piece := range bodyPieces(n.Body) {
@@ -187,12 +196,12 @@ func render(n *plugin.Notification, loc *time.Location) []string {
 		shown, more = shown[:maxEvents], len(shown)-maxEvents
 	}
 	for _, e := range shown {
-		segs = append(segs, segment{sep: "\n\n", text: eventBlock(e, loc)})
+		segs = append(segs, segment{sep: "\n\n", text: eventBlock(e, loc, lang)})
 	}
 	if f := footer(n, more); f != "" {
 		segs = append(segs, segment{sep: "\n\n", text: f})
 	}
-	return pack(head.String(), cont, segs, maxMessageLen-partReserve)
+	return pack(head.String(), cont, segs, maxMessageLen-partReserve, lang)
 }
 
 // bodyLine renders one line of a Markdown body (reports, tests) as MarkdownV2: headings and
@@ -248,7 +257,7 @@ func bodyPieces(body string) []string {
 	return out
 }
 
-func eventBlock(e plugin.EventView, loc *time.Location) string {
+func eventBlock(e plugin.EventView, loc *time.Location, lang i18n.Locale) string {
 	var b strings.Builder
 	t := clip(oneLine(e.Title), maxTitleRunes)
 	if t == "" {
@@ -263,27 +272,27 @@ func eventBlock(e plugin.EventView, loc *time.Location) string {
 	if e.Label != "" && e.Label != t {
 		meta = append(meta, clip(oneLine(e.Label), maxNameRunes))
 	}
-	meta = append(meta, e.Severity.Label())
+	meta = append(meta, e.Severity.LabelIn(lang))
 	if !e.At.IsZero() {
-		meta = append(meta, e.At.In(loc).Format("02.01. 15:04"))
+		meta = append(meta, shortTime(e.At.In(loc), lang))
 	}
 	b.WriteString("\n_" + escape(strings.Join(meta, " · ")) + "_")
 
-	if dev := deviceLine(e); dev != "" {
+	if dev := deviceLine(e, lang); dev != "" {
 		b.WriteString("\n🖥 " + dev)
 	}
 	if msg := clip(e.Message, maxMessageRunes); msg != "" {
 		b.WriteString("\n" + escape(msg))
 	}
 	var tail []string
-	if l := link("Öffnen", e.Link); l != "" {
+	if l := link(i18n.T(lang, "Öffnen"), e.Link); l != "" {
 		tail = append(tail, l)
 	}
 	if e.Escalated {
-		tail = append(tail, "⏰ "+escape("eskaliert"))
+		tail = append(tail, "⏰ "+escape(i18n.T(lang, "eskaliert")))
 	}
 	if e.Acknowledged {
-		tail = append(tail, "✅ "+escape("quittiert"))
+		tail = append(tail, "✅ "+escape(i18n.T(lang, "quittiert")))
 	}
 	if len(tail) > 0 {
 		b.WriteString("\n" + strings.Join(tail, " · "))
@@ -291,7 +300,7 @@ func eventBlock(e plugin.EventView, loc *time.Location) string {
 	return b.String()
 }
 
-func deviceLine(e plugin.EventView) string {
+func deviceLine(e plugin.EventView, lang i18n.Locale) string {
 	name := clip(oneLine(e.DeviceName), maxNameRunes)
 	ip := clip(oneLine(e.DeviceIP), 64)
 	var parts []string
@@ -313,25 +322,26 @@ func deviceLine(e plugin.EventView) string {
 		}
 	}
 	if site := clip(oneLine(e.Site), maxNameRunes); site != "" {
-		parts = append(parts, escape("Standort "+site))
+		parts = append(parts, escape(i18n.Sprintf(lang, "Standort %s", site)))
 	}
 	return strings.Join(parts, " · ")
 }
 
 func footer(n *plugin.Notification, more int) string {
+	lang := n.Lang
 	if more > 0 {
-		s := "… und 1 weiteres Ereignis"
+		s := i18n.T(lang, "… und 1 weiteres Ereignis")
 		if more > 1 {
-			s = fmt.Sprintf("… und %d weitere Ereignisse", more)
+			s = i18n.Sprintf(lang, "… und %d weitere Ereignisse", more)
 		}
 		out := escape(s)
-		if l := link("Alle anzeigen", n.Link); l != "" {
+		if l := link(i18n.T(lang, "Alle anzeigen"), n.Link); l != "" {
 			out += " – " + l
 		}
 		return out
 	}
 	if len(n.Events) != 1 {
-		return link("In NetScope öffnen", n.Link)
+		return link(i18n.T(lang, "In NetScope öffnen"), n.Link)
 	}
 	return ""
 }
@@ -339,7 +349,7 @@ func footer(n *plugin.Notification, more int) string {
 // pack distributes the segments over as few messages as possible without splitting a
 // segment. Continuation messages start with cont; with more than one message every
 // message gets a "Teil i/n" marker (space for it is reserved by the caller's limit).
-func pack(head, cont string, segs []segment, limit int) []string {
+func pack(head, cont string, segs []segment, limit int, lang i18n.Locale) []string {
 	var msgs []string
 	cur, curLen := head, utf16Len(head)
 	for _, s := range segs {
@@ -356,7 +366,7 @@ func pack(head, cont string, segs []segment, limit int) []string {
 	msgs = append(msgs, cur)
 	if len(msgs) > 1 {
 		for i := range msgs {
-			msgs[i] += "\n\n_" + escape(fmt.Sprintf("Teil %d/%d", i+1, len(msgs))) + "_"
+			msgs[i] += "\n\n_" + escape(i18n.Sprintf(lang, "Teil %d/%d", i+1, len(msgs))) + "_"
 		}
 	}
 	return msgs

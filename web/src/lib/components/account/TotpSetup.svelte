@@ -6,6 +6,7 @@
 	import type { TotpSetup } from '$lib/api';
 	import { errorMessage, fieldErrors } from '$lib/api/client';
 	import { Alert, Button, CopyButton, Input, Spinner } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		replacing?: boolean;
@@ -41,7 +42,7 @@
 
 	async function confirm() {
 		if (!/^\d{6}$/.test(code.replace(/\s/g, ''))) {
-			error = 'Den 6-stelligen Code aus der App eingeben';
+			error = t('Den 6-stelligen Code aus der App eingeben');
 			return;
 		}
 		busy = true;
@@ -71,48 +72,53 @@
 	{#if !setup}
 		{#if replacing}
 			<p class="text-fg-muted">
-				Die bisherige Verbindung zur Authenticator-App wird ersetzt, sobald der neue Code bestätigt ist. Zur
-				Sicherheit dein Passwort:
+				{t(
+					'Die bisherige Verbindung zur Authenticator-App wird ersetzt, sobald der neue Code bestätigt ist. Zur Sicherheit dein Passwort:'
+				)}
 			</p>
 			<Input
-				label="Passwort"
+				label={t('Passwort')}
 				type="password"
 				autocomplete="current-password"
 				bind:value={password}
 				required
 			/>
 			<div class="flex gap-2">
-				<Button type="submit" variant="primary" loading={busy}>Weiter</Button>
-				{#if oncancel}<Button onclick={oncancel} disabled={busy}>Abbrechen</Button>{/if}
+				<Button type="submit" variant="primary" loading={busy}>{t('Weiter')}</Button>
+				{#if oncancel}<Button onclick={oncancel} disabled={busy}>{t('Abbrechen')}</Button>{/if}
 			</div>
 		{:else if busy}
-			<div class="flex items-center gap-2 text-fg-muted"><Spinner size={16} /> Schlüssel wird erzeugt …</div>
+			<div class="flex items-center gap-2 text-fg-muted">
+				<Spinner size={16} />
+				{t('Schlüssel wird erzeugt …')}
+			</div>
 		{:else if oncancel}
-			<div><Button onclick={oncancel}>Schließen</Button></div>
+			<div><Button onclick={oncancel}>{t('Schließen')}</Button></div>
 		{/if}
 	{:else}
 		<ol class="flex list-decimal flex-col gap-4 pl-5">
 			<li>
 				<p>
-					Authenticator-App öffnen (z. B. Aegis, Google Authenticator, Microsoft Authenticator, 1Password) und
-					den QR-Code scannen:
+					{t(
+						'Authenticator-App öffnen (z. B. Aegis, Google Authenticator, Microsoft Authenticator, 1Password) und den QR-Code scannen:'
+					)}
 				</p>
 				<img
 					src={setup.qr}
-					alt="QR-Code für die Authenticator-App"
+					alt={t('QR-Code für die Authenticator-App')}
 					width="176"
 					height="176"
 					class="mt-2 h-44 w-44 rounded-md border border-border bg-white p-1"
 				/>
-				<p class="mt-2 text-xs text-fg-subtle">Scannen nicht möglich? Schlüssel von Hand eingeben:</p>
+				<p class="mt-2 text-xs text-fg-subtle">{t('Scannen nicht möglich? Schlüssel von Hand eingeben:')}</p>
 				<div class="mt-1 flex items-center gap-2">
 					<code class="mono rounded bg-surface-2 px-2 py-1 text-xs break-all select-all">{grouped}</code>
-					<CopyButton text={setup.secret} label="Schlüssel kopieren" />
+					<CopyButton text={setup.secret} label={t('Schlüssel kopieren')} />
 				</div>
 			</li>
 			<li>
 				<Input
-					label="Code aus der App"
+					label={t('Code aus der App')}
 					bind:value={code}
 					inputmode="numeric"
 					autocomplete="one-time-code"
@@ -125,8 +131,8 @@
 			</li>
 		</ol>
 		<div class="flex gap-2">
-			<Button type="submit" variant="primary" icon="check" loading={busy}>Aktivieren</Button>
-			{#if oncancel}<Button onclick={oncancel} disabled={busy}>Abbrechen</Button>{/if}
+			<Button type="submit" variant="primary" icon="check" loading={busy}>{t('Aktivieren')}</Button>
+			{#if oncancel}<Button onclick={oncancel} disabled={busy}>{t('Abbrechen')}</Button>{/if}
 		</div>
 	{/if}
 </form>

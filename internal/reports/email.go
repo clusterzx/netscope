@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 )
 
@@ -79,7 +80,11 @@ type htmlWriter struct {
 	b    strings.Builder
 	base string // public UI root for links ("" = no links)
 	loc  *time.Location
+	lang i18n.Locale
 }
+
+// t translates a fixed text of the report.
+func (w *htmlWriter) t(s string) string { return i18n.T(w.lang, s) }
 
 func esc(s string) string { return html.EscapeString(s) }
 
@@ -102,7 +107,7 @@ func (w *htmlWriter) date(s string) string {
 	if err != nil {
 		return s
 	}
-	return t.In(w.loc).Format("02.01. 15:04") // the year is in the period
+	return t.In(w.loc).Format(DateLayout(w.lang, "02.01. 15:04")) // the year is in the period
 }
 
 func mono(s string) string {
@@ -133,8 +138,9 @@ type col struct {
 	small  bool // hidden on small screens (ns-sm-hide)
 }
 
-// table writes a data table; cells are HTML.
-func (w *htmlWriter) table(cols []col, rows [][]string, more int, moreText string) {
+// table writes a data table; cells are HTML, column titles are translated. more rows
+// than shown are pointed to the PDF attachment.
+func (w *htmlWriter) table(cols []col, rows [][]string, more int) {
 	w.raw(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:` +
 		fontSans + `;font-size:13px;line-height:1.45;color:` + cFg + `;border:1px solid ` + cBorder + `;">` + "\n<tr>")
 	for _, c := range cols {
@@ -151,7 +157,7 @@ func (w *htmlWriter) table(cols []col, rows [][]string, more int, moreText strin
 			cls = ` class="ns-sm-hide"`
 		}
 		w.raw(`<th` + cls + ` align="` + align + `"` + width + ` style="padding:8px 10px;background-color:` + cSurface + `;border-bottom:1px solid ` + cBorder +
-			`;font-size:11px;font-weight:600;color:` + cSubtle + `;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;">` + esc(c.title) + `</th>`)
+			`;font-size:11px;font-weight:600;color:` + cSubtle + `;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;">` + esc(w.t(c.title)) + `</th>`)
 	}
 	w.raw("</tr>\n")
 	for i, r := range rows {
@@ -182,7 +188,8 @@ func (w *htmlWriter) table(cols []col, rows [][]string, more int, moreText strin
 	}
 	w.raw("</table>\n")
 	if more > 0 {
-		w.raw(`<div style="margin-top:6px;font-family:` + fontSans + `;font-size:12px;color:` + cSubtle + `;">… und ` + strconv.Itoa(more) + " " + esc(moreText) + "</div>\n")
+		w.raw(`<div style="margin-top:6px;font-family:` + fontSans + `;font-size:12px;color:` + cSubtle + `;">` +
+			esc(i18n.Sprintf(w.lang, "… und %d weitere im PDF-Anhang", more)) + "</div>\n")
 	}
 }
 
@@ -206,11 +213,11 @@ func panel(label string, badges []string) string {
 		strings.Join(badges, "&nbsp; ") + `</td></tr></table></td>`
 }
 
-func countBadges(counts map[string]int, keys []string, zeroLabel string) []string {
+func countBadges(counts map[string]int, keys []string, zeroLabel string, lang i18n.Locale) []string {
 	var out []string
 	for _, k := range keys {
 		if n := counts[k]; n > 0 {
-			out = append(out, badge(strconv.Itoa(n)+" "+strings.ToLower(sevLabel(k)), sevTone(k)))
+			out = append(out, badge(strconv.Itoa(n)+" "+strings.ToLower(sevLabel(k, lang)), sevTone(k)))
 		}
 	}
 	if len(out) == 0 {
@@ -219,68 +226,70 @@ func countBadges(counts map[string]int, keys []string, zeroLabel string) []strin
 	return out
 }
 
-// EmailHTML renders the report for a notification mail. root is the public URL of the UI
-// (links are left out without it).
-func (r *ChangeReport) EmailHTML(loc *time.Location, root string) string {
+// EmailHTML renders the report for a notification mail in the language. root is the
+// public URL of the UI (links are left out without it).
+func (r *ChangeReport) EmailHTML(lang i18n.Locale, loc *time.Location, root string) string {
 	if loc == nil {
 		loc = time.Local
 	}
-	w := &htmlWriter{base: strings.TrimRight(root, "/"), loc: loc}
+	w := &htmlWriter{base: strings.TrimRight(root, "/"), loc: loc, lang: lang}
+	layout := DateLayout(lang, "02.01.2006 15:04")
 
-	w.raw(`<div style="font-family:` + fontSans + `;font-size:14px;color:` + cMuted + `;margin:0 0 16px 0;">Zeitraum <strong style="color:` + cFg + `;">` +
-		esc(r.From.In(loc).Format("02.01.2006 15:04")+" – "+r.To.In(loc).Format("02.01.2006 15:04")) + `</strong></div>` + "\n")
+	w.raw(`<div style="font-family:` + fontSans + `;font-size:14px;color:` + cMuted + `;margin:0 0 16px 0;">` + esc(w.t("Zeitraum")) + ` <strong style="color:` + cFg + `;">` +
+		esc(r.From.In(loc).Format(layout)+" – "+r.To.In(loc).Format(layout)) + `</strong></div>` + "\n")
 
 	// key figures
 	total, online := r.Devices["total"], r.Devices["online"]
 	pct := "–"
 	if total > 0 {
-		pct = fmt.Sprintf("%d %% erreichbar", online*100/total)
+		pct = i18n.Sprintf(lang, "%d %% erreichbar", online*100/total)
 	}
 	w.raw(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
-		tile("Geräte", strconv.Itoa(total), "im Inventar", cFg) +
-		tile("Online", strconv.Itoa(online), pct, cOK) +
-		tile("Neu", strconv.Itoa(r.Devices["new"]), "im Zeitraum", cAccent) +
-		tile("Unbekannt", strconv.Itoa(r.Devices["unknown"]), "nicht bestätigt", cViolet) +
+		tile(w.t("Geräte"), strconv.Itoa(total), w.t("im Inventar"), cFg) +
+		tile(w.t("Online"), strconv.Itoa(online), pct, cOK) +
+		tile(w.t("Neu"), strconv.Itoa(r.Devices["new"]), w.t("im Zeitraum"), cAccent) +
+		tile(w.t("Unbekannt"), strconv.Itoa(r.Devices["unknown"]), w.t("nicht bestätigt"), cViolet) +
 		"</tr></table>\n")
 	open := map[string]int{"critical": r.OpenCritical, "high": r.OpenHigh}
 	w.raw(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr>` +
-		panel("Offene Events", countBadges(open, []string{"critical", "high"}, "keine kritischen")) +
-		panel("Aktive Schwachstellen", countBadges(r.CVEBySeverity, []string{"critical", "high", "medium", "low"}, "keine")) +
+		panel(w.t("Offene Events"), countBadges(open, []string{"critical", "high"}, w.t("keine kritischen"), lang)) +
+		panel(w.t("Aktive Schwachstellen"), countBadges(r.CVEBySeverity, []string{"critical", "high", "medium", "low"}, w.t("keine"), lang)) +
 		"</tr></table>\n")
 
 	empty := len(r.NewDevices) == 0 && len(r.EventCounts) == 0 && len(r.Important) == 0 && len(r.NewCVEs) == 0 &&
 		len(r.ExpiringCerts) == 0 && len(r.Outages) == 0 && len(r.FailedRuns) == 0
 	if empty {
 		w.raw(`<div style="margin-top:24px;padding:16px;border-radius:10px;background-color:` + toneOK.bg + `;color:` + toneOK.fg +
-			`;font-family:` + fontSans + `;font-size:14px;font-weight:600;">Keine Änderungen im Zeitraum – alles ruhig.</div>` + "\n")
+			`;font-family:` + fontSans + `;font-size:14px;font-weight:600;">` + esc(w.t("Keine Änderungen im Zeitraum – alles ruhig.")) + `</div>` + "\n")
 	}
 
 	if len(r.Important) > 0 {
-		w.section("Wichtige Ereignisse", len(r.Important))
+		w.section(w.t("Wichtige Ereignisse"), len(r.Important))
 		var rows [][]string
 		for i, e := range r.Important {
 			if i >= mailMaxRows {
 				break
 			}
-			title := esc(e.Title)
+			text := i18n.T(lang, e.Title)
+			title := esc(text)
 			if w.base != "" {
-				title = w.link("/events?id="+strconv.FormatInt(e.ID, 10), e.Title)
+				title = w.link("/events?id="+strconv.FormatInt(e.ID, 10), text)
 			}
-			if e.Device != "" && !strings.Contains(e.Title, e.Device) {
+			if e.Device != "" && !strings.Contains(text, e.Device) {
 				title += `<div style="font-size:12px;color:` + cSubtle + `;">` + esc(e.Device) + `</div>`
 			}
-			state := muted("offen")
+			state := muted(w.t("offen"))
 			if e.Acked {
-				state = badge("quittiert", toneOK)
+				state = badge(w.t("quittiert"), toneOK)
 			}
-			rows = append(rows, []string{badge(sevLabel(e.Severity), sevTone(e.Severity)), mono(w.date(e.TS)), title, state})
+			rows = append(rows, []string{badge(sevLabel(e.Severity, lang), sevTone(e.Severity)), mono(w.date(e.TS)), title, state})
 		}
 		w.table([]col{{title: "Schwere", nowrap: true}, {title: "Zeit", nowrap: true, small: true}, {title: "Ereignis", width: "60%"}, {title: "Status", nowrap: true}},
-			rows, len(r.Important)-len(rows), "weitere im PDF-Anhang")
+			rows, len(r.Important)-len(rows))
 	}
 
 	if len(r.NewDevices) > 0 {
-		w.section("Neue Geräte", len(r.NewDevices))
+		w.section(w.t("Neue Geräte"), len(r.NewDevices))
 		var rows [][]string
 		for i, d := range r.NewDevices {
 			if i >= mailMaxDevices {
@@ -298,11 +307,11 @@ func (r *ChangeReport) EmailHTML(loc *time.Location, root string) string {
 			rows = append(rows, []string{cell, mono(d.IP), vendor, mono(w.date(d.At))})
 		}
 		w.table([]col{{title: "Gerät", width: "34%"}, {title: "IP", nowrap: true}, {title: "Hersteller"}, {title: "Erstmals", nowrap: true, small: true}},
-			rows, len(r.NewDevices)-len(rows), "weitere im PDF-Anhang")
+			rows, len(r.NewDevices)-len(rows))
 	}
 
 	if len(r.NewCVEs) > 0 {
-		w.section("Neue Schwachstellen", len(r.NewCVEs))
+		w.section(w.t("Neue Schwachstellen"), len(r.NewCVEs))
 		var rows [][]string
 		for i, c := range r.NewCVEs {
 			if i >= mailMaxRows {
@@ -316,49 +325,49 @@ func (r *ChangeReport) EmailHTML(loc *time.Location, root string) string {
 			rows = append(rows, []string{`<span style="white-space:nowrap;">` + id + `</span>`, score, esc(c.Device), esc(c.Detail)})
 		}
 		w.table([]col{{title: "CVE", nowrap: true}, {title: "CVSS", align: "center", nowrap: true}, {title: "Gerät"}, {title: "Produkt", small: true}},
-			rows, len(r.NewCVEs)-len(rows), "weitere im PDF-Anhang")
+			rows, len(r.NewCVEs)-len(rows))
 	}
 
 	if len(r.ExpiringCerts) > 0 {
-		w.section("Ablaufende Zertifikate", len(r.ExpiringCerts))
+		w.section(w.t("Ablaufende Zertifikate"), len(r.ExpiringCerts))
 		var rows [][]string
 		for i, c := range r.ExpiringCerts {
 			if i >= mailMaxRows {
 				break
 			}
-			left := badge(fmt.Sprintf("%d Tage", c.DaysLeft), certTone(c.DaysLeft))
+			left := badge(i18n.Sprintf(lang, "%d Tage", c.DaysLeft), certTone(c.DaysLeft))
 			if c.DaysLeft < 0 {
-				left = badge("abgelaufen", toneCritical)
+				left = badge(w.t("abgelaufen"), toneCritical)
 			}
 			rows = append(rows, []string{esc(c.Subject), mono(c.Endpoint), esc(c.Device), left})
 		}
 		w.table([]col{{title: "Zertifikat"}, {title: "Endpunkt", nowrap: true, small: true}, {title: "Gerät"}, {title: "Restlaufzeit", align: "right", nowrap: true}},
-			rows, len(r.ExpiringCerts)-len(rows), "weitere im PDF-Anhang")
+			rows, len(r.ExpiringCerts)-len(rows))
 	}
 
 	if len(r.Outages) > 0 {
-		w.section("Ausfälle", len(r.Outages))
+		w.section(w.t("Ausfälle"), len(r.Outages))
 		var rows [][]string
 		for i, o := range r.Outages {
 			if i >= mailMaxRows {
 				break
 			}
-			state := badge("Ausfall", toneCritical)
+			state := badge(w.t("Ausfall"), toneCritical)
 			if o.State == "degraded" {
-				state = badge("Beeinträchtigt", toneMedium)
+				state = badge(w.t("Beeinträchtigt"), toneMedium)
 			}
 			dur := esc(humanDuration(time.Duration(o.Seconds) * time.Second))
 			if o.Ongoing {
-				dur += " " + badge("andauernd", toneCritical)
+				dur += " " + badge(w.t("andauernd"), toneCritical)
 			}
 			rows = append(rows, []string{esc(o.Check), state, mono(w.date(o.Started)), dur})
 		}
 		w.table([]col{{title: "Check"}, {title: "Zustand", nowrap: true}, {title: "Beginn", nowrap: true, small: true}, {title: "Dauer", nowrap: true}},
-			rows, len(r.Outages)-len(rows), "weitere im PDF-Anhang")
+			rows, len(r.Outages)-len(rows))
 	}
 
 	if len(r.EventCounts) > 0 {
-		w.section("Ereignisse nach Typ", 0)
+		w.section(w.t("Ereignisse nach Typ"), 0)
 		type kv struct {
 			k string
 			v int
@@ -379,13 +388,13 @@ func (r *ChangeReport) EmailHTML(loc *time.Location, root string) string {
 				bar += `<td style="font-size:0;line-height:0;">&nbsp;</td>`
 			}
 			bar += `</tr></table>`
-			rows = append(rows, []string{esc(eventLabel(e.k)), bar, `<strong>` + strconv.Itoa(e.v) + `</strong>`})
+			rows = append(rows, []string{esc(eventLabel(e.k, lang)), bar, `<strong>` + strconv.Itoa(e.v) + `</strong>`})
 		}
-		w.table([]col{{title: "Ereignis", width: "46%"}, {title: "Verteilung", width: "40%", small: true}, {title: "Anzahl", align: "right", nowrap: true}}, rows, 0, "")
+		w.table([]col{{title: "Ereignis", width: "46%"}, {title: "Verteilung", width: "40%", small: true}, {title: "Anzahl", align: "right", nowrap: true}}, rows, 0)
 	}
 
 	if len(r.FailedRuns) > 0 {
-		w.section("Fehlgeschlagene Plugin-Läufe", 0)
+		w.section(w.t("Fehlgeschlagene Plugin-Läufe"), 0)
 		ids := make([]string, 0, len(r.FailedRuns))
 		for id := range r.FailedRuns {
 			ids = append(ids, id)
@@ -395,7 +404,7 @@ func (r *ChangeReport) EmailHTML(loc *time.Location, root string) string {
 		for _, id := range ids {
 			name := id
 			if p, ok := plugin.Get(id); ok {
-				name = p.Info().Name
+				name = i18n.T(lang, p.Info().Name)
 			}
 			cell := esc(name)
 			if w.base != "" {
@@ -403,7 +412,7 @@ func (r *ChangeReport) EmailHTML(loc *time.Location, root string) string {
 			}
 			rows = append(rows, []string{cell, badge(strconv.Itoa(r.FailedRuns[id])+"×", toneHigh)})
 		}
-		w.table([]col{{title: "Plugin"}, {title: "Fehlschläge", align: "right", nowrap: true}}, rows, 0, "")
+		w.table([]col{{title: "Plugin"}, {title: "Fehlschläge", align: "right", nowrap: true}}, rows, 0)
 	}
 	return w.b.String()
 }

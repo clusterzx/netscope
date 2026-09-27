@@ -5,6 +5,7 @@
 <script lang="ts">
 	import type { PublisherInfo, RuleAction } from '$lib/api';
 	import { Alert, Button, Checkbox, Input, Select } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { PRIORITIES, durationText, fieldMessage, priorityLabel } from './rule';
 
 	interface Props {
@@ -34,9 +35,12 @@
 	const err = (k: string) => fieldMessage(errors[`actions.${index}.${k}`]);
 
 	const publisherOptions = $derived([
-		...publishers.map((p) => ({ value: p.id, label: p.enabled ? p.name : `${p.name} (inaktiv)` })),
+		...publishers.map((p) => ({
+			value: p.id,
+			label: p.enabled ? p.name : t('{name} (inaktiv)', { name: p.name })
+		})),
 		...(action.publisher && !publishers.some((p) => p.id === action.publisher)
-			? [{ value: action.publisher, label: `${action.publisher} (unbekannt)` }]
+			? [{ value: action.publisher, label: t('{name} (unbekannt)', { name: action.publisher }) }]
 			: [])
 	]);
 	const selected = $derived(publishers.find((p) => p.id === action.publisher));
@@ -67,19 +71,19 @@
 </script>
 
 <fieldset class="flex flex-col gap-4 rounded-lg border border-border bg-surface-2/40 p-3.5">
-	<legend class="sr-only">Aktion {index + 1}</legend>
+	<legend class="sr-only">{t('Aktion {n}', { n: index + 1 })}</legend>
 	<div class="flex items-center gap-2">
 		<span
 			class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent"
 			aria-hidden="true">{index + 1}</span
 		>
-		<span class="flex-1 text-sm font-medium">Aktion {index + 1}</span>
+		<span class="flex-1 text-sm font-medium">{t('Aktion {n}', { n: index + 1 })}</span>
 		{#if count > 1 && onmove}
 			<Button
 				size="xs"
 				variant="ghost"
 				icon="arrow-up"
-				label="Aktion nach oben"
+				label={t('Aktion nach oben')}
 				disabled={index === 0}
 				onclick={() => onmove(-1)}
 			/>
@@ -87,7 +91,7 @@
 				size="xs"
 				variant="ghost"
 				icon="arrow-down"
-				label="Aktion nach unten"
+				label={t('Aktion nach unten')}
 				disabled={index === count - 1}
 				onclick={() => onmove(1)}
 			/>
@@ -97,7 +101,7 @@
 				size="xs"
 				variant="ghost"
 				icon="trash"
-				label="Aktion {index + 1} entfernen"
+				label={t('Aktion {n} entfernen', { n: index + 1 })}
 				onclick={onremove}
 			/>
 		{/if}
@@ -109,13 +113,13 @@
 			label="Publisher"
 			required
 			options={publisherOptions}
-			placeholder="Publisher wählen …"
+			placeholder={t('Publisher wählen …')}
 			bind:value={action.publisher}
 			error={err('publisher')}
 		/>
 		<Select
 			id="{idp}-priority"
-			label="Priorität"
+			label={t('Priorität')}
 			options={priorityOptions}
 			bind:value={action.priority}
 			error={err('priority')}
@@ -123,13 +127,15 @@
 	</div>
 	{#if selected && !selected.enabled}
 		<Alert tone="warn">
-			Der Publisher „{selected.name}“ ist inaktiv – Benachrichtigungen dieser Aktion werden übersprungen.
-			<a href="/plugins/{encodeURIComponent(selected.id)}" class="link">Publisher einrichten</a>
+			{t('Der Publisher „{name}“ ist inaktiv – Benachrichtigungen dieser Aktion werden übersprungen.', {
+				name: selected.name
+			})}
+			<a href="/plugins/{encodeURIComponent(selected.id)}" class="link">{t('Publisher einrichten')}</a>
 		</Alert>
 	{/if}
 
 	<fieldset class="flex flex-col gap-2">
-		<legend class="mb-1 text-[0.8125rem] font-medium text-fg">Zustellung</legend>
+		<legend class="mb-1 text-[0.8125rem] font-medium text-fg">{t('Zustellung')}</legend>
 		<div class="flex flex-wrap gap-x-5 gap-y-2">
 			<label class="flex cursor-pointer items-start gap-2 text-sm">
 				<input
@@ -140,7 +146,8 @@
 					onchange={() => setMode('immediate')}
 				/>
 				<span
-					>Sofort <span class="block text-xs text-fg-subtle">Events eines Laufs werden gebündelt</span></span
+					>{t('Sofort')}
+					<span class="block text-xs text-fg-subtle">{t('Events eines Laufs werden gebündelt')}</span></span
 				>
 			</label>
 			<label class="flex cursor-pointer items-start gap-2 text-sm">
@@ -152,7 +159,8 @@
 					onchange={() => setMode('batch')}
 				/>
 				<span
-					>Sammeln <span class="block text-xs text-fg-subtle">über einen Zeitraum zusammenfassen</span></span
+					>{t('Sammeln')}
+					<span class="block text-xs text-fg-subtle">{t('über einen Zeitraum zusammenfassen')}</span></span
 				>
 			</label>
 		</div>
@@ -161,12 +169,12 @@
 			<Input
 				id="{idp}-batch"
 				type="number"
-				label="Sammelzeitraum (Minuten)"
+				label={t('Sammelzeitraum (Minuten)')}
 				min={1}
 				max={1440}
 				bind:value={action.batchMinutes}
 				error={err('batchMinutes')}
-				hint="1–1440 Minuten"
+				hint={t('1–1440 Minuten')}
 				class="sm:w-64"
 			/>
 		{/if}
@@ -174,13 +182,15 @@
 
 	<Input
 		id="{idp}-throttle"
-		label="Drosselung"
-		placeholder="z. B. 24h"
+		label={t('Drosselung')}
+		placeholder={t('z. B. 24h')}
 		bind:value={action.throttle}
 		error={err('throttle')}
 		hint={action.throttle?.trim()
-			? `Höchstens eine Benachrichtigung je Event-Typ und Gerät alle ${durationText(action.throttle.trim())}.`
-			: 'Leer = keine Drosselung. Dauer wie 30m, 6h, 24h.'}
+			? t('Höchstens eine Benachrichtigung je Event-Typ und Gerät alle {duration}.', {
+					duration: durationText(action.throttle.trim())
+				})
+			: t('Leer = keine Drosselung. Dauer wie 30m, 6h, 24h.')}
 		class="sm:w-80"
 		mono
 	/>
@@ -190,31 +200,31 @@
 			id="{idp}-quiet"
 			checked={quiet}
 			onchange={(e) => setQuiet((e.currentTarget as HTMLInputElement).checked)}
-			label="Ruhezeiten"
-			description="In diesem Zeitraum wird nicht sofort benachrichtigt."
+			label={t('Ruhezeiten')}
+			description={t('In diesem Zeitraum wird nicht sofort benachrichtigt.')}
 		/>
 		{#if quiet && action.quietHours}
 			<div class="grid grid-cols-2 gap-3 sm:ml-6 sm:grid-cols-4">
 				<Input
 					id="{idp}-qfrom"
 					type="time"
-					label="Von"
+					label={t('Von')}
 					bind:value={action.quietHours.from}
 					error={err('quietHours.from')}
 				/>
 				<Input
 					id="{idp}-qto"
 					type="time"
-					label="Bis"
+					label={t('Bis')}
 					bind:value={action.quietHours.to}
 					error={err('quietHours.to')}
 				/>
 				<Select
 					id="{idp}-qbehavior"
-					label="Verhalten"
+					label={t('Verhalten')}
 					options={[
-						{ value: 'delay', label: 'Bis zum Ende verzögern' },
-						{ value: 'drop', label: 'Verwerfen' }
+						{ value: 'delay', label: t('Bis zum Ende verzögern') },
+						{ value: 'drop', label: t('Verwerfen') }
 					]}
 					bind:value={action.quietHours.behavior}
 					error={err('quietHours.behavior')}
@@ -223,7 +233,7 @@
 				<Checkbox
 					id="{idp}-qurgent"
 					bind:checked={action.quietHours.allowUrgent}
-					label="Dringende trotzdem sofort senden"
+					label={t('Dringende trotzdem sofort senden')}
 					class="col-span-2 sm:col-span-4"
 				/>
 			</div>
@@ -235,15 +245,15 @@
 			id="{idp}-esc"
 			checked={escalate}
 			onchange={(e) => setEscalate((e.currentTarget as HTMLInputElement).checked)}
-			label="Eskalation"
-			description="Erneut benachrichtigen, wenn das Event nicht rechtzeitig quittiert wird."
+			label={t('Eskalation')}
+			description={t('Erneut benachrichtigen, wenn das Event nicht rechtzeitig quittiert wird.')}
 		/>
 		{#if escalate}
 			<div class="grid grid-cols-1 gap-3 sm:ml-6 sm:grid-cols-3">
 				<Input
 					id="{idp}-escmin"
 					type="number"
-					label="Nach (Minuten)"
+					label={t('Nach (Minuten)')}
 					min={1}
 					max={10080}
 					bind:value={action.escalateAfterMinutes}
@@ -251,20 +261,20 @@
 				/>
 				<Select
 					id="{idp}-escpub"
-					label="An Publisher"
+					label={t('An Publisher')}
 					options={publishers.map((p) => ({
 						value: p.id,
-						label: p.enabled ? p.name : `${p.name} (inaktiv)`
+						label: p.enabled ? p.name : t('{name} (inaktiv)', { name: p.name })
 					}))}
-					placeholder="Gleicher Publisher"
+					placeholder={t('Gleicher Publisher')}
 					bind:value={action.escalatePublisher}
 					error={err('escalatePublisher')}
 				/>
 				<Select
 					id="{idp}-escprio"
-					label="Priorität"
+					label={t('Priorität')}
 					options={priorityOptions}
-					placeholder="Dringend (Standard)"
+					placeholder={t('Dringend (Standard)')}
 					bind:value={action.escalatePriority}
 					error={err('escalatePriority')}
 				/>

@@ -165,22 +165,23 @@ func statusError(resp *http.Response, raw []byte) error {
 			detail = fmt.Sprintf("%s (Code %d)", detail, er.Code)
 		}
 	}
-	msg := "Server antwortete mit HTTP " + resp.Status
+	// Whole phrases (the hint wraps the status error) keep the message translatable.
+	err := fmt.Errorf("Server antwortete mit HTTP %s", resp.Status)
 	if detail != "" {
-		msg += ": " + detail
+		err = fmt.Errorf("Server antwortete mit HTTP %s: %s", resp.Status, detail)
 	}
 	switch resp.StatusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		msg += " – Token bzw. Zugangsdaten und Schreibrecht auf das Topic prüfen"
+		return fmt.Errorf("%w – Token bzw. Zugangsdaten und Schreibrecht auf das Topic prüfen", err)
 	case http.StatusTooManyRequests:
-		msg += " – Ratenlimit erreicht, später erneut versuchen"
 		if ra := strings.TrimSpace(resp.Header.Get("Retry-After")); ra != "" {
-			msg += " (Retry-After: " + excerpt([]byte(ra), 40) + ")"
+			return fmt.Errorf("%w – Ratenlimit erreicht, später erneut versuchen (Retry-After: %s)", err, excerpt([]byte(ra), 40))
 		}
+		return fmt.Errorf("%w – Ratenlimit erreicht, später erneut versuchen", err)
 	case http.StatusRequestEntityTooLarge:
-		msg += " – Nachricht zu groß"
+		return fmt.Errorf("%w – Nachricht zu groß", err)
 	}
-	return errors.New(msg)
+	return err
 }
 
 // authorization returns the Authorization header value: the token wins over the

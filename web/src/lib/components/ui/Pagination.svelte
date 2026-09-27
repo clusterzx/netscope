@@ -3,6 +3,7 @@
 	<Pagination total={list.total} bind:offset bind:limit onchange={load} sizes={[50, 100, 250, 500]} />
 -->
 <script lang="ts">
+	import { t, tn } from '$lib/i18n';
 	import Button from './Button.svelte';
 	import { formatNumber } from '$lib/utils/format';
 
@@ -46,17 +47,21 @@
 
 <nav
 	class="flex flex-wrap items-center justify-between gap-2 text-sm text-fg-muted {klass}"
-	aria-label="Seitennavigation"
+	aria-label={t('Seitennavigation')}
 >
 	<div class="tabular">
 		{#if total > 0}
-			{formatNumber(from)}–{formatNumber(to)} von {formatNumber(total)}
+			{t('{from}–{to} von {total}', {
+				from: formatNumber(from),
+				to: formatNumber(to),
+				total: formatNumber(total)
+			})}
 		{:else}
-			0 Einträge
+			{tn(0, '{n} Eintrag', '{n} Einträge')}
 		{/if}
 	</div>
 	<div class="flex items-center gap-2">
-		<label for="{uid}-size" class="hidden sm:inline">Pro Seite</label>
+		<label for="{uid}-size" class="hidden sm:inline">{t('Pro Seite')}</label>
 		<select
 			id="{uid}-size"
 			value={String(limit)}
@@ -70,7 +75,7 @@
 				variant="ghost"
 				size="sm"
 				icon="chevrons-left"
-				label="Erste Seite"
+				label={t('Erste Seite')}
 				disabled={page <= 1}
 				onclick={() => go(1)}
 			/>
@@ -78,7 +83,7 @@
 				variant="ghost"
 				size="sm"
 				icon="chevron-left"
-				label="Vorherige Seite"
+				label={t('Vorherige Seite')}
 				disabled={page <= 1}
 				onclick={() => go(page - 1)}
 			/>
@@ -87,7 +92,7 @@
 				variant="ghost"
 				size="sm"
 				icon="chevron-right"
-				label="Nächste Seite"
+				label={t('Nächste Seite')}
 				disabled={page >= pages}
 				onclick={() => go(page + 1)}
 			/>
@@ -95,7 +100,7 @@
 				variant="ghost"
 				size="sm"
 				icon="chevrons-right"
-				label="Letzte Seite"
+				label={t('Letzte Seite')}
 				disabled={page >= pages}
 				onclick={() => go(pages)}
 			/>

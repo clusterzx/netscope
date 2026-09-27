@@ -11,6 +11,7 @@
 // 403 of a session that has to finish its setup (password, second factor) to /setup
 // (unless `auth: false`). Failures throw ApiError (status, code, message, fields).
 import { goto } from '$app/navigation';
+import { locale, t } from '$lib/i18n';
 import type { ApiPaths, ApiUploadResponse } from './generated';
 
 export type FieldError = { field: string; message: string };
@@ -111,7 +112,7 @@ export type Body<P extends keyof ApiPaths, M extends Method> = OpOf<P, M>['body'
 function fillPath(path: string, params?: Record<string, string | number>): string {
 	return path.replace(/\{([a-zA-Z_]+)\}/g, (_, name: string) => {
 		const v = params?.[name];
-		if (v === undefined || v === '') throw new Error(`Pfadparameter ${name} fehlt für ${path}`);
+		if (v === undefined || v === '') throw new Error(`path parameter ${name} missing for ${path}`);
 		return encodeURIComponent(String(v));
 	});
 }
@@ -149,7 +150,8 @@ async function parseError(res: globalThis.Response): Promise<ApiError> {
 		// non-JSON error body
 	}
 	if (res.status === 502 || res.status === 503 || res.status === 504) {
-		if (!fields.length && code.startsWith('http_')) message = 'Server nicht erreichbar (' + res.status + ')';
+		if (!fields.length && code.startsWith('http_'))
+			message = t('Server nicht erreichbar ({status})', { status: res.status });
 	}
 	return new ApiError(res.status, code, message, fields);
 }
@@ -164,7 +166,8 @@ export async function request<T>(
 	opts: RequestOptions & { query?: Query; body?: unknown } = {}
 ): Promise<T> {
 	const m = method.toUpperCase();
-	const headers: Record<string, string> = { Accept: 'application/json' };
+	// the server answers in the language of the UI (plugin settings, events, errors)
+	const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': locale };
 	let body: BodyInit | undefined;
 	if (m !== 'GET' && m !== 'HEAD') headers['X-NetScope-CSRF'] = '1';
 	if (opts.body instanceof FormData) body = opts.body;
@@ -183,7 +186,7 @@ export async function request<T>(
 		});
 	} catch (e) {
 		if (e instanceof DOMException && e.name === 'AbortError') throw e;
-		throw new ApiError(0, 'network', 'Server nicht erreichbar – Netzwerkfehler');
+		throw new ApiError(0, 'network', t('Server nicht erreichbar – Netzwerkfehler'));
 	}
 	if (!res.ok) {
 		const err = await parseError(res);
@@ -199,7 +202,7 @@ export async function request<T>(
 		try {
 			return (await res.json()) as T;
 		} catch {
-			throw new ApiError(res.status, 'invalid_json', 'Ungültige Antwort vom Server');
+			throw new ApiError(res.status, 'invalid_json', t('Ungültige Antwort vom Server'));
 		}
 	}
 	return (await res.blob()) as T;
@@ -235,7 +238,10 @@ async function upload(file: File, opts?: RequestOptions): Promise<ApiUploadRespo
 
 /** Downloads an endpoint response as file (uses the filename from Content-Disposition). */
 async function download(url: string, query?: Query, fallbackName = 'download'): Promise<void> {
-	const res = await fetch(url + toQueryString(query), { credentials: 'same-origin' });
+	const res = await fetch(url + toQueryString(query), {
+		credentials: 'same-origin',
+		headers: { 'Accept-Language': locale }
+	});
 	if (!res.ok) {
 		const err = await parseError(res);
 		if (res.status === 401) redirectToLogin();

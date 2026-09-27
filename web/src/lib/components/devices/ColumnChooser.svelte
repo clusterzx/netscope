@@ -2,6 +2,7 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/Button.svelte';
 	import Popover from '$lib/components/ui/Popover.svelte';
+	import { t } from '$lib/i18n';
 	import { DEFAULT_COLUMNS, type DeviceColumnDef } from './columns';
 
 	interface Props {
@@ -36,12 +37,12 @@
 <span bind:this={anchor} class="inline-flex">
 	<Button
 		icon="columns"
-		label="Spalten wählen"
+		label={t('Spalten wählen')}
 		aria-haspopup="dialog"
 		aria-expanded={open}
 		onclick={() => (open = !open)}
 	>
-		<span class="hidden sm:inline">Spalten</span>
+		<span class="hidden sm:inline">{t('Spalten')}</span>
 	</Button>
 </span>
 
@@ -49,17 +50,17 @@
 	bind:open
 	{anchor}
 	placement="bottom-end"
-	label="Spalten wählen"
+	label={t('Spalten wählen')}
 	class="w-[min(34rem,calc(100vw-1rem))]"
 >
 	<div class="flex items-center justify-between border-b border-border px-4 py-2.5">
-		<h2 class="text-sm font-semibold">Spalten</h2>
+		<h2 class="text-sm font-semibold">{t('Spalten')}</h2>
 		<button
 			type="button"
 			class="text-xs text-accent hover:underline"
 			onclick={() => onchange([...DEFAULT_COLUMNS])}
 		>
-			Standard wiederherstellen
+			{t('Standard wiederherstellen')}
 		</button>
 	</div>
 	<div class="grid grid-cols-1 gap-x-6 gap-y-4 px-4 py-3 sm:grid-cols-2">

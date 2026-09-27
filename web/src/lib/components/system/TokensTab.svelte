@@ -18,6 +18,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -33,7 +34,7 @@
 	const tokens = $derived(
 		[...(list.data ?? [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 	);
-	const expired = (t: ApiToken) => !!t.expiresAt && new Date(t.expiresAt).getTime() < now;
+	const expired = (tok: ApiToken) => !!tok.expiresAt && new Date(tok.expiresAt).getTime() < now;
 
 	// ---------------------------------------------------------------- create
 	let open = $state(false);
@@ -47,12 +48,18 @@
 	let created = $state<TokenCreated | null>(null);
 
 	const EXPIRY = [
-		{ value: '7', label: '7 Tage' },
-		{ value: '30', label: '30 Tage' },
-		{ value: '90', label: '90 Tage' },
-		{ value: '365', label: '1 Jahr' },
-		{ value: 'never', label: 'Läuft nie ab' },
-		{ value: 'custom', label: 'Datum wählen …' }
+		{ value: '7', label: t('{n} Tage', { n: 7 }) },
+		{ value: '30', label: t('{n} Tage', { n: 30 }) },
+		{ value: '90', label: t('{n} Tage', { n: 90 }) },
+		{ value: '365', label: t('1 Jahr') },
+		{ value: 'never', label: t('Läuft nie ab') },
+		{ value: 'custom', label: t('Datum wählen …') }
+	];
+
+	const scopeLabel = (s: string | undefined) => (s === 'write' ? t('Lesen & Schreiben') : t('Nur lesen'));
+	const SCOPES = [
+		{ value: 'read', label: t('Nur lesen'), description: t('GET-Zugriffe, keine Änderungen') },
+		{ value: 'write', label: t('Lesen & Schreiben'), description: t('Alles, was deine Rolle darf') }
 	];
 
 	function openCreate() {
@@ -79,11 +86,12 @@
 	async function create() {
 		general = null;
 		const e: Record<string, string> = {};
-		if (!name.trim()) e.name = 'Name erforderlich';
-		else if (name.trim().length > 100) e.name = 'Maximal 100 Zeichen';
+		if (!name.trim()) e.name = t('Name erforderlich');
+		else if (name.trim().length > 100) e.name = t('Maximal 100 Zeichen');
 		const exp = expiresAt();
-		if (exp === null) e.expiry = 'Ablaufdatum wählen';
-		else if (exp && new Date(exp).getTime() < Date.now()) e.expiry = 'Das Datum liegt in der Vergangenheit';
+		if (exp === null) e.expiry = t('Ablaufdatum wählen');
+		else if (exp && new Date(exp).getTime() < Date.now())
+			e.expiry = t('Das Datum liegt in der Vergangenheit');
 		errors = e;
 		if (Object.keys(e).length) return;
 		saving = true;
@@ -99,17 +107,20 @@
 		}
 	}
 
-	async function revoke(t: ApiToken) {
+	async function revoke(tok: ApiToken) {
 		const ok = await confirm({
-			title: 'API-Token widerrufen?',
-			message: `„${t.name}“ (${t.prefix}…) wird sofort ungültig. Skripte, die ihn nutzen, erhalten danach 401.`,
-			confirmLabel: 'Widerrufen',
+			title: t('API-Token widerrufen?'),
+			message: t('„{name}“ ({prefix}…) wird sofort ungültig. Skripte, die ihn nutzen, erhalten danach 401.', {
+				name: tok.name,
+				prefix: tok.prefix
+			}),
+			confirmLabel: t('Widerrufen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
-			await api.delete('/api/v1/tokens/{id}', { path: { id: t.id } });
-			toast.success(`Token „${t.name}“ widerrufen`);
+			await api.delete('/api/v1/tokens/{id}', { path: { id: tok.id } });
+			toast.success(t('Token „{name}“ wurde widerrufen', { name: tok.name }));
 			list.reload();
 		} catch (e) {
 			toast.error(e);
@@ -119,24 +130,26 @@
 	const all = $derived(auth.can('users.manage'));
 	const columns: Column<ApiToken>[] = $derived([
 		{ key: 'name', label: 'Name' },
-		...(all ? [{ key: 'owner', label: 'Benutzer', hideBelow: 'md' as const }] : []),
-		{ key: 'scope', label: 'Berechtigung', width: '8rem' },
-		{ key: 'createdAt', label: 'Erstellt', hideBelow: 'md' },
-		{ key: 'expiresAt', label: 'Läuft ab' },
-		{ key: 'lastUsedAt', label: 'Zuletzt benutzt', hideBelow: 'lg' },
+		...(all ? [{ key: 'owner', label: t('Benutzer'), hideBelow: 'md' as const }] : []),
+		{ key: 'scope', label: t('Berechtigung'), width: '8rem' },
+		{ key: 'createdAt', label: t('Erstellt'), hideBelow: 'md' },
+		{ key: 'expiresAt', label: t('Läuft ab') },
+		{ key: 'lastUsedAt', label: t('Zuletzt benutzt'), hideBelow: 'lg' },
 		{ key: 'actions', label: '', align: 'right', width: '3rem' }
 	]);
 </script>
 
 <Card
-	title="API-Tokens"
-	description="Für Skripte: Header „Authorization: Bearer &lt;token&gt;“ – mit höchstens den Rechten deiner Rolle"
+	title={t('API-Tokens')}
+	description={t(
+		'Für Skripte: Header „Authorization: Bearer <token>“ – mit höchstens den Rechten deiner Rolle'
+	)}
 	icon="key"
 	padding="none"
 >
 	{#snippet actions()}
 		{#if auth.can('tokens.create')}
-			<Button size="sm" variant="primary" icon="plus" onclick={openCreate}>Token erstellen</Button>
+			<Button size="sm" variant="primary" icon="plus" onclick={openCreate}>{t('Token erstellen')}</Button>
 		{/if}
 	{/snippet}
 	{#if list.error && !list.data}
@@ -145,45 +158,43 @@
 		<Table
 			{columns}
 			rows={tokens}
-			key={(t) => t.id}
+			key={(tok) => tok.id}
 			loading={list.loading && !list.data}
 			class="rounded-none border-0"
-			caption="API-Tokens"
+			caption={t('API-Tokens')}
 		>
-			{#snippet cell(t, col)}
+			{#snippet cell(tok, col)}
 				{#if col.key === 'name'}
-					<span class="font-medium {expired(t) ? 'text-fg-subtle line-through' : ''}">{t.name}</span>
-					<span class="mono block text-xs text-fg-subtle">{t.prefix}…</span>
+					<span class="font-medium {expired(tok) ? 'text-fg-subtle line-through' : ''}">{tok.name}</span>
+					<span class="mono block text-xs text-fg-subtle">{tok.prefix}…</span>
 				{:else if col.key === 'owner'}
-					<span class="text-fg-muted">{t.owner}</span>
+					<span class="text-fg-muted">{tok.owner}</span>
 				{:else if col.key === 'scope'}
-					<Badge tone={t.scope === 'write' ? 'warn' : 'info'}
-						>{t.scope === 'write' ? 'Lesen & Schreiben' : 'Nur lesen'}</Badge
-					>
+					<Badge tone={tok.scope === 'write' ? 'warn' : 'info'}>{scopeLabel(tok.scope)}</Badge>
 				{:else if col.key === 'createdAt'}
-					<span class="text-fg-muted">{formatDate(t.createdAt)}</span>
+					<span class="text-fg-muted">{formatDate(tok.createdAt)}</span>
 				{:else if col.key === 'expiresAt'}
-					{#if !t.expiresAt}
-						<span class="text-fg-muted">nie</span>
-					{:else if expired(t)}
-						<Badge tone="neutral" title={formatDateTime(t.expiresAt)}>abgelaufen</Badge>
+					{#if !tok.expiresAt}
+						<span class="text-fg-muted">{t('nie')}</span>
+					{:else if expired(tok)}
+						<Badge tone="neutral" title={formatDateTime(tok.expiresAt)}>{t('abgelaufen')}</Badge>
 					{:else}
-						<RelativeTime value={t.expiresAt} class="text-fg-muted" />
+						<RelativeTime value={tok.expiresAt} class="text-fg-muted" />
 					{/if}
 				{:else if col.key === 'lastUsedAt'}
-					{#if t.lastUsedAt}
-						<RelativeTime value={t.lastUsedAt} class="text-fg-muted" />
-						{#if t.lastUsedIp}<span class="mono block text-xs text-fg-subtle">{t.lastUsedIp}</span>{/if}
+					{#if tok.lastUsedAt}
+						<RelativeTime value={tok.lastUsedAt} class="text-fg-muted" />
+						{#if tok.lastUsedIp}<span class="mono block text-xs text-fg-subtle">{tok.lastUsedIp}</span>{/if}
 					{:else}
-						<span class="text-fg-subtle">noch nie</span>
+						<span class="text-fg-subtle">{t('noch nie')}</span>
 					{/if}
 				{:else if col.key === 'actions'}
 					<Button
 						size="sm"
 						variant="ghost"
 						icon="trash"
-						label="Token „{t.name}“ widerrufen"
-						onclick={() => revoke(t)}
+						label={t('Token „{name}“ widerrufen', { name: tok.name })}
+						onclick={() => revoke(tok)}
 					/>
 				{/if}
 			{/snippet}
@@ -191,8 +202,8 @@
 				<EmptyState
 					compact
 					icon="key"
-					title="Keine API-Tokens"
-					description="Tokens erlauben Skripten den Zugriff auf die API – wahlweise nur lesend."
+					title={t('Keine API-Tokens')}
+					description={t('Tokens erlauben Skripten den Zugriff auf die API – wahlweise nur lesend.')}
 				/>
 			{/snippet}
 		</Table>
@@ -201,7 +212,7 @@
 
 <Modal
 	bind:open
-	title={created ? 'Token erstellt' : 'API-Token erstellen'}
+	title={created ? t('Token erstellt') : t('API-Token erstellen')}
 	size="md"
 	as="form"
 	onsubmit={() => (created ? (open = false) : create())}
@@ -209,20 +220,23 @@
 >
 	{#if created}
 		<div class="flex flex-col gap-3 text-sm">
-			<Alert tone="warn" title="Nur jetzt sichtbar">
-				Den Token jetzt kopieren und sicher ablegen – er wird nicht noch einmal angezeigt.
+			<Alert tone="warn" title={t('Nur jetzt sichtbar')}>
+				{t('Den Token jetzt kopieren und sicher ablegen – er wird nicht noch einmal angezeigt.')}
 			</Alert>
 			<div class="flex items-center gap-2 rounded-md border border-border bg-surface-2 py-1.5 pr-1.5 pl-3">
-				<code class="mono min-w-0 flex-1 text-[0.8rem] break-all select-all" aria-label="Neuer Token"
+				<code class="mono min-w-0 flex-1 text-[0.8rem] break-all select-all" aria-label={t('Neuer Token')}
 					>{created.token}</code
 				>
-				<CopyButton text={created.token} label="Token kopieren" size="sm" />
+				<CopyButton text={created.token} label={t('Token kopieren')} size="sm" />
 			</div>
 			<p class="text-fg-muted">
-				„{created.info?.name}“ · {created.info?.scope === 'write' ? 'Lesen & Schreiben' : 'Nur lesen'} · {created
-					.info?.expiresAt
-					? `gültig bis ${formatDateTime(created.info.expiresAt)}`
-					: 'läuft nie ab'}
+				{t('„{name}“ · {scope} · {validity}', {
+					name: created.info?.name ?? '',
+					scope: scopeLabel(created.info?.scope),
+					validity: created.info?.expiresAt
+						? t('gültig bis {date}', { date: formatDateTime(created.info.expiresAt) })
+						: t('läuft nie ab')
+				})}
 			</p>
 			<pre
 				class="mono rounded-md bg-surface-2 px-3 py-2 text-xs break-all whitespace-pre-wrap text-fg-muted">curl -H "Authorization: Bearer {created.token.slice(
@@ -238,27 +252,27 @@
 				bind:value={name}
 				required
 				maxlength={100}
-				placeholder="z. B. home-assistant"
+				placeholder={t('z. B. home-assistant')}
 				error={errors.name}
 			/>
 			<fieldset>
-				<legend class="mb-1.5 text-[0.8125rem] font-medium text-fg">Berechtigung</legend>
+				<legend class="mb-1.5 text-[0.8125rem] font-medium text-fg">{t('Berechtigung')}</legend>
 				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-					{#each [['read', 'Nur lesen', 'GET-Zugriffe, keine Änderungen'], ['write', 'Lesen & Schreiben', 'Alles, was deine Rolle darf']] as [v, l, d] (v)}
+					{#each SCOPES as s (s.value)}
 						<label
 							class="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm has-focus-visible:ring-2 has-focus-visible:ring-focus
-								{scope === v ? 'border-accent bg-accent-soft' : 'border-border hover:bg-surface-2'}"
+								{scope === s.value ? 'border-accent bg-accent-soft' : 'border-border hover:bg-surface-2'}"
 						>
 							<input
 								type="radio"
 								name="token-scope"
-								value={v}
+								value={s.value}
 								bind:group={scope}
 								class="mt-0.5 accent-(--accent)"
 							/>
 							<span>
-								<span class="block font-medium">{l}</span>
-								<span class="block text-xs text-fg-subtle">{d}</span>
+								<span class="block font-medium">{s.label}</span>
+								<span class="block text-xs text-fg-subtle">{s.description}</span>
 							</span>
 						</label>
 					{/each}
@@ -267,23 +281,23 @@
 			</fieldset>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<Select
-					label="Gültigkeit"
+					label={t('Gültigkeit')}
 					bind:value={expiry}
 					options={EXPIRY}
 					error={expiry === 'custom' ? undefined : errors.expiry}
 				/>
 				{#if expiry === 'custom'}
-					<Input label="Gültig bis" type="date" bind:value={customDate} error={errors.expiry} required />
+					<Input label={t('Gültig bis')} type="date" bind:value={customDate} error={errors.expiry} required />
 				{/if}
 			</div>
 		</div>
 	{/if}
 	{#snippet footer()}
 		{#if created}
-			<Button type="submit" variant="primary">Fertig</Button>
+			<Button type="submit" variant="primary">{t('Fertig')}</Button>
 		{:else}
-			<Button onclick={() => (open = false)} disabled={saving}>Abbrechen</Button>
-			<Button type="submit" variant="primary" icon="key" loading={saving}>Erstellen</Button>
+			<Button onclick={() => (open = false)} disabled={saving}>{t('Abbrechen')}</Button>
+			<Button type="submit" variant="primary" icon="key" loading={saving}>{t('Erstellen')}</Button>
 		{/if}
 	{/snippet}
 </Modal>

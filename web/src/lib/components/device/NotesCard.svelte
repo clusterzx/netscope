@@ -11,6 +11,7 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		device: DeviceDetail;
@@ -52,7 +53,7 @@
 				path: { id: device.id },
 				body: { notes: text }
 			});
-			toast.success('Notiz gespeichert');
+			toast.success(t('Notiz gespeichert'));
 			editing = false;
 			onsaved(next);
 		} catch (e) {
@@ -74,11 +75,11 @@
 </script>
 
 <div bind:this={card}>
-	<Card title="Notizen" icon="note" padding="md">
+	<Card title={t('Notizen')} icon="note" padding="md">
 		{#snippet actions()}
 			{#if !editing && auth.can('devices.edit')}
 				<Button size="xs" variant="ghost" icon="edit" onclick={() => (editing = true)}>
-					{device.notes ? 'Bearbeiten' : 'Hinzufügen'}
+					{device.notes ? t('Bearbeiten') : t('Hinzufügen')}
 				</Button>
 			{/if}
 		{/snippet}
@@ -86,23 +87,25 @@
 			<div class="flex flex-col gap-2">
 				<Tabs
 					items={[
-						{ id: 'write', label: 'Schreiben' },
-						{ id: 'preview', label: 'Vorschau' }
+						{ id: 'write', label: t('Schreiben') },
+						{ id: 'preview', label: t('Vorschau') }
 					]}
 					bind:active={mode}
 					idPrefix="notes-"
-					label="Notiz-Editor"
+					label={t('Notiz-Editor')}
 				/>
 				{#if mode === 'write'}
 					<div role="tabpanel" id="notes-panel-write" aria-labelledby="notes-tab-write">
 						<Textarea
-							label="Notiz (Markdown)"
+							label={t('Notiz (Markdown)')}
 							bind:value={text}
 							bind:ref={area}
 							rows={10}
 							mono
 							onkeydown={onKey}
-							hint="Markdown: **fett**, _kursiv_, `Code`, - Listen, [Link](https://…). Strg+Enter speichert."
+							hint={t(
+								'Markdown: **fett**, _kursiv_, `Code`, - Listen, [Link](https://…). Strg+Enter speichert.'
+							)}
 						/>
 					</div>
 				{:else}
@@ -115,15 +118,15 @@
 						{#if text.trim()}
 							<MarkdownView source={text} class="[&>:first-child]:mt-0" />
 						{:else}
-							<p class="text-sm text-fg-subtle">Keine Notiz.</p>
+							<p class="text-sm text-fg-subtle">{t('Keine Notiz.')}</p>
 						{/if}
 					</div>
 				{/if}
 				{#if error}<Alert tone="danger">{error}</Alert>{/if}
 				<div class="flex justify-end gap-2">
-					<Button size="sm" onclick={() => (editing = false)} disabled={busy}>Abbrechen</Button>
+					<Button size="sm" onclick={() => (editing = false)} disabled={busy}>{t('Abbrechen')}</Button>
 					<Button size="sm" variant="primary" icon="save" loading={busy} onclick={save} disabled={!dirty}
-						>Speichern</Button
+						>{t('Speichern')}</Button
 					>
 				</div>
 			</div>
@@ -131,7 +134,7 @@
 			<MarkdownView source={device.notes} class="text-sm [&>:first-child]:mt-0" />
 		{:else}
 			<p class="text-sm text-fg-subtle">
-				Noch keine Notiz – z. B. Zweck, Zugangsdaten-Ort, Garantie oder Besonderheiten.
+				{t('Noch keine Notiz – z. B. Zweck, Zugangsdaten-Ort, Garantie oder Besonderheiten.')}
 			</p>
 		{/if}
 	</Card>

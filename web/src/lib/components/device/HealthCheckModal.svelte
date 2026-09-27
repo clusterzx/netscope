@@ -15,6 +15,7 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		open: boolean;
@@ -26,9 +27,9 @@
 
 	type CheckType = 'tcp' | 'http' | 'tls' | 'icmp';
 	const TYPES: { value: CheckType; label: string }[] = [
-		{ value: 'tcp', label: 'TCP-Verbindung' },
-		{ value: 'http', label: 'HTTP(S)-Abruf' },
-		{ value: 'tls', label: 'TLS-Handshake / Zertifikat' },
+		{ value: 'tcp', label: t('TCP-Verbindung') },
+		{ value: 'http', label: t('HTTP(S)-Abruf') },
+		{ value: 'tls', label: t('TLS-Handshake / Zertifikat') },
 		{ value: 'icmp', label: 'Ping (ICMP)' }
 	];
 	const typeShort: Record<CheckType, string> = { tcp: 'TCP', http: 'HTTP', tls: 'TLS', icmp: 'Ping' };
@@ -59,16 +60,16 @@
 	let error = $state('');
 	let busy = $state(false);
 
-	const devName = $derived(device.name || device.ip || `Gerät ${device.id}`);
+	const devName = $derived(device.name || device.ip || t('Gerät {id}', { id: device.id }));
 	const openPorts = $derived(
 		(device.ports ?? []).filter((p) => p.endsWith('/tcp')).map((p) => Number(p.split('/')[0]))
 	);
 
-	function defaultPort(t: CheckType): number | null {
+	function defaultPort(ct: CheckType): number | null {
 		const has = (p: number) => openPorts.includes(p);
-		if (t === 'http') return has(80) ? 80 : has(8080) ? 8080 : has(443) ? 443 : 80;
-		if (t === 'tls') return has(443) ? 443 : has(8443) ? 8443 : 443;
-		if (t === 'tcp') return openPorts[0] ?? 22;
+		if (ct === 'http') return has(80) ? 80 : has(8080) ? 8080 : has(443) ? 443 : 80;
+		if (ct === 'tls') return has(443) ? 443 : has(8443) ? 8443 : 443;
+		if (ct === 'tcp') return openPorts[0] ?? 22;
 		return null;
 	}
 
@@ -108,8 +109,8 @@
 		if (!nameTouched) name = auto;
 	});
 
-	function changeType(t: string) {
-		type = t as CheckType;
+	function changeType(v: string) {
+		type = v as CheckType;
 		port = defaultPort(type);
 		errors = {};
 	}
@@ -130,8 +131,8 @@
 
 	function validate(): boolean {
 		const e: Record<string, string> = {};
-		if (!name.trim()) e.name = 'Name erforderlich';
-		if (target.trim() && /[\s/]/.test(target.trim())) e.target = 'Hostname oder IP ohne Leerzeichen/Pfad';
+		if (!name.trim()) e.name = t('Name erforderlich');
+		if (target.trim() && /[\s/]/.test(target.trim())) e.target = t('Hostname oder IP ohne Leerzeichen/Pfad');
 		if (type === 'tcp' || type === 'tls') {
 			if (!intIn(port, 1, 65535)) e.port = 'Port 1–65535';
 		}
@@ -140,25 +141,26 @@
 				try {
 					const u = new URL(url.trim());
 					if (u.protocol !== 'http:' && u.protocol !== 'https:')
-						e['config.url'] = 'URL muss mit http:// oder https:// beginnen';
+						e['config.url'] = t('URL muss mit http:// oder https:// beginnen');
 				} catch {
-					e['config.url'] = 'Ungültige URL (http:// oder https://)';
+					e['config.url'] = t('Ungültige URL (http:// oder https://)');
 				}
-			} else if (!intIn(port, 1, 65535)) e.port = 'Port 1–65535 oder URL angeben';
-			if (!statusValid(expectStatus)) e['config.expectStatus'] = 'z. B. 200-399 oder 200,204';
+			} else if (!intIn(port, 1, 65535)) e.port = t('Port 1–65535 oder URL angeben');
+			if (!statusValid(expectStatus)) e['config.expectStatus'] = t('z. B. 200-399 oder 200,204');
 			if (bodyMatch) {
 				try {
 					new RegExp(bodyMatch);
 				} catch {
-					e['config.bodyMatch'] = 'Ungültiger regulärer Ausdruck';
+					e['config.bodyMatch'] = t('Ungültiger regulärer Ausdruck');
 				}
 			}
 		}
-		if (type === 'tls' && minDays !== null && !intIn(minDays, 0, 3650)) e['config.minDays'] = '0–3650 Tage';
+		if (type === 'tls' && minDays !== null && !intIn(minDays, 0, 3650))
+			e['config.minDays'] = t('0–3650 Tage');
 		if (type === 'icmp' && !intIn(count, 1, 20)) e['config.count'] = '1–20 Pings';
-		if (degradedMs !== null && !intIn(degradedMs, 0, 600000)) e['config.degradedMs'] = 'Millisekunden ≥ 0';
-		if (!intIn(interval, 30, 86400)) e.intervalSeconds = '30 Sekunden bis 24 Stunden';
-		if (!intIn(timeout, 1, 120)) e.timeoutSeconds = '1–120 Sekunden';
+		if (degradedMs !== null && !intIn(degradedMs, 0, 600000)) e['config.degradedMs'] = t('Millisekunden ≥ 0');
+		if (!intIn(interval, 30, 86400)) e.intervalSeconds = t('30 Sekunden bis 24 Stunden');
+		if (!intIn(timeout, 1, 120)) e.timeoutSeconds = t('1–120 Sekunden');
 		if (!intIn(failThreshold, 1, 20)) e.failThreshold = '1–20';
 		if (!intIn(recoverThreshold, 1, 20)) e.recoverThreshold = '1–20';
 		errors = e;
@@ -215,7 +217,7 @@
 		error = '';
 		try {
 			const created = await api.post('/api/v1/health-checks', { body });
-			toast.success(`Health-Check „${created.name}“ angelegt`);
+			toast.success(t('Health-Check „{name}“ angelegt', { name: created.name }));
 			open = false;
 			oncreated(created);
 		} catch (e) {
@@ -235,8 +237,10 @@
 
 <Modal
 	bind:open
-	title="Health-Check anlegen"
-	description="Für „{devName}“ – Zustand Up/Down/Beeinträchtigt mit Verfügbarkeit und Ausfallhistorie."
+	title={t('Health-Check anlegen')}
+	description={t('Für „{name}“ – Zustand Up/Down/Beeinträchtigt mit Verfügbarkeit und Ausfallhistorie.', {
+		name: devName
+	})}
 	size="md"
 	as="form"
 	onsubmit={submit}
@@ -246,7 +250,7 @@
 		{#if error}<Alert tone="danger">{error}</Alert>{/if}
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 			<Select
-				label="Art"
+				label={t('Art')}
 				value={type}
 				options={TYPES}
 				error={errors.type}
@@ -265,12 +269,12 @@
 		{#if type !== 'http' || !url.trim()}
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8rem]">
 				<Input
-					label="Ziel (Host/IP)"
+					label={t('Ziel (Host/IP)')}
 					bind:value={target}
 					error={errors.target}
 					mono
-					placeholder={device.ip || 'Hostname oder IP'}
-					hint="Leer = immer die aktuelle IP des Geräts"
+					placeholder={device.ip || t('Hostname oder IP')}
+					hint={t('Leer = immer die aktuelle IP des Geräts')}
 				/>
 				{#if type !== 'icmp'}
 					<Input
@@ -299,56 +303,56 @@
 				error={errors['config.url']}
 				mono
 				placeholder="https://{device.ip || 'host'}/health"
-				hint="Ersetzt Ziel und Port, z. B. für einen bestimmten Pfad"
+				hint={t('Ersetzt Ziel und Port, z. B. für einen bestimmten Pfad')}
 			/>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<Select
-					label="Methode"
+					label={t('Methode')}
 					bind:value={method}
 					options={['GET', 'HEAD']}
 					error={errors['config.method']}
 				/>
 				<Input
-					label="Erwarteter Status"
+					label={t('Erwarteter Status')}
 					bind:value={expectStatus}
 					error={errors['config.expectStatus']}
 					placeholder="200-399"
 					mono
-					hint="Bereiche oder Liste, z. B. 200,204"
+					hint={t('Bereiche oder Liste, z. B. 200,204')}
 				/>
 			</div>
 			<Input
-				label="Body muss enthalten (Regex, optional)"
+				label={t('Body muss enthalten (Regex, optional)')}
 				bind:value={bodyMatch}
 				error={errors['config.bodyMatch']}
 				mono
-				placeholder="z. B. \bOK\b"
+				placeholder={t('z. B. {example}', { example: '\\bOK\\b' })}
 			/>
 			<div class="flex flex-col gap-2 sm:flex-row sm:gap-6">
-				<Checkbox bind:checked={followRedirects} label="Weiterleitungen folgen" />
-				<Checkbox bind:checked={verifyTls} label="TLS-Zertifikat prüfen" />
+				<Checkbox bind:checked={followRedirects} label={t('Weiterleitungen folgen')} />
+				<Checkbox bind:checked={verifyTls} label={t('TLS-Zertifikat prüfen')} />
 			</div>
 		{:else if type === 'tls'}
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<Input
-					label="Servername (SNI, optional)"
+					label={t('Servername (SNI, optional)')}
 					bind:value={serverName}
 					mono
 					placeholder={device.hostname || 'example.lan'}
 				/>
 				<Input
-					label="Beeinträchtigt, wenn Ablauf in weniger als"
+					label={t('Beeinträchtigt, wenn Ablauf in weniger als')}
 					type="number"
 					bind:value={minDays}
 					error={errors['config.minDays']}
 					min={0}
-					hint="Tagen (0 = aus)"
+					hint={t('Tagen (0 = aus)')}
 				/>
 			</div>
-			<Checkbox bind:checked={verifyTls} label="Zertifikatskette prüfen (Down bei ungültiger Kette)" />
+			<Checkbox bind:checked={verifyTls} label={t('Zertifikatskette prüfen (Down bei ungültiger Kette)')} />
 		{:else if type === 'icmp'}
 			<Input
-				label="Anzahl Pings pro Prüfung"
+				label={t('Anzahl Pings pro Prüfung')}
 				type="number"
 				bind:value={count}
 				error={errors['config.count']}
@@ -359,12 +363,12 @@
 		{/if}
 
 		<Input
-			label="Beeinträchtigt ab Latenz (ms, optional)"
+			label={t('Beeinträchtigt ab Latenz (ms, optional)')}
 			type="number"
 			bind:value={degradedMs}
 			error={errors['config.degradedMs']}
 			min={0}
-			placeholder="aus"
+			placeholder={t('aus')}
 			class="sm:w-60"
 		/>
 
@@ -376,15 +380,18 @@
 				onclick={() => (advanced = !advanced)}
 			>
 				<Icon name={advanced ? 'chevron-down' : 'chevron-right'} size={14} class="text-fg-subtle" />
-				Intervall & Schwellwerte
+				{t('Intervall & Schwellwerte')}
 				<span class="ml-auto text-xs font-normal text-fg-subtle">
-					alle {interval ?? '–'} s · Timeout {timeout ?? '–'} s
+					{t('alle {interval} s · Timeout {timeout} s', {
+						interval: interval ?? '–',
+						timeout: timeout ?? '–'
+					})}
 				</span>
 			</button>
 			{#if advanced}
 				<div class="grid grid-cols-2 gap-3 border-t border-border p-3">
 					<Input
-						label="Intervall (s)"
+						label={t('Intervall (s)')}
 						type="number"
 						bind:value={interval}
 						error={errors.intervalSeconds}
@@ -400,30 +407,34 @@
 						max={120}
 					/>
 					<Input
-						label="Down nach Fehlern"
+						label={t('Down nach Fehlern')}
 						type="number"
 						bind:value={failThreshold}
 						error={errors.failThreshold}
 						min={1}
 						max={20}
-						hint="aufeinanderfolgend"
+						hint={t('aufeinanderfolgend')}
 					/>
 					<Input
-						label="Up nach Erfolgen"
+						label={t('Up nach Erfolgen')}
 						type="number"
 						bind:value={recoverThreshold}
 						error={errors.recoverThreshold}
 						min={1}
 						max={20}
-						hint="Flap-Dämpfung"
+						hint={t('Flap-Dämpfung')}
 					/>
 				</div>
 			{/if}
 		</div>
-		<Toggle bind:checked={enabled} label="Aktiv" description="Deaktivierte Checks werden nicht ausgeführt." />
+		<Toggle
+			bind:checked={enabled}
+			label={t('Aktiv')}
+			description={t('Deaktivierte Checks werden nicht ausgeführt.')}
+		/>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="plus" loading={busy}>Anlegen</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="plus" loading={busy}>{t('Anlegen')}</Button>
 	{/snippet}
 </Modal>

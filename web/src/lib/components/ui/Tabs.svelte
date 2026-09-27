@@ -16,6 +16,7 @@
 </script>
 
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import { formatNumber } from '$lib/utils/format';
 
@@ -32,7 +33,7 @@
 		items,
 		active = $bindable(),
 		idPrefix = '',
-		label = 'Bereiche',
+		label = t('Bereiche'),
 		class: klass = '',
 		onchange
 	}: Props = $props();
@@ -45,8 +46,8 @@
 	}
 
 	function onKey(e: KeyboardEvent) {
-		const enabled = items.filter((t) => !t.disabled);
-		const i = enabled.findIndex((t) => t.id === active);
+		const enabled = items.filter((it) => !it.disabled);
+		const i = enabled.findIndex((it) => it.id === active);
 		let next = -1;
 		if (e.key === 'ArrowRight') next = (i + 1) % enabled.length;
 		else if (e.key === 'ArrowLeft') next = (i - 1 + enabled.length) % enabled.length;
@@ -67,29 +68,29 @@
 	onkeydown={onKey}
 	class="-mb-px flex gap-0.5 overflow-x-auto border-b border-border {klass}"
 >
-	{#each items as t (t.id)}
+	{#each items as tab (tab.id)}
 		<button
 			type="button"
 			role="tab"
-			id="{idPrefix}tab-{t.id}"
-			aria-selected={active === t.id}
-			aria-controls="{idPrefix}panel-{t.id}"
-			tabindex={active === t.id ? 0 : -1}
-			disabled={t.disabled}
-			onclick={() => select(t.id)}
+			id="{idPrefix}tab-{tab.id}"
+			aria-selected={active === tab.id}
+			aria-controls="{idPrefix}panel-{tab.id}"
+			tabindex={active === tab.id ? 0 : -1}
+			disabled={tab.disabled}
+			onclick={() => select(tab.id)}
 			class="inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors
 				disabled:cursor-not-allowed disabled:opacity-40
-				{active === t.id
+				{active === tab.id
 				? 'border-accent font-medium text-fg'
 				: 'border-transparent text-fg-muted hover:border-border-strong hover:text-fg'}"
 		>
-			{#if t.icon}<Icon name={t.icon} size={15} />{/if}
-			{t.label}
-			{#if t.count !== undefined && t.count !== null}
+			{#if tab.icon}<Icon name={tab.icon} size={15} />{/if}
+			{tab.label}
+			{#if tab.count !== undefined && tab.count !== null}
 				<span
-					class="rounded px-1.5 text-[0.7rem] tabular {active === t.id
+					class="rounded px-1.5 text-[0.7rem] tabular {active === tab.id
 						? 'bg-accent-soft text-accent'
-						: 'bg-surface-3 text-fg-subtle'}">{formatNumber(t.count)}</span
+						: 'bg-surface-3 text-fg-subtle'}">{formatNumber(tab.count)}</span
 				>
 			{/if}
 		</button>

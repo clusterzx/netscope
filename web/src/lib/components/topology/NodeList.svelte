@@ -6,6 +6,7 @@
 <script lang="ts">
 	import type { GraphNode } from '$lib/api';
 	import { Icon, Input } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { formatNumber } from '$lib/utils/format';
 	import { typeIcon } from './graph';
 
@@ -80,20 +81,23 @@
 			size="sm"
 			icon="search"
 			bind:value={search}
-			placeholder="Name, IP, Hersteller, Tag …"
-			aria-label="Geräte im Graph suchen"
+			placeholder={t('Name, IP, Hersteller, Tag …')}
+			aria-label={t('Geräte im Graph suchen')}
 			autocomplete="off"
 			onkeydown={onSearchKey}
 		/>
 		<p class="mt-1.5 px-0.5 text-xs text-fg-subtle" aria-live="polite">
 			{#if search.trim()}
-				{formatNumber(nodes.length)} von {formatNumber(total)} Treffern
+				{t('{count} von {total} Treffern', {
+					count: formatNumber(nodes.length),
+					total: formatNumber(total)
+				})}
 			{:else}
-				{formatNumber(total)} Knoten{#if connectMode}&nbsp;· Endpunkt wählen{/if}
+				{tn(total, '1 Knoten', '{n} Knoten')}{#if connectMode}&nbsp;· {t('Endpunkt wählen')}{/if}
 			{/if}
 		</p>
 	</div>
-	<ul bind:this={list} class="min-h-0 flex-1 overflow-y-auto p-1" aria-label="Knoten im Graph">
+	<ul bind:this={list} class="min-h-0 flex-1 overflow-y-auto p-1" aria-label={t('Knoten im Graph')}>
 		{#each nodes as n (n.id)}
 			{@const icon = typeIcon(n.type)}
 			{@const sel = n.id === selected}
@@ -128,7 +132,7 @@
 				</button>
 			</li>
 		{:else}
-			<li class="px-2 py-6 text-center text-sm text-fg-muted">Keine Treffer</li>
+			<li class="px-2 py-6 text-center text-sm text-fg-muted">{t('Keine Treffer')}</li>
 		{/each}
 	</ul>
 </div>

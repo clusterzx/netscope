@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"netscope/internal/db"
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 )
 
@@ -32,6 +33,17 @@ type System struct {
 	ObservationRawMaxKB int `json:"observationRawMaxKb"`
 	// MetricsPublic serves /metrics without authentication.
 	MetricsPublic bool `json:"metricsPublic"`
+	// Language of notifications and scheduled reports: de | en (the web UI follows each
+	// user's own choice).
+	Language string `json:"language"`
+}
+
+// Lang returns the language for notifications and scheduled reports.
+func (s System) Lang() i18n.Locale {
+	if l, ok := i18n.Parse(s.Language); ok {
+		return l
+	}
+	return i18n.Default
 }
 
 // DefaultSystem returns the defaults.
@@ -46,6 +58,7 @@ func DefaultSystem() System {
 			"nas", "desktop", "laptop", "phone", "tablet", "tv", "media-player", "speaker", "printer", "camera",
 			"smart-home", "iot", "game-console", "ups", "other"},
 		ObservationRawMaxKB: 256,
+		Language:            string(i18n.Default),
 	}
 }
 
@@ -66,6 +79,14 @@ func (s *System) Validate() error {
 	}
 	if s.ObservationRawMaxKB < 0 || s.ObservationRawMaxKB > 16384 {
 		return plugin.FieldErr("observationRawMaxKb", "0–16384 erwartet")
+	}
+	if s.Language == "" {
+		s.Language = string(i18n.Default)
+	}
+	if l, ok := i18n.Parse(s.Language); ok {
+		s.Language = string(l)
+	} else {
+		return plugin.FieldErr("language", "de oder en erwartet")
 	}
 	clean := func(in []string) []string {
 		seen := map[string]bool{}

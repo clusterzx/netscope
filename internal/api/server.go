@@ -25,6 +25,7 @@ import (
 	"netscope/internal/db"
 	"netscope/internal/events"
 	"netscope/internal/federation"
+	"netscope/internal/i18n"
 	"netscope/internal/inventory"
 	"netscope/internal/logging"
 	"netscope/internal/plugin"
@@ -133,7 +134,7 @@ func New(d Deps) *Server {
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)
 	s.mux.HandleFunc("GET /api/docs", s.handleDocs)
 	s.mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, http.StatusNotFound, "not_found", "Unbekannter API-Endpunkt", nil)
+		writeError(w, r, http.StatusNotFound, "not_found", "Unbekannter API-Endpunkt", nil)
 	})
 	if d.UI != nil {
 		s.mux.Handle("/", d.UI)
@@ -300,7 +301,7 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 					panic(rec)
 				}
 				s.Log.Error("panic in handler", "path", r.URL.Path, "panic", fmt.Sprint(rec), "stack", string(debug.Stack()))
-				writeError(w, http.StatusInternalServerError, "internal", "Interner Fehler", nil)
+				writeError(w, r, http.StatusInternalServerError, "internal", "Interner Fehler", nil)
 			}
 		}()
 		next.ServeHTTP(w, r)
@@ -360,35 +361,37 @@ func (s *Server) withAuth(rt *route) http.HandlerFunc {
 		}
 		p, viaCookie := s.authenticate(w, r)
 		if p == nil {
-			writeError(w, http.StatusUnauthorized, "unauthenticated", "Anmeldung erforderlich", nil)
+			writeError(w, r, http.StatusUnauthorized, "unauthenticated", "Anmeldung erforderlich", nil)
 			return
 		}
+		// from here on errors follow the user's language preference
+		r = r.WithContext(context.WithValue(r.Context(), keyPrincipal, p))
 		unsafe := r.Method != http.MethodGet && r.Method != http.MethodHead
 		if viaCookie && unsafe && r.Header.Get(csrfHeader) == "" {
-			writeError(w, http.StatusForbidden, "csrf", "CSRF-Header fehlt", nil)
+			writeError(w, r, http.StatusForbidden, "csrf", "CSRF-Header fehlt", nil)
 			return
 		}
 		if (scope == scopeWrite || unsafe) && !p.CanWrite() {
-			writeError(w, http.StatusForbidden, "forbidden", "Dieses Token darf nur lesen", nil)
+			writeError(w, r, http.StatusForbidden, "forbidden", "Dieses Token darf nur lesen", nil)
 			return
 		}
 		switch p.Restricted() {
 		case "password":
 			if !rt.Setup {
-				writeError(w, http.StatusForbidden, "password_change_required", "Bitte zuerst das Start-Passwort ändern", nil)
+				writeError(w, r, http.StatusForbidden, "password_change_required", "Bitte zuerst das Start-Passwort ändern", nil)
 				return
 			}
 		case "mfa":
 			if !rt.Setup {
-				writeError(w, http.StatusForbidden, "mfa_setup_required", "Deine Rolle verlangt einen zweiten Faktor – bitte zuerst einrichten", nil)
+				writeError(w, r, http.StatusForbidden, "mfa_setup_required", "Deine Rolle verlangt einen zweiten Faktor – bitte zuerst einrichten", nil)
 				return
 			}
 		}
 		if !p.Has(rt.Perm) {
-			writeError(w, http.StatusForbidden, "forbidden", "Dazu fehlt die Berechtigung „"+permLabel(rt.Perm)+"“", nil)
+			forbidden(w, r, rt.Perm)
 			return
 		}
-		h(w, r.WithContext(context.WithValue(r.Context(), keyPrincipal, p)))
+		h(w, r)
 	}
 }
 
@@ -409,8 +412,25 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = enc.Encode(v)
 }
 
-func writeError(w http.ResponseWriter, status int, code, msg string, fields []plugin.FieldError) {
-	writeJSON(w, status, map[string]any{"error": apiError{Code: code, Message: msg, Fields: fields}})
+// writeError answers with an error in the language of the request (message and field
+// messages are written in German and translated through the i18n catalogs).
+func writeError(w http.ResponseWriter, r *http.Request, status int, code, msg string, fields []plugin.FieldError) {
+	loc := requestLocale(r)
+	writeJSON(w, status, map[string]any{"error": apiError{Code: code, Message: i18n.Err(loc, msg),
+		Fields: plugin.LocalizeErrors(fields, loc)}})
+}
+
+// requestLocale is the language of the answer: the signed-in user's preference, otherwise
+// the browser language (Accept-Language), otherwise German.
+func requestLocale(r *http.Request) i18n.Locale {
+	if r == nil {
+		return i18n.Default
+	}
+	pref := ""
+	if p := principal(r); p != nil {
+		pref = p.Locale
+	}
+	return i18n.Pick(pref, r.Header.Get("Accept-Language"))
 }
 
 func isInternal(err error) bool {
@@ -430,34 +450,37 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var ce *pluginhost.ConfigError
 	switch {
 	case errors.Is(err, db.ErrNotFound):
-		writeError(w, http.StatusNotFound, "not_found", "Nicht gefunden", nil)
+		writeError(w, r, http.StatusNotFound, "not_found", "Nicht gefunden", nil)
 	case errors.As(err, &ve):
-		writeError(w, http.StatusBadRequest, "validation", ve.Error(), ve.Errors)
+		// the summary is built from the translated field messages
+		loc := requestLocale(r)
+		fields := plugin.LocalizeErrors(ve.Errors, loc)
+		writeError(w, r, http.StatusBadRequest, "validation", (&plugin.ValidationError{Errors: fields}).ErrorIn(loc), fields)
 	case errors.As(err, &ce):
-		writeError(w, http.StatusBadRequest, "validation", ce.Error(), []plugin.FieldError{{Field: ce.Field, Message: ce.Message}})
+		writeError(w, r, http.StatusBadRequest, "validation", ce.Error(), []plugin.FieldError{{Field: ce.Field, Message: ce.Message}})
 	case errors.Is(err, auth.ErrInvalidCredentials):
-		writeError(w, http.StatusUnauthorized, "invalid_credentials", err.Error(), nil)
+		writeError(w, r, http.StatusUnauthorized, "invalid_credentials", err.Error(), nil)
 	case errors.Is(err, auth.ErrInvalidCode):
-		writeError(w, http.StatusUnauthorized, "invalid_code", err.Error(), nil)
+		writeError(w, r, http.StatusUnauthorized, "invalid_code", err.Error(), nil)
 	case errors.Is(err, auth.ErrChallengeExpired):
-		writeError(w, http.StatusUnauthorized, "challenge_expired", err.Error(), nil)
+		writeError(w, r, http.StatusUnauthorized, "challenge_expired", err.Error(), nil)
 	case errors.Is(err, auth.ErrAccountDisabled):
-		writeError(w, http.StatusForbidden, "account_disabled", err.Error(), nil)
+		writeError(w, r, http.StatusForbidden, "account_disabled", err.Error(), nil)
 	case errors.Is(err, auth.ErrNoRole):
-		writeError(w, http.StatusForbidden, "no_role", err.Error(), nil)
+		writeError(w, r, http.StatusForbidden, "no_role", err.Error(), nil)
 	case errors.Is(err, auth.ErrRateLimited):
-		writeError(w, http.StatusTooManyRequests, "rate_limited", err.Error(), nil)
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", err.Error(), nil)
 	case errors.Is(err, auth.ErrUnauthenticated):
-		writeError(w, http.StatusUnauthorized, "unauthenticated", err.Error(), nil)
+		writeError(w, r, http.StatusUnauthorized, "unauthenticated", err.Error(), nil)
 	case errors.Is(err, pluginhost.ErrAlreadyQueued):
-		writeError(w, http.StatusConflict, "conflict", err.Error(), nil)
+		writeError(w, r, http.StatusConflict, "conflict", err.Error(), nil)
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		writeError(w, http.StatusServiceUnavailable, "timeout", "Anfrage abgebrochen oder Zeitüberschreitung", nil)
+		writeError(w, r, http.StatusServiceUnavailable, "timeout", "Anfrage abgebrochen oder Zeitüberschreitung", nil)
 	case isInternal(err):
 		s.Log.Error("request failed", "path", r.URL.Path, "err", err)
-		writeError(w, http.StatusInternalServerError, "internal", "Interner Fehler (Details im Log)", nil)
+		writeError(w, r, http.StatusInternalServerError, "internal", "Interner Fehler (Details im Log)", nil)
 	default:
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error(), nil)
+		writeError(w, r, http.StatusBadRequest, "bad_request", err.Error(), nil)
 	}
 }
 
@@ -557,7 +580,7 @@ func actorName(r *http.Request) string {
 func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	fl, ok := w.(http.Flusher)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "internal", "Streaming nicht unterstützt", nil)
+		writeError(w, r, http.StatusInternalServerError, "internal", "Streaming nicht unterstützt", nil)
 		return
 	}
 	var topics []string
@@ -568,6 +591,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	defer sub.Close()
 	// server log lines are for those who may read the log
 	logs := principal(r).Has(auth.PermAuditView)
+	loc := requestLocale(r)
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache")
@@ -594,6 +618,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 			if msg.Topic == bus.TopicLog && !logs {
 				continue
 			}
+			msg = localizeMessage(msg, loc)
 			b, err := json.Marshal(msg)
 			if err != nil {
 				continue
@@ -617,6 +642,7 @@ func permLabel(key string) string {
 }
 
 // forbidden answers a request that lacks a permission a handler checks itself.
-func forbidden(w http.ResponseWriter, perm string) {
-	writeError(w, http.StatusForbidden, "forbidden", "Dazu fehlt die Berechtigung „"+permLabel(perm)+"“", nil)
+func forbidden(w http.ResponseWriter, r *http.Request, perm string) {
+	loc := requestLocale(r)
+	writeError(w, r, http.StatusForbidden, "forbidden", i18n.Sprintf(loc, "Dazu fehlt die Berechtigung „%s“", i18n.T(loc, permLabel(perm))), nil)
 }

@@ -19,7 +19,7 @@
 	import { groups, meta, tags } from '$lib/stores/catalog.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { CRITICALITIES, criticalityLabel, stateLabel } from '$lib/utils/labels';
-	import { formatNumber } from '$lib/utils/format';
+	import { t, tn } from '$lib/i18n';
 	import ActionParamsDialog from './ActionParamsDialog.svelte';
 	import { outcomeToast } from './actions';
 
@@ -45,14 +45,14 @@
 	const canCreateGroup = $derived(auth.can('inventory.config'));
 
 	const n = $derived(ids.length);
-	const target = $derived(n === 1 ? '1 Gerät' : `${formatNumber(n)} Geräte`);
+	const target = $derived(tn(n, '{n} Gerät', '{n} Geräte'));
 	let busy = $state(false);
 
 	async function bulk(body: Omit<BulkRequest, 'ids'>, success: string) {
 		busy = true;
 		try {
 			const res = await api.post('/api/v1/devices/bulk', { body: { ...body, ids } as BulkRequest });
-			toast.success(`${success} (${res.affected} ${res.affected === 1 ? 'Gerät' : 'Geräte'})`);
+			toast.success(tn(res.affected, '{what} ({n} Gerät)', '{what} ({n} Geräte)', { what: success }));
 			ondone();
 			return res;
 		} catch (e) {
@@ -68,7 +68,7 @@
 	let tagMode = $state<'add_tags' | 'remove_tags'>('add_tags');
 	let tagList = $state<string[]>([]);
 	let tagError = $state('');
-	const tagSuggestions = $derived((tags.value ?? []).map((t) => t.tag));
+	const tagSuggestions = $derived((tags.value ?? []).map((x) => x.tag));
 
 	function openTags(mode: 'add_tags' | 'remove_tags') {
 		tagMode = mode;
@@ -78,13 +78,13 @@
 	}
 	async function submitTags() {
 		if (!tagList.length) {
-			tagError = 'Mindestens ein Tag angeben';
+			tagError = t('Mindestens ein Tag angeben');
 			return;
 		}
 		try {
 			await bulk(
 				{ action: tagMode, tags: tagList },
-				tagMode === 'add_tags' ? 'Tags hinzugefügt' : 'Tags entfernt'
+				tagMode === 'add_tags' ? t('Tags hinzugefügt') : t('Tags entfernt')
 			);
 			tagOpen = false;
 			tags.refresh().catch(() => {});
@@ -126,12 +126,12 @@
 				groups.refresh().catch(() => {});
 			}
 			if (!gid) {
-				groupError = 'Gruppe wählen oder neu anlegen';
+				groupError = t('Gruppe wählen oder neu anlegen');
 				return;
 			}
 			await bulk(
 				{ action: groupMode, group: gid },
-				groupMode === 'add_group' ? 'Zur Gruppe hinzugefügt' : 'Aus Gruppe entfernt'
+				groupMode === 'add_group' ? t('Zur Gruppe hinzugefügt') : t('Aus Gruppe entfernt')
 			);
 			groupOpen = false;
 			groups.refresh().catch(() => {});
@@ -152,11 +152,13 @@
 		mergeOpen = true;
 	}
 	async function submitMerge() {
-		const t = Number(mergeTarget);
+		const tid = Number(mergeTarget);
 		busy = true;
 		try {
-			await api.post('/api/v1/devices/merge', { body: { target: t, sources: ids.filter((i) => i !== t) } });
-			toast.success(`${n - 1} ${n - 1 === 1 ? 'Gerät' : 'Geräte'} zusammengeführt`);
+			await api.post('/api/v1/devices/merge', {
+				body: { target: tid, sources: ids.filter((i) => i !== tid) }
+			});
+			toast.success(tn(n - 1, '{n} Gerät zusammengeführt', '{n} Geräte zusammengeführt'));
 			mergeOpen = false;
 			onclear();
 			ondone();
@@ -191,7 +193,7 @@
 		}
 		if (
 			a.confirm &&
-			!(await confirm({ title: a.label, message: `${a.confirm}\n\n${target}`, confirmLabel: 'Ausführen' }))
+			!(await confirm({ title: a.label, message: `${a.confirm}\n\n${target}`, confirmLabel: t('Ausführen') }))
 		)
 			return;
 		try {
@@ -203,21 +205,22 @@
 
 	async function remove() {
 		const ok = await confirm({
-			title: `${target} löschen?`,
-			message:
-				'Alle Daten der Geräte (Ports, Zertifikate, Historie …) werden gelöscht. Events bleiben erhalten. Beim nächsten Scan werden aktive Geräte neu angelegt.',
-			confirmLabel: 'Löschen',
+			title: t('{target} löschen?', { target }),
+			message: t(
+				'Alle Daten der Geräte (Ports, Zertifikate, Historie …) werden gelöscht. Events bleiben erhalten. Beim nächsten Scan werden aktive Geräte neu angelegt.'
+			),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
-		await bulk({ action: 'delete' }, 'Geräte gelöscht').catch(() => {});
+		await bulk({ action: 'delete' }, t('Geräte gelöscht')).catch(() => {});
 		onclear();
 	}
 
 	const actionItems = $derived<MenuItem[]>([
 		...(canActions && (meta.value?.deviceActions ?? []).length
 			? [
-					{ separator: true as const, label: 'Plugin-Aktionen' },
+					{ separator: true as const, label: t('Plugin-Aktionen') },
 					...(meta.value?.deviceActions ?? []).map((a) => ({
 						label: a.label,
 						icon: a.plugin === 'wol' ? ('zap' as const) : ('play' as const),
@@ -228,9 +231,9 @@
 			: []),
 		...(canDelete
 			? [
-					{ separator: true as const, label: 'Inventar' },
-					{ label: 'Zusammenführen …', icon: 'merge' as const, disabled: n < 2, onclick: openMerge },
-					{ label: 'Löschen …', icon: 'trash' as const, danger: true, onclick: remove }
+					{ separator: true as const, label: t('Inventar') },
+					{ label: t('Zusammenführen …'), icon: 'merge' as const, disabled: n < 2, onclick: openMerge },
+					{ label: t('Löschen …'), icon: 'trash' as const, danger: true, onclick: remove }
 				]
 			: [])
 	]);
@@ -239,10 +242,10 @@
 <div
 	class="flex flex-wrap items-center gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2"
 	role="region"
-	aria-label="Massenaktionen"
+	aria-label={t('Massenaktionen')}
 >
-	<span class="text-sm font-medium text-fg">{target} ausgewählt</span>
-	<Button size="sm" variant="ghost" onclick={onclear}>Auswahl aufheben</Button>
+	<span class="text-sm font-medium text-fg">{t('{target} ausgewählt', { target })}</span>
+	<Button size="sm" variant="ghost" onclick={onclear}>{t('Auswahl aufheben')}</Button>
 	<span class="mx-1 hidden h-5 w-px bg-border sm:block"></span>
 	{#if canEdit}
 		<Menu
@@ -253,38 +256,41 @@
 			placement="bottom-start"
 			disabled={busy}
 			items={[
-				{ label: 'Tags hinzufügen …', icon: 'plus', onclick: () => openTags('add_tags') },
-				{ label: 'Tags entfernen …', icon: 'minus', onclick: () => openTags('remove_tags') }
+				{ label: t('Tags hinzufügen …'), icon: 'plus', onclick: () => openTags('add_tags') },
+				{ label: t('Tags entfernen …'), icon: 'minus', onclick: () => openTags('remove_tags') }
 			]}
 		/>
 		<Menu
-			text="Gruppe"
-			label="Gruppe"
+			text={t('Gruppe')}
+			label={t('Gruppe')}
 			size="sm"
 			variant="secondary"
 			placement="bottom-start"
 			disabled={busy}
 			items={[
-				{ label: 'Zu Gruppe hinzufügen …', icon: 'plus', onclick: () => openGroups('add_group') },
-				{ label: 'Aus Gruppe entfernen …', icon: 'minus', onclick: () => openGroups('remove_group') }
+				{ label: t('Zu Gruppe hinzufügen …'), icon: 'plus', onclick: () => openGroups('add_group') },
+				{ label: t('Aus Gruppe entfernen …'), icon: 'minus', onclick: () => openGroups('remove_group') }
 			]}
 		/>
 		<Menu
-			text="Zustand"
-			label="Zustand setzen"
+			text={t('Zustand')}
+			label={t('Zustand setzen')}
 			size="sm"
 			variant="secondary"
 			placement="bottom-start"
 			disabled={busy}
 			items={(['known', 'unknown', 'ignored'] as const).map((s) => ({
-				label: `Als „${stateLabel[s]}“ markieren`,
+				label: t('Als „{state}“ markieren', { state: stateLabel[s] }),
 				onclick: () =>
-					bulk({ action: 'set_state', value: s }, `Zustand „${stateLabel[s]}“ gesetzt`).catch(() => {})
+					bulk(
+						{ action: 'set_state', value: s },
+						t('Zustand „{state}“ gesetzt', { state: stateLabel[s] })
+					).catch(() => {})
 			}))}
 		/>
 		<Menu
-			text="Kritikalität"
-			label="Kritikalität setzen"
+			text={t('Kritikalität')}
+			label={t('Kritikalität setzen')}
 			size="sm"
 			variant="secondary"
 			placement="bottom-start"
@@ -294,15 +300,15 @@
 				onclick: () =>
 					bulk(
 						{ action: 'set_criticality', value: c },
-						`Kritikalität „${criticalityLabel[c]}“ gesetzt`
+						t('Kritikalität „{value}“ gesetzt', { value: criticalityLabel[c] })
 					).catch(() => {})
 			}))}
 		/>
 	{/if}
 	{#if actionItems.length}
 		<Menu
-			text="Weitere"
-			label="Weitere Aktionen"
+			text={t('Weitere')}
+			label={t('Weitere Aktionen')}
 			size="sm"
 			variant="secondary"
 			placement="bottom-start"
@@ -314,7 +320,7 @@
 
 <Modal
 	bind:open={tagOpen}
-	title={tagMode === 'add_tags' ? 'Tags hinzufügen' : 'Tags entfernen'}
+	title={tagMode === 'add_tags' ? t('Tags hinzufügen') : t('Tags entfernen')}
 	description={target}
 	size="sm"
 	as="form"
@@ -327,19 +333,19 @@
 		suggestions={tagSuggestions}
 		error={tagError}
 		normalize={(s) => s.trim().toLowerCase()}
-		hint="Enter oder Komma trennt Tags"
+		hint={t('Enter oder Komma trennt Tags')}
 	/>
 	{#snippet footer()}
-		<Button onclick={() => (tagOpen = false)} disabled={busy}>Abbrechen</Button>
+		<Button onclick={() => (tagOpen = false)} disabled={busy}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="primary" loading={busy}
-			>{tagMode === 'add_tags' ? 'Hinzufügen' : 'Entfernen'}</Button
+			>{tagMode === 'add_tags' ? t('Hinzufügen') : t('Entfernen')}</Button
 		>
 	{/snippet}
 </Modal>
 
 <Modal
 	bind:open={groupOpen}
-	title={groupMode === 'add_group' ? 'Zu Gruppe hinzufügen' : 'Aus Gruppe entfernen'}
+	title={groupMode === 'add_group' ? t('Zu Gruppe hinzufügen') : t('Aus Gruppe entfernen')}
 	description={target}
 	size="sm"
 	as="form"
@@ -350,35 +356,35 @@
 		{#if groupError}<Alert tone="danger">{groupError}</Alert>{/if}
 		{#if manualGroups.length}
 			<Select
-				label="Gruppe"
+				label={t('Gruppe')}
 				bind:value={groupId}
 				options={manualGroups.map((g) => ({ value: String(g.id), label: `${g.name} (${g.memberCount})` }))}
 				disabled={groupMode === 'add_group' && !!newGroup.trim()}
 			/>
 		{:else}
 			<p class="text-sm text-fg-muted">
-				Es gibt noch keine manuellen Gruppen. Regelbasierte Gruppen ergeben sich aus ihrem Filter.
+				{t('Es gibt noch keine manuellen Gruppen. Regelbasierte Gruppen ergeben sich aus ihrem Filter.')}
 			</p>
 		{/if}
 		{#if groupMode === 'add_group' && canCreateGroup}
 			<Input
-				label="… oder neue manuelle Gruppe anlegen"
+				label={t('… oder neue manuelle Gruppe anlegen')}
 				bind:value={newGroup}
-				placeholder="Name der neuen Gruppe"
+				placeholder={t('Name der neuen Gruppe')}
 			/>
 		{/if}
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (groupOpen = false)} disabled={busy}>Abbrechen</Button>
+		<Button onclick={() => (groupOpen = false)} disabled={busy}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="primary" loading={busy}
-			>{groupMode === 'add_group' ? 'Hinzufügen' : 'Entfernen'}</Button
+			>{groupMode === 'add_group' ? t('Hinzufügen') : t('Entfernen')}</Button
 		>
 	{/snippet}
 </Modal>
 
 <Modal
 	bind:open={mergeOpen}
-	title="Geräte zusammenführen"
+	title={t('Geräte zusammenführen')}
 	description={target}
 	as="form"
 	onsubmit={submitMerge}
@@ -386,12 +392,13 @@
 >
 	<div class="flex flex-col gap-3">
 		<p class="text-sm text-fg-muted">
-			Alle MAC- und IP-Adressen, Beobachtungen und manuellen Daten der anderen Geräte werden in das Zielgerät
-			übernommen; die übrigen Geräte werden danach gelöscht.
+			{t(
+				'Alle MAC- und IP-Adressen, Beobachtungen und manuellen Daten der anderen Geräte werden in das Zielgerät übernommen; die übrigen Geräte werden danach gelöscht.'
+			)}
 		</p>
 		{#if mergeError}<Alert tone="danger">{mergeError}</Alert>{/if}
 		<fieldset class="flex flex-col gap-1.5">
-			<legend class="mb-1 text-[0.8125rem] font-medium">Zielgerät (bleibt erhalten)</legend>
+			<legend class="mb-1 text-[0.8125rem] font-medium">{t('Zielgerät (bleibt erhalten)')}</legend>
 			{#each mergeRows as r (r.id)}
 				<label
 					class="flex cursor-pointer items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-2 has-checked:border-accent has-checked:bg-accent-soft"
@@ -410,14 +417,18 @@
 			{/each}
 			{#if mergeRows.length < n}
 				<p class="text-xs text-fg-subtle">
-					{n - mergeRows.length} ausgewählte Geräte sind auf anderen Seiten.
+					{tn(
+						n - mergeRows.length,
+						'{n} ausgewähltes Gerät ist auf einer anderen Seite.',
+						'{n} ausgewählte Geräte sind auf anderen Seiten.'
+					)}
 				</p>
 			{/if}
 		</fieldset>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (mergeOpen = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="merge" loading={busy}>Zusammenführen</Button>
+		<Button onclick={() => (mergeOpen = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="merge" loading={busy}>{t('Zusammenführen')}</Button>
 	{/snippet}
 </Modal>
 

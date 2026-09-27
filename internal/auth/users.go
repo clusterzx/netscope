@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"netscope/internal/db"
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 )
 
@@ -32,7 +33,9 @@ type User struct {
 	// have no NetScope password.
 	AuthSource string `json:"authSource"`
 	// MFARequired: the role requires a second factor.
-	MFARequired bool       `json:"mfaRequired"`
+	MFARequired bool `json:"mfaRequired"`
+	// Locale is the language of the web interface: "" follows the browser, "de" or "en".
+	Locale      string     `json:"locale"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
 	LastLoginAt *time.Time `json:"lastLoginAt,omitempty"`
@@ -42,7 +45,7 @@ const userSelect = `SELECT u.id, u.username, u.display_name, u.email, u.role_id,
 	u.must_change_password, u.totp_enabled_at IS NOT NULL,
 	(SELECT COUNT(*) FROM user_passkeys k WHERE k.user_id = u.id),
 	(SELECT COUNT(*) FROM user_recovery_codes c WHERE c.user_id = u.id AND c.used_at IS NULL),
-	u.created_at, u.updated_at, u.last_login_at, u.auth_source
+	u.created_at, u.updated_at, u.last_login_at, u.auth_source, u.locale
 	FROM users u JOIN roles r ON r.id = u.role_id`
 
 func scanUser(sc interface{ Scan(...any) error }) (User, error) {
@@ -52,7 +55,7 @@ func scanUser(sc interface{ Scan(...any) error }) (User, error) {
 		lastLogin sql.NullInt64
 	)
 	err := sc.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Email, &u.RoleID, &u.RoleName, &u.MFARequired, &u.Disabled,
-		&u.MustChangePassword, &u.TOTP, &u.Passkeys, &u.RecoveryCodes, &c, &up, &lastLogin, &u.AuthSource)
+		&u.MustChangePassword, &u.TOTP, &u.Passkeys, &u.RecoveryCodes, &c, &up, &lastLogin, &u.AuthSource, &u.Locale)
 	u.CreatedAt, u.UpdatedAt, u.LastLoginAt = db.Time(c), db.Time(up), db.NullTime(lastLogin)
 	return u, err
 }
@@ -94,6 +97,37 @@ type UserInput struct {
 	// Password of a new account ("" = generate one). The user has to change it at the first
 	// login, because the administrator knows it.
 	Password string `json:"password,omitempty"`
+	// Locale sets the language of the web interface ("" = browser, "de", "en"); omitted,
+	// it stays as it is.
+	Locale *string `json:"locale,omitempty"`
+}
+
+// NormalizeLocale checks a language preference: "" (browser), "de" or "en".
+func NormalizeLocale(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	if l, ok := i18n.Parse(s); ok {
+		return string(l), nil
+	}
+	return "", plugin.FieldErr("locale", "Sprache: leer (Browser), de oder en erwartet")
+}
+
+// SetLocale changes the language preference of a user.
+func (s *Service) SetLocale(ctx context.Context, userID int64, locale string) error {
+	l, err := NormalizeLocale(locale)
+	if err != nil {
+		return err
+	}
+	res, err := s.db.W.ExecContext(ctx, "UPDATE users SET locale = ?, updated_at = ? WHERE id = ?", l, db.Now(), userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return db.ErrNotFound
+	}
+	return nil
 }
 
 var usernameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$`)
@@ -111,6 +145,13 @@ func (in *UserInput) normalize() error {
 		return plugin.FieldErr("email", "ungültige E-Mail-Adresse")
 	case in.RoleID <= 0:
 		return plugin.FieldErr("roleId", "Rolle erforderlich")
+	}
+	if in.Locale != nil {
+		l, err := NormalizeLocale(*in.Locale)
+		if err != nil {
+			return err
+		}
+		in.Locale = &l
 	}
 	return nil
 }
@@ -179,9 +220,13 @@ func (s *Service) CreateUser(ctx context.Context, in UserInput) (*User, string, 
 			return err
 		}
 		now := db.Now()
+		locale := ""
+		if in.Locale != nil {
+			locale = *in.Locale
+		}
 		res, err := tx.ExecContext(ctx, `INSERT INTO users(username, password_hash, display_name, email, role_id, disabled,
-			must_change_password, created_at, updated_at) VALUES (?,?,?,?,?,?,1,?,?)`,
-			in.Username, hash, in.DisplayName, in.Email, in.RoleID, db.Bool(in.Disabled), now, now)
+			must_change_password, created_at, updated_at, locale) VALUES (?,?,?,?,?,?,1,?,?,?)`,
+			in.Username, hash, in.DisplayName, in.Email, in.RoleID, db.Bool(in.Disabled), now, now, locale)
 		if err != nil {
 			return err
 		}
@@ -229,6 +274,11 @@ func (s *Service) UpdateUser(ctx context.Context, actor, id int64, in UserInput)
 		if _, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = ?, email = ?, role_id = ?, disabled = ?,
 			updated_at = ? WHERE id = ?`, in.Username, in.DisplayName, in.Email, in.RoleID, db.Bool(in.Disabled), db.Now(), id); err != nil {
 			return err
+		}
+		if in.Locale != nil {
+			if _, err := tx.ExecContext(ctx, "UPDATE users SET locale = ? WHERE id = ?", *in.Locale, id); err != nil {
+				return err
+			}
 		}
 		if in.Disabled {
 			_, err := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id = ?", id)

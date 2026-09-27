@@ -5,6 +5,7 @@
 <script lang="ts">
 	import type { ChangeReport } from '$lib/api';
 	import { Badge, EmptyState, SeverityBadge } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { eventTypeLabel, meta } from '$lib/stores/catalog.svelte';
 	import { formatDateTime, formatNumber, formatSeconds } from '$lib/utils/format';
 	import { eventCategoryLabel, healthStateLabel, healthTone, severityLabel } from '$lib/utils/labels';
@@ -54,23 +55,23 @@
 
 	const kpis = $derived([
 		{
-			label: 'Geräte',
+			label: t('Geräte'),
 			value: r.devices?.total ?? 0,
 			detail: `${formatNumber(r.devices?.online ?? 0)} online`,
 			href: '/devices'
 		},
-		{ label: 'Neu im Zeitraum', value: r.devices?.new ?? 0, detail: 'erstmals gesehen', href: '' },
+		{ label: t('Neu im Zeitraum'), value: r.devices?.new ?? 0, detail: t('erstmals gesehen'), href: '' },
 		{
-			label: 'Unbekannt',
+			label: t('Unbekannt'),
 			value: r.devices?.unknown ?? 0,
-			detail: 'nicht als bekannt markiert',
+			detail: t('nicht als bekannt markiert'),
 			href: '/devices?q=state:unknown'
 		},
-		{ label: 'Events', value: eventTotal, detail: `${eventRows.length} Typen`, href: '' },
+		{ label: 'Events', value: eventTotal, detail: tn(eventRows.length, '{n} Typ', '{n} Typen'), href: '' },
 		{
-			label: 'Offen kritisch / hoch',
+			label: t('Offen kritisch / hoch'),
 			value: `${formatNumber(r.openCritical)} / ${formatNumber(r.openHigh)}`,
-			detail: 'nicht quittiert (aktuell)',
+			detail: t('nicht quittiert (aktuell)'),
 			href: '/events?acked=0'
 		}
 	]);
@@ -90,7 +91,7 @@
 {#snippet more(total: number, open: boolean, toggle: () => void)}
 	{#if total > LIMIT}
 		<button type="button" class="mt-1.5 text-xs font-medium text-accent hover:underline" onclick={toggle}>
-			{open ? 'Weniger anzeigen' : `Alle ${formatNumber(total)} anzeigen`}
+			{open ? t('Weniger anzeigen') : t('Alle {n} anzeigen', { n: formatNumber(total) })}
 		</button>
 	{/if}
 {/snippet}
@@ -114,9 +115,9 @@
 	<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
 		<!-- new devices -->
 		<section>
-			{@render sectionTitle('Neue Geräte', newDevices.length)}
+			{@render sectionTitle(t('Neue Geräte'), newDevices.length)}
 			{#if newDevices.length === 0}
-				<p class="text-sm text-fg-subtle">Keine neuen Geräte im Zeitraum.</p>
+				<p class="text-sm text-fg-subtle">{t('Keine neuen Geräte im Zeitraum.')}</p>
 			{:else}
 				<ul class="divide-y divide-border rounded-md border border-border">
 					{#each allDevices ? newDevices : newDevices.slice(0, LIMIT) as d (d.id)}
@@ -138,9 +139,9 @@
 
 		<!-- events by type -->
 		<section>
-			{@render sectionTitle('Events nach Typ', eventTotal)}
+			{@render sectionTitle(t('Events nach Typ'), eventTotal)}
 			{#if eventRows.length === 0}
-				<p class="text-sm text-fg-subtle">Keine Events im Zeitraum.</p>
+				<p class="text-sm text-fg-subtle">{t('Keine Events im Zeitraum.')}</p>
 			{:else}
 				<ul class="flex flex-col gap-1">
 					{#each allEvents ? eventRows : eventRows.slice(0, LIMIT) as e (e.type)}
@@ -168,9 +169,9 @@
 
 	<!-- important events -->
 	<section>
-		{@render sectionTitle('Wichtige Events (hoch & kritisch)', important.length)}
+		{@render sectionTitle(t('Wichtige Events (hoch & kritisch)'), important.length)}
 		{#if important.length === 0}
-			<p class="text-sm text-fg-subtle">Keine hohen oder kritischen Events im Zeitraum.</p>
+			<p class="text-sm text-fg-subtle">{t('Keine hohen oder kritischen Events im Zeitraum.')}</p>
 		{:else}
 			<ul class="divide-y divide-border rounded-md border border-border">
 				{#each important as e (e.id)}
@@ -182,7 +183,7 @@
 						<span class="flex shrink-0 items-center gap-2 text-xs text-fg-subtle">
 							{#if e.device}<span class="truncate">{e.device}</span> ·{/if}
 							<span>{formatDateTime(e.ts)}</span>
-							<Badge tone={e.acked ? 'ok' : 'warn'}>{e.acked ? 'quittiert' : 'offen'}</Badge>
+							<Badge tone={e.acked ? 'ok' : 'warn'}>{e.acked ? t('quittiert') : t('offen')}</Badge>
 						</span>
 					</li>
 				{/each}
@@ -193,7 +194,7 @@
 	<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
 		<!-- CVEs -->
 		<section>
-			{@render sectionTitle('Schwachstellen (aktuell offen)', cveTotal)}
+			{@render sectionTitle(t('Schwachstellen (aktuell offen)'), cveTotal)}
 			<ul class="flex flex-col gap-1">
 				{#each sevOrder as s (s)}
 					{@const n = r.cveBySeverity?.[s] ?? 0}
@@ -210,10 +211,12 @@
 				{/each}
 			</ul>
 			<h4 class="mt-4 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-				Neu gefunden im Zeitraum ({formatNumber(newCves.length)}{newCves.length >= 50 ? '+' : ''})
+				{t('Neu gefunden im Zeitraum ({count})', {
+					count: formatNumber(newCves.length) + (newCves.length >= 50 ? '+' : '')
+				})}
 			</h4>
 			{#if newCves.length === 0}
-				<p class="text-sm text-fg-subtle">Keine neuen CVEs.</p>
+				<p class="text-sm text-fg-subtle">{t('Keine neuen CVEs.')}</p>
 			{:else}
 				<ul class="divide-y divide-border rounded-md border border-border">
 					{#each allCves ? newCves : newCves.slice(0, LIMIT) as c, i (c.cve + c.device + i)}
@@ -233,9 +236,9 @@
 		<div class="flex flex-col gap-6">
 			<!-- certificates -->
 			<section>
-				{@render sectionTitle('Ablaufende Zertifikate (≤ 30 Tage nach Zeitraumende)', certs.length)}
+				{@render sectionTitle(t('Ablaufende Zertifikate (≤ 30 Tage nach Zeitraumende)'), certs.length)}
 				{#if certs.length === 0}
-					<p class="text-sm text-fg-subtle">Keine ablaufenden Zertifikate.</p>
+					<p class="text-sm text-fg-subtle">{t('Keine ablaufenden Zertifikate.')}</p>
 				{:else}
 					<ul class="divide-y divide-border rounded-md border border-border">
 						{#each certs as c, i (c.endpoint + i)}
@@ -244,7 +247,7 @@
 									tone={c.daysLeft < 0 ? 'critical' : c.daysLeft <= 7 ? 'high' : 'medium'}
 									class="w-24 justify-center"
 								>
-									{c.daysLeft < 0 ? 'abgelaufen' : `${c.daysLeft} Tage`}
+									{c.daysLeft < 0 ? t('abgelaufen') : tn(c.daysLeft, '{n} Tag', '{n} Tage')}
 								</Badge>
 								<span class="min-w-0 flex-1">
 									<span class="block truncate">{c.subject || c.endpoint}</span>
@@ -260,9 +263,9 @@
 
 			<!-- outages -->
 			<section>
-				{@render sectionTitle('Ausfälle', outages.length)}
+				{@render sectionTitle(t('Ausfälle'), outages.length)}
 				{#if outages.length === 0}
-					<p class="text-sm text-fg-subtle">Keine Ausfälle im Zeitraum.</p>
+					<p class="text-sm text-fg-subtle">{t('Keine Ausfälle im Zeitraum.')}</p>
 				{:else}
 					<ul class="divide-y divide-border rounded-md border border-border">
 						{#each outages as o, i (o.check + o.started + i)}
@@ -274,7 +277,7 @@
 								<span class="shrink-0 text-right text-xs text-fg-subtle">
 									{formatDateTime(o.started)} ·
 									<span class="font-medium text-fg-muted tabular">{formatSeconds(o.seconds)}</span>
-									{#if o.ongoing}<Badge tone="danger" dot class="ml-1">andauernd</Badge>{/if}
+									{#if o.ongoing}<Badge tone="danger" dot class="ml-1">{t('andauernd')}</Badge>{/if}
 								</span>
 							</li>
 						{/each}
@@ -285,11 +288,11 @@
 			<!-- failed runs -->
 			<section>
 				{@render sectionTitle(
-					'Fehlgeschlagene Läufe',
+					t('Fehlgeschlagene Läufe'),
 					failed.reduce((a, [, n]) => a + n, 0)
 				)}
 				{#if failed.length === 0}
-					<p class="text-sm text-fg-subtle">Alle Plugin-Läufe waren erfolgreich.</p>
+					<p class="text-sm text-fg-subtle">{t('Alle Plugin-Läufe waren erfolgreich.')}</p>
 				{:else}
 					<ul class="flex flex-wrap gap-2">
 						{#each failed as [id, n] (id)}
@@ -313,8 +316,8 @@
 		<EmptyState
 			compact
 			icon="check-circle"
-			title="Ruhiger Zeitraum"
-			description="Im gewählten Zeitraum gab es keine Änderungen."
+			title={t('Ruhiger Zeitraum')}
+			description={t('Im gewählten Zeitraum gab es keine Änderungen.')}
 		/>
 	{/if}
 </div>

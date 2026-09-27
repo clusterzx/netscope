@@ -1,4 +1,5 @@
 // Helpers for the device detail page (/devices/[id]).
+import { t, tn } from '$lib/i18n';
 import { AsyncData } from '$lib/stores/resource.svelte';
 import { meta } from '$lib/stores/catalog.svelte';
 import type { FactView } from '$lib/api/types';
@@ -45,9 +46,9 @@ export class LazyData<T> extends AsyncData<T> {
 }
 
 const staticSources: Record<string, string> = {
-	manual: 'Manuell',
-	arpscan: 'ARP-Scan',
-	icmp: 'ICMP-Ping',
+	manual: t('Manuell'),
+	arpscan: t('ARP-Scan'),
+	icmp: t('ICMP-Ping'),
 	nmap: 'Nmap',
 	nmap_udp: 'Nmap (UDP)',
 	dns: 'DNS',
@@ -64,13 +65,13 @@ const staticSources: Record<string, string> = {
 	openwrt: 'OpenWrt',
 	docker: 'Docker',
 	netalertx: 'NetAlertX',
-	csv: 'CSV-Import',
+	csv: t('CSV-Import'),
 	diff: 'Diff',
-	cve: 'CVE-Abgleich',
-	healthcheck: 'Health-Check',
-	topology: 'Topologie',
+	cve: t('CVE-Abgleich'),
+	healthcheck: t('Health-Check'),
+	topology: t('Topologie'),
 	cleanup: 'Cleanup',
-	windows_dhcp: 'Windows-DHCP'
+	windows_dhcp: t('Windows-DHCP')
 };
 
 /** Human readable name of a data source (plugin id or "manual"). */
@@ -106,19 +107,19 @@ export function daysLeftTone(days: number): Tone {
 }
 
 export function daysLeftText(days: number): string {
-	if (days < 0) return `seit ${-days} ${-days === 1 ? 'Tag' : 'Tagen'} abgelaufen`;
-	if (days === 0) return 'läuft heute ab';
-	return `noch ${days} ${days === 1 ? 'Tag' : 'Tage'}`;
+	if (days < 0) return tn(-days, 'seit {n} Tag abgelaufen', 'seit {n} Tagen abgelaufen');
+	if (days === 0) return t('läuft heute ab');
+	return tn(days, 'noch {n} Tag', 'noch {n} Tage');
 }
 
 export const matchTypeLabel: Record<string, string> = {
-	exact: 'Exakt',
-	range: 'Versionsbereich',
-	heuristic: 'Heuristisch'
+	exact: t('Exakt'),
+	range: t('Versionsbereich'),
+	heuristic: t('Heuristisch')
 };
 
-export function matchTypeTone(t: string): Tone {
-	return t === 'exact' ? 'ok' : t === 'range' ? 'accent' : 'warn';
+export function matchTypeTone(type: string): Tone {
+	return type === 'exact' ? 'ok' : type === 'range' ? 'accent' : 'warn';
 }
 
 export function httpStatusTone(code: number): Tone {
@@ -144,21 +145,21 @@ export function containerStateTone(state: string | undefined): Tone {
 }
 
 export const containerStateLabel: Record<string, string> = {
-	running: 'läuft',
-	exited: 'beendet',
-	paused: 'pausiert',
-	restarting: 'startet neu',
-	created: 'erstellt',
-	dead: 'tot',
-	removing: 'wird entfernt'
+	running: t('läuft'),
+	exited: t('beendet'),
+	paused: t('pausiert'),
+	restarting: t('startet neu'),
+	created: t('erstellt'),
+	dead: t('tot'),
+	removing: t('wird entfernt')
 };
 
 export const portStateLabel: Record<string, string> = {
-	open: 'offen',
-	closed: 'geschlossen',
-	filtered: 'gefiltert',
-	'open|filtered': 'offen|gefiltert',
-	unfiltered: 'ungefiltert'
+	open: t('offen'),
+	closed: t('geschlossen'),
+	filtered: t('gefiltert'),
+	'open|filtered': t('offen|gefiltert'),
+	unfiltered: t('ungefiltert')
 };
 
 /** Query value for a group filter (quotes names with spaces). */

@@ -26,6 +26,7 @@
 	import type { Tone } from '$lib/utils/labels';
 	import { eventCategoryLabel, label, runStatusLabel, runStatusTone, stateLabel } from '$lib/utils/labels';
 	import { debounce } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		/** event to show (null = closed) */
@@ -81,19 +82,19 @@
 	$effect(() => () => reload.cancel());
 
 	eventTypes.load().catch(() => {});
-	const spec = $derived(ev ? eventTypes.value?.find((t) => t.type === ev.type) : undefined);
+	const spec = $derived(ev ? eventTypes.value?.find((et) => et.type === ev.type) : undefined);
 
 	// ---------------------------------------------------------------- payload
 	const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 	// labels for common keys whose catalog description is not a usable label
 	const KEY_LABEL: Record<string, string> = {
-		device_state: 'Gerätezustand',
-		source: 'Quelle',
-		proto: 'Protokoll'
+		device_state: t('Gerätezustand'),
+		source: t('Quelle'),
+		proto: t('Protokoll')
 	};
 	function fmt(v: unknown): string {
 		if (v === null || v === undefined || v === '') return '–';
-		if (typeof v === 'boolean') return v ? 'Ja' : 'Nein';
+		if (typeof v === 'boolean') return v ? t('Ja') : t('Nein');
 		if (typeof v === 'string') return ISO.test(v) ? formatDateTime(v, true) : v;
 		if (typeof v === 'number') return String(v);
 		if (Array.isArray(v) && v.every((x) => typeof x !== 'object' || x === null))
@@ -119,16 +120,16 @@
 
 	// ---------------------------------------------------------------- notifications
 	const notifStatus: Record<string, { label: string; tone: Tone }> = {
-		pending: { label: 'Wartend', tone: 'accent' },
-		sending: { label: 'Wird gesendet', tone: 'accent' },
-		sent: { label: 'Gesendet', tone: 'ok' },
-		failed: { label: 'Fehlgeschlagen', tone: 'danger' },
-		skipped: { label: 'Übersprungen', tone: 'neutral' }
+		pending: { label: t('Wartend'), tone: 'accent' },
+		sending: { label: t('Wird gesendet'), tone: 'accent' },
+		sent: { label: t('Gesendet'), tone: 'ok' },
+		failed: { label: t('Fehlgeschlagen'), tone: 'danger' },
+		skipped: { label: t('Übersprungen'), tone: 'neutral' }
 	};
 	const notifKind: Record<string, string> = {
-		event: 'Sofort',
-		digest: 'Sammelmeldung',
-		escalation: 'Eskalation'
+		event: t('Sofort'),
+		digest: t('Sammelmeldung'),
+		escalation: t('Eskalation')
 	};
 	const notifications = $derived<NotificationView[]>(ev?.notifications ?? []);
 
@@ -145,7 +146,7 @@
 		acking = true;
 		try {
 			const res = await api.post('/api/v1/events/ack', { body: { ids: [ev.id], note: note.trim() } });
-			toast.success(res.acknowledged ? 'Event quittiert' : 'Event war bereits quittiert');
+			toast.success(res.acknowledged ? t('Event quittiert') : t('Event war bereits quittiert'));
 			onacked?.(ev.id);
 			await detail.reload();
 		} catch (e) {
@@ -164,7 +165,7 @@
 
 <Drawer
 	bind:open
-	title={ev?.title ?? (detail.error ? 'Event' : 'Event wird geladen …')}
+	title={ev?.title ?? (detail.error ? 'Event' : t('Event wird geladen …'))}
 	description={ev ? `${ev.label || ev.type} · ${label(eventCategoryLabel, ev.category)}` : undefined}
 	size="lg"
 	{onclose}
@@ -175,7 +176,7 @@
 				variant="ghost"
 				size="sm"
 				icon="chevron-up"
-				label="Vorheriges Event"
+				label={t('Vorheriges Event')}
 				disabled={prevId === null}
 				onclick={() => prevId !== null && onnavigate(prevId)}
 			/>
@@ -183,7 +184,7 @@
 				variant="ghost"
 				size="sm"
 				icon="chevron-down"
-				label="Nächstes Event"
+				label={t('Nächstes Event')}
 				disabled={nextId === null}
 				onclick={() => nextId !== null && onnavigate(nextId)}
 			/>
@@ -200,12 +201,12 @@
 				<SeverityBadge severity={ev.severity} size="md" />
 				<Badge tone="neutral" size="md">{ev.label || ev.type}</Badge>
 				{#if ev.ackedAt}
-					<Badge tone="ok" size="md" dot>Quittiert</Badge>
+					<Badge tone="ok" size="md" dot>{t('Quittiert')}</Badge>
 				{:else}
-					<Badge tone="warn" size="md" dot>Offen</Badge>
+					<Badge tone="warn" size="md" dot>{t('Offen')}</Badge>
 				{/if}
 				{#if diffHref}
-					<Button size="sm" icon="diff" href={diffHref} class="ml-auto">Diff anzeigen</Button>
+					<Button size="sm" icon="diff" href={diffHref} class="ml-auto">{t('Diff anzeigen')}</Button>
 				{/if}
 			</div>
 
@@ -214,31 +215,33 @@
 			{/if}
 
 			<DescList>
-				<DescItem label="Zeitpunkt">
+				<DescItem label={t('Zeitpunkt')}>
 					{formatDateTime(ev.ts, true)}
 					<span class="text-fg-subtle">(<RelativeTime value={ev.ts} />)</span>
 				</DescItem>
-				<DescItem label="Gerät">
+				<DescItem label={t('Gerät')}>
 					{#if ev.deviceId}
-						<a class="link" href="/devices/{ev.deviceId}">{ev.deviceName || `Gerät #${ev.deviceId}`}</a>
+						<a class="link" href="/devices/{ev.deviceId}"
+							>{ev.deviceName || t('Gerät #{id}', { id: ev.deviceId })}</a
+						>
 						<a
 							class="ml-2 text-xs text-fg-subtle hover:text-accent"
-							href="/events?device={ev.deviceId}&acked=all">alle Events</a
+							href="/events?device={ev.deviceId}&acked=all">{t('alle Events')}</a
 						>
 					{:else}
 						<span class="text-fg-subtle">–</span>
 					{/if}
 				</DescItem>
 				{#if ev.site}
-					<DescItem label="Standort" hint="Event des NetScope-Standorts" value={ev.site} />
-					<DescItem label="Erzeugt von" hint="am Standort" value={ev.pluginId} mono />
+					<DescItem label={t('Standort')} hint={t('Event des NetScope-Standorts')} value={ev.site} />
+					<DescItem label={t('Erzeugt von')} hint={t('am Standort')} value={ev.pluginId} mono />
 				{:else}
-					<DescItem label="Erzeugt von">
+					<DescItem label={t('Erzeugt von')}>
 						<a class="link" href="/plugins/{ev.pluginId}">{ev.pluginId}</a>
 					</DescItem>
 				{/if}
 				{#if ev.runId}
-					<DescItem label="Lauf">
+					<DescItem label={t('Lauf')}>
 						{#if runInfo}
 							<a class="link" href="/plugins/{runInfo.pluginId}/runs/{runInfo.id}">
 								{runInfo.pluginName || runInfo.pluginId} · #{runInfo.id}
@@ -250,25 +253,28 @@
 							<span class="mono">#{ev.runId}</span>
 						{/if}
 						{#if ev.prevRunId}
-							<span class="block text-xs text-fg-subtle">Vorheriger Lauf: #{ev.prevRunId}</span>
+							<span class="block text-xs text-fg-subtle"
+								>{t('Vorheriger Lauf: #{id}', { id: ev.prevRunId })}</span
+							>
 						{/if}
 					</DescItem>
 				{/if}
 				{#if ev.dedupKey}
-					<DescItem label="Dedup-Schlüssel" mono value={ev.dedupKey} />
+					<DescItem label={t('Dedup-Schlüssel')} mono value={ev.dedupKey} />
 				{/if}
 			</DescList>
 
 			<!-- acknowledgement -->
 			<section aria-labelledby="ev-ack-h">
 				<h3 id="ev-ack-h" class="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-					Quittierung
+					{t('Quittierung')}
 				</h3>
 				{#if ev.ackedAt}
 					<div class="rounded-md border border-border bg-surface-2 px-3 py-2.5 text-sm">
 						<div>
-							Quittiert von <strong class="font-medium">{ev.ackedBy || 'unbekannt'}</strong> am
-							{formatDateTime(ev.ackedAt)}
+							{t('Quittiert von')}
+							<strong class="font-medium">{ev.ackedBy || t('unbekannt')}</strong>
+							{t('am {date}', { date: formatDateTime(ev.ackedAt) })}
 						</div>
 						{#if ev.ackNote}
 							<p class="mt-1 whitespace-pre-wrap text-fg-muted">{ev.ackNote}</p>
@@ -282,15 +288,15 @@
 							ack();
 						}}
 					>
-						<Textarea label="Notiz (optional)" bind:value={note} rows={2} maxlength={1000} />
+						<Textarea label={t('Notiz (optional)')} bind:value={note} rows={2} maxlength={1000} />
 						<div>
 							<Button type="submit" variant="primary" size="sm" icon="check" loading={acking}
-								>Quittieren</Button
+								>{t('Quittieren')}</Button
 							>
 						</div>
 					</form>
 				{:else}
-					<p class="text-sm text-fg-muted">Noch nicht quittiert.</p>
+					<p class="text-sm text-fg-muted">{t('Noch nicht quittiert.')}</p>
 				{/if}
 			</section>
 
@@ -300,7 +306,7 @@
 					Details
 				</h3>
 				{#if payloadRows.length === 0}
-					<p class="text-sm text-fg-muted">Keine weiteren Daten.</p>
+					<p class="text-sm text-fg-muted">{t('Keine weiteren Daten.')}</p>
 				{:else}
 					<dl class="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-1.5 text-sm">
 						{#each payloadRows as r (r.key)}
@@ -310,7 +316,7 @@
 					</dl>
 					<details class="mt-3">
 						<summary class="cursor-pointer text-sm text-fg-muted select-none hover:text-fg"
-							>Rohdaten (JSON)</summary
+							>{t('Rohdaten (JSON)')}</summary
 						>
 						<JsonView value={ev.payload} class="mt-2" maxHeight="20rem" />
 					</details>
@@ -321,15 +327,15 @@
 			<section aria-labelledby="ev-notif-h">
 				<div class="mb-2 flex items-center justify-between gap-2">
 					<h3 id="ev-notif-h" class="text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-						Benachrichtigungen ({notifications.length})
+						{t('Benachrichtigungen ({n})', { n: notifications.length })}
 					</h3>
 					<a href="/rules?tab=notifications" class="text-xs text-fg-subtle hover:text-accent"
-						>Verlauf öffnen</a
+						>{t('Verlauf öffnen')}</a
 					>
 				</div>
 				{#if notifications.length === 0}
 					<p class="text-sm text-fg-muted">
-						Keine Regel hat für dieses Event eine Benachrichtigung ausgelöst.
+						{t('Keine Regel hat für dieses Event eine Benachrichtigung ausgelöst.')}
 					</p>
 				{:else}
 					<ul class="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -346,13 +352,13 @@
 								</div>
 								{#if n.ruleName}
 									<div class="text-xs text-fg-muted">
-										Regel:
+										{t('Regel:')}
 										{#if n.ruleId}
 											<a class="hover:text-accent hover:underline" href="/rules/{n.ruleId}">{n.ruleName}</a>
 										{:else}
 											{n.ruleName}
 										{/if}
-										{#if n.attempts > 1}· {n.attempts} Versuche{/if}
+										{#if n.attempts > 1}· {t('{n} Versuche', { n: n.attempts })}{/if}
 									</div>
 								{/if}
 								{#if n.error}<div class="text-xs break-words text-danger">{n.error}</div>{/if}

@@ -50,11 +50,11 @@ type PayloadSummary struct {
 type PayloadEvent struct {
 	ID            int64          `json:"id"`
 	Type          string         `json:"type"`     // catalog type, e.g. port.opened
-	Label         string         `json:"label"`    // German label of the type
+	Label         string         `json:"label"`    // label of the type (language of the notification)
 	Category      string         `json:"category"` // device | port | cert | …
 	Severity      string         `json:"severity"` // info | low | medium | high | critical
 	SeverityRank  int            `json:"severityRank"`
-	SeverityLabel string         `json:"severityLabel"` // German label
+	SeverityLabel string         `json:"severityLabel"` // label in the language of the notification
 	Title         string         `json:"title"`
 	Message       string         `json:"message"`
 	At            string         `json:"at"` // RFC 3339, UTC
@@ -116,7 +116,7 @@ func BuildPayload(n *plugin.Notification, sentAt time.Time) *Payload {
 			Category:      e.Category,
 			Severity:      string(e.Severity),
 			SeverityRank:  max(e.Severity.Rank(), 0),
-			SeverityLabel: e.Severity.Label(),
+			SeverityLabel: e.Severity.LabelIn(n.Lang),
 			Title:         e.Title,
 			Message:       e.Message,
 			At:            formatTime(e.At),

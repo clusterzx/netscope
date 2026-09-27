@@ -8,9 +8,11 @@
 </script>
 
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import FormField from './FormField.svelte';
 	import Icon from './Icon.svelte';
 	import Popover from './Popover.svelte';
+	import { formatNumber } from '$lib/utils/format';
 
 	interface Props {
 		value?: string[];
@@ -35,7 +37,7 @@
 		label,
 		hint,
 		error,
-		placeholder = 'Auswählen …',
+		placeholder = t('Auswählen …'),
 		required = false,
 		disabled = false,
 		size = 'md',
@@ -63,7 +65,7 @@
 		const sel = norm.filter((o) => selected.has(o.value));
 		if (sel.length === 0) return '';
 		if (sel.length <= 2) return sel.map((o) => o.label).join(', ');
-		return `${sel.length} ausgewählt`;
+		return t('{n} ausgewählt', { n: formatNumber(sel.length) });
 	});
 
 	function toggle(v: string) {
@@ -126,8 +128,8 @@
 				type="search"
 				bind:value={search}
 				autofocus
-				placeholder="Filtern …"
-				aria-label="Optionen filtern"
+				placeholder={t('Filtern …')}
+				aria-label={t('Optionen filtern')}
 				class="h-7 w-full rounded border border-border bg-surface-2 px-2 text-[0.8125rem] focus:border-accent focus:outline-none"
 			/>
 		</div>
@@ -152,13 +154,16 @@
 				</span>
 			</label>
 		{:else}
-			<p class="px-3 py-2 text-sm text-fg-subtle">Keine Treffer</p>
+			<p class="px-3 py-2 text-sm text-fg-subtle">{t('Keine Treffer')}</p>
 		{/each}
 	</div>
 	{#if (value?.length ?? 0) > 0}
 		<div class="sticky bottom-0 flex justify-between border-t border-border bg-surface px-3 py-1.5">
-			<span class="text-xs text-fg-subtle">{value?.length} ausgewählt</span>
-			<button type="button" class="text-xs text-accent hover:underline" onclick={clear}>Auswahl leeren</button
+			<span class="text-xs text-fg-subtle"
+				>{t('{n} ausgewählt', { n: formatNumber(value?.length ?? 0) })}</span
+			>
+			<button type="button" class="text-xs text-accent hover:underline" onclick={clear}
+				>{t('Auswahl leeren')}</button
 			>
 		</div>
 	{/if}

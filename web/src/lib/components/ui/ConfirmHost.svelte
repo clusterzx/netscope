@@ -1,5 +1,6 @@
 <!-- Renders confirm() dialogs (mounted once in the root layout). -->
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import { confirmState } from '$lib/stores/confirm.svelte';
 	import Button from './Button.svelte';
 	import Modal from './Modal.svelte';
@@ -15,7 +16,7 @@
 	<Modal bind:open title={c.title} size="sm" onclose={() => confirmState.answer(false)}>
 		{#if c.message}<p class="text-sm whitespace-pre-line text-fg-muted">{c.message}</p>{/if}
 		{#snippet footer()}
-			<Button onclick={() => confirmState.answer(false)}>{c.cancelLabel ?? 'Abbrechen'}</Button>
+			<Button onclick={() => confirmState.answer(false)}>{c.cancelLabel ?? t('Abbrechen')}</Button>
 			<Button variant={c.danger ? 'danger' : 'primary'} onclick={() => confirmState.answer(true)}>
 				{c.confirmLabel ?? 'OK'}
 			</Button>

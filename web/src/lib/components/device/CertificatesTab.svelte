@@ -13,6 +13,7 @@
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
+	import { t } from '$lib/i18n';
 	import { formatDate, formatDateTime } from '$lib/utils/format';
 	import { daysLeftText, daysLeftTone, LazyData, sourceName } from './util';
 
@@ -66,8 +67,8 @@
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-center gap-3">
-		<h2 class="flex-1 text-sm font-semibold">TLS-Zertifikate</h2>
-		<Toggle bind:checked={history} label="Frühere Zertifikate anzeigen" size="sm" />
+		<h2 class="flex-1 text-sm font-semibold">{t('TLS-Zertifikate')}</h2>
+		<Toggle bind:checked={history} label={t('Frühere Zertifikate anzeigen')} size="sm" />
 	</div>
 
 	{#if data.error && !data.data}
@@ -78,8 +79,8 @@
 		<div class="rounded-lg border border-border bg-surface">
 			<EmptyState
 				icon="lock"
-				title="Keine Zertifikate"
-				description="Der TLS-Scanner liest Zertifikate auf allen TLS-Ports (z. B. 443, 8443) aus."
+				title={t('Keine Zertifikate')}
+				description={t('Der TLS-Scanner liest Zertifikate auf allen TLS-Ports (z. B. 443, 8443) aus.')}
 			/>
 		</div>
 	{:else}
@@ -87,32 +88,34 @@
 			{@const tone = daysLeftTone(c.daysLeft)}
 			<article
 				class="rounded-lg border border-border bg-surface shadow-sm {c.goneAt ? 'opacity-70' : ''}"
-				aria-label="Zertifikat {c.subjectCn} auf Port {c.port}"
+				aria-label={t('Zertifikat {cn} auf Port {port}', { cn: c.subjectCn, port: c.port })}
 			>
 				<header class="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-4 py-2.5">
 					<Icon name="lock" size={16} class="text-fg-subtle" />
 					<div class="min-w-0 flex-1">
-						<h3 class="truncate text-sm font-semibold" title={c.subjectCn}>{c.subjectCn || '(ohne CN)'}</h3>
+						<h3 class="truncate text-sm font-semibold" title={c.subjectCn}>
+							{c.subjectCn || t('(ohne CN)')}
+						</h3>
 						<p class="mono truncate text-xs text-fg-subtle">
 							{c.ip}:{c.port}{#if c.serverName}<span class="font-sans"> · SNI {c.serverName}</span>{/if}
 						</p>
 					</div>
 					{#if c.goneAt}
-						<Badge tone="neutral">ersetzt/entfernt {formatDate(c.goneAt)}</Badge>
+						<Badge tone="neutral">{t('ersetzt/entfernt {date}', { date: formatDate(c.goneAt) })}</Badge>
 					{/if}
-					<Badge {tone} size="md" title="Gültig bis {formatDateTime(c.notAfter)}">
+					<Badge {tone} size="md" title={t('Gültig bis {time}', { time: formatDateTime(c.notAfter) })}>
 						{daysLeftText(c.daysLeft)}
 					</Badge>
 				</header>
 				<div class="grid grid-cols-1 gap-4 px-4 py-3 lg:grid-cols-2">
 					<dl class="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 text-sm">
-						<dt class="text-xs text-fg-subtle">Gültigkeit</dt>
+						<dt class="text-xs text-fg-subtle">{t('Gültigkeit')}</dt>
 						<dd>
 							{formatDate(c.notBefore)} – {formatDate(c.notAfter)}
 							<span
 								class="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface-3"
 								role="meter"
-								aria-label="Abgelaufener Anteil der Laufzeit"
+								aria-label={t('Abgelaufener Anteil der Laufzeit')}
 								aria-valuenow={Math.round(elapsed(c))}
 								aria-valuemin={0}
 								aria-valuemax={100}
@@ -121,26 +124,26 @@
 								></span>
 							</span>
 						</dd>
-						<dt class="text-xs text-fg-subtle">Aussteller</dt>
+						<dt class="text-xs text-fg-subtle">{t('Aussteller')}</dt>
 						<dd class="break-words">
 							{c.issuerCn || '–'}
 							{#if c.issuer && c.issuer !== `CN=${c.issuerCn}`}
 								<span class="mono block text-xs break-all text-fg-subtle">{c.issuer}</span>
 							{/if}
 						</dd>
-						<dt class="text-xs text-fg-subtle">Vertrauen</dt>
+						<dt class="text-xs text-fg-subtle">{t('Vertrauen')}</dt>
 						<dd class="flex flex-wrap items-center gap-1.5">
-							{#if c.selfSigned}<Badge tone="warn">selbstsigniert</Badge>{/if}
+							{#if c.selfSigned}<Badge tone="warn">{t('selbstsigniert')}</Badge>{/if}
 							{#if c.chainValid}
-								<Badge tone="ok">Kette gültig</Badge>
+								<Badge tone="ok">{t('Kette gültig')}</Badge>
 							{:else}
-								<Badge tone="danger" title={c.chainError}>Kette ungültig</Badge>
+								<Badge tone="danger" title={c.chainError}>{t('Kette ungültig')}</Badge>
 							{/if}
 							{#if !c.chainValid && c.chainError}
 								<span class="mono block w-full text-xs break-all text-fg-subtle">{c.chainError}</span>
 							{/if}
 						</dd>
-						<dt class="text-xs text-fg-subtle">Alternative Namen</dt>
+						<dt class="text-xs text-fg-subtle">{t('Alternative Namen')}</dt>
 						<dd class="flex flex-wrap gap-1">
 							{#each c.sans ?? [] as s (s)}
 								<span class="mono rounded bg-surface-3 px-1.5 text-xs break-all">{s}</span>
@@ -148,7 +151,7 @@
 						</dd>
 					</dl>
 					<dl class="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 text-sm">
-						<dt class="text-xs text-fg-subtle">Protokolle</dt>
+						<dt class="text-xs text-fg-subtle">{t('Protokolle')}</dt>
 						<dd class="flex flex-wrap gap-1">
 							{#each c.versions ?? [] as v (v)}
 								<Badge tone={(c.weakProtocols ?? []).includes(v) ? 'danger' : 'neutral'}>{v}</Badge>
@@ -159,7 +162,7 @@
 						</dd>
 						<dt class="text-xs text-fg-subtle">Cipher</dt>
 						<dd class="mono text-xs break-all">{c.cipher || '–'}</dd>
-						<dt class="text-xs text-fg-subtle">Schwache Cipher</dt>
+						<dt class="text-xs text-fg-subtle">{t('Schwache Cipher')}</dt>
 						<dd>
 							{#if c.weakCiphers?.length}
 								<span class="flex flex-col gap-0.5">
@@ -167,26 +170,25 @@
 										>{/each}
 								</span>
 							{:else}
-								<span class="text-xs text-ok">keine gefunden</span>
+								<span class="text-xs text-ok">{t('keine gefunden')}</span>
 							{/if}
 						</dd>
-						<dt class="text-xs text-fg-subtle">Schlüssel</dt>
+						<dt class="text-xs text-fg-subtle">{t('Schlüssel')}</dt>
 						<dd>
-							{c.keyType}{c.keyBits ? ` ${c.keyBits} Bit` : ''}
+							{c.keyType}{c.keyBits ? ` ${t('{n} Bit', { n: c.keyBits })}` : ''}
 							<span class="text-xs text-fg-subtle">· {c.signatureAlg}</span>
 						</dd>
 						<dt class="text-xs text-fg-subtle">Fingerprint</dt>
 						<dd class="flex items-start gap-1">
 							<span class="mono min-w-0 text-xs break-all text-fg-muted">SHA-256 {c.fingerprint}</span>
-							<CopyButton text={c.fingerprint} label="Fingerprint kopieren" />
+							<CopyButton text={c.fingerprint} label={t('Fingerprint kopieren')} />
 						</dd>
-						<dt class="text-xs text-fg-subtle">Seriennummer</dt>
+						<dt class="text-xs text-fg-subtle">{t('Seriennummer')}</dt>
 						<dd class="mono text-xs break-all text-fg-muted">{c.serial || '–'}</dd>
-						<dt class="text-xs text-fg-subtle">Gesehen</dt>
+						<dt class="text-xs text-fg-subtle">{t('Gesehen')}</dt>
 						<dd class="text-xs text-fg-muted">
-							seit {formatDateTime(c.firstSeen)} · zuletzt <RelativeTime value={c.lastSeen} /> ({sourceName(
-								c.source
-							)})
+							{t('seit {time}', { time: formatDateTime(c.firstSeen) })} · {t('zuletzt')}
+							<RelativeTime value={c.lastSeen} /> ({sourceName(c.source)})
 						</dd>
 					</dl>
 				</div>

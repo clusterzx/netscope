@@ -6,6 +6,7 @@
 	import { Badge, Card, CopyButton } from '$lib/components/ui';
 	import { formatNumber } from '$lib/utils/format';
 	import { severityFromCvss, severityTone } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 	import { cveSeverityLabel, parseVector } from './cve';
 
 	interface Props {
@@ -54,7 +55,7 @@
 	{#if vector}
 		<div class="mt-3 flex items-center gap-1 rounded-md bg-surface-2 py-1 pr-1 pl-2.5">
 			<code class="mono min-w-0 flex-1 truncate text-xs text-fg-muted" title={vector}>{vector}</code>
-			<CopyButton text={vector} label="Vektor kopieren" />
+			<CopyButton text={vector} label={t('Vektor kopieren')} />
 		</div>
 		{#if parsed.metrics.length}
 			<dl
@@ -74,6 +75,6 @@
 			</dl>
 		{/if}
 	{:else}
-		<p class="mt-3 text-sm text-fg-subtle">Kein CVSS-Vektor vorhanden.</p>
+		<p class="mt-3 text-sm text-fg-subtle">{t('Kein CVSS-Vektor vorhanden.')}</p>
 	{/if}
 </Card>

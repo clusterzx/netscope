@@ -17,6 +17,7 @@
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
+	import { t } from '$lib/i18n';
 	import { formatDateTime, formatNumber } from '$lib/utils/format';
 	import { debounce } from '$lib/utils/url';
 	import GenericData from './GenericData.svelte';
@@ -82,25 +83,27 @@
 	const multiManager = $derived(new Set(items.map((p) => p.manager)).size > 1);
 
 	const columns = $derived<Column<PackageView>[]>([
-		{ key: 'name', label: 'Paket', cell: nameCell },
+		{ key: 'name', label: t('Paket'), cell: nameCell },
 		{ key: 'version', label: 'Version', cell: versionCell },
-		{ key: 'arch', label: 'Architektur', hideBelow: 'md', value: (p) => p.arch || '–' },
+		{ key: 'arch', label: t('Architektur'), hideBelow: 'md', value: (p) => p.arch || '–' },
 		...(multiManager ? [{ key: 'manager', label: 'Manager', hideBelow: 'sm' } as Column<PackageView>] : []),
-		{ key: 'firstSeen', label: 'Installiert/geändert', hideBelow: 'sm', cell: seenCell }
+		{ key: 'firstSeen', label: t('Installiert/geändert'), hideBelow: 'sm', cell: seenCell }
 	]);
 </script>
 
 {#snippet nameCell(p: PackageView)}<span class="mono">{p.name}</span>{/snippet}
 {#snippet versionCell(p: PackageView)}<span class="mono break-all text-fg-muted">{p.version}</span>{/snippet}
 {#snippet seenCell(p: PackageView)}
-	<span class="whitespace-nowrap text-fg-muted" title="Zuletzt gesehen {formatDateTime(p.lastSeen)}"
+	<span
+		class="whitespace-nowrap text-fg-muted"
+		title={t('Zuletzt gesehen {time}', { time: formatDateTime(p.lastSeen) })}
 		>{formatDateTime(p.firstSeen)}</span
 	>
 {/snippet}
 
 <div class="flex flex-col gap-4">
 	<section aria-labelledby="inv-h" class="flex flex-col gap-2">
-		<h2 id="inv-h" class="text-sm font-semibold">System-Inventar</h2>
+		<h2 id="inv-h" class="text-sm font-semibold">{t('System-Inventar')}</h2>
 		{#if inv.error && !inv.data}
 			<ErrorState error={inv.error} onretry={() => inv.reload()} />
 		{:else if !inv.data}
@@ -110,8 +113,10 @@
 				<EmptyState
 					compact
 					icon="server"
-					title="Kein strukturiertes Inventar"
-					description="Details wie CPU, RAM, Datenträger und Dienste liefert das SSH-Inventar (Zugangsdaten unter Credentials) oder SNMP."
+					title={t('Kein strukturiertes Inventar')}
+					description={t(
+						'Details wie CPU, RAM, Datenträger und Dienste liefert das SSH-Inventar (Zugangsdaten unter Credentials) oder SNMP.'
+					)}
 				/>
 			</div>
 		{:else}
@@ -130,7 +135,7 @@
 								{sourceName(src)}
 								{#if entry.collectedAt}
 									<span class="text-xs font-normal text-fg-subtle"
-										>erfasst <RelativeTime value={entry.collectedAt} /></span
+										>{t('erfasst')} <RelativeTime value={entry.collectedAt} /></span
 									>
 								{/if}
 							</button>
@@ -143,7 +148,7 @@
 								active={rawView[src]}
 								onclick={() => (rawView[src] = !rawView[src])}
 							>
-								{rawView[src] ? 'Ansicht' : 'JSON'}
+								{rawView[src] ? t('Ansicht') : 'JSON'}
 							</Button>
 						{/if}
 					{/snippet}
@@ -166,9 +171,9 @@
 	<section aria-labelledby="pkg-h" class="flex flex-col gap-2">
 		<div class="flex flex-wrap items-center gap-2">
 			<h2 id="pkg-h" class="flex-1 text-sm font-semibold">
-				Installierte Pakete
+				{t('Installierte Pakete')}
 				{#if pkgs.data}<span class="font-normal text-fg-subtle"
-						>({formatNumber(total)}{q ? ' Treffer' : ''})</span
+						>({q ? t('{n} Treffer', { n: formatNumber(total) }) : formatNumber(total)})</span
 					>{/if}
 			</h2>
 			<Input
@@ -177,8 +182,8 @@
 				type="search"
 				bind:value={search}
 				oninput={() => applySearch(search)}
-				placeholder="Paket oder Version suchen"
-				aria-label="Pakete durchsuchen"
+				placeholder={t('Paket oder Version suchen')}
+				aria-label={t('Pakete durchsuchen')}
 				class="w-full sm:w-72"
 			/>
 		</div>
@@ -192,16 +197,16 @@
 				loading={pkgs.loading}
 				dense
 				maxHeight="36rem"
-				caption="Installierte Pakete"
+				caption={t('Installierte Pakete')}
 			>
 				{#snippet empty()}
 					<EmptyState
 						compact
 						icon="package"
-						title={q ? 'Keine Treffer' : 'Keine Paketliste'}
+						title={q ? t('Keine Treffer') : t('Keine Paketliste')}
 						description={q
-							? `Kein Paket passt zu „${q}“.`
-							: 'Paketlisten (dpkg, rpm, apk) liefert das SSH-Inventar.'}
+							? t('Kein Paket passt zu „{q}“.', { q })
+							: t('Paketlisten (dpkg, rpm, apk) liefert das SSH-Inventar.')}
 					/>
 				{/snippet}
 			</Table>

@@ -9,6 +9,7 @@
 	import type { DeviceRow } from '$lib/api';
 	import { Button, Icon, Popover, Spinner } from '$lib/components/ui';
 	import { debounce } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		value: number | null;
@@ -40,12 +41,12 @@
 		api
 			.get('/api/v1/devices/{id}', { path: { id }, signal: ctrl.signal })
 			.then((d) => (resolved = { id, name: d.name }))
-			.catch(() => (resolved = { id, name: `Gerät #${id}` }));
+			.catch(() => (resolved = { id, name: t('Gerät #{id}', { id }) }));
 		return () => ctrl.abort();
 	});
 
 	const display = $derived(
-		value ? (name ?? (resolved?.id === value ? resolved.name : `Gerät #${value}`)) : ''
+		value ? (name ?? (resolved?.id === value ? resolved.name : t('Gerät #{id}', { id: value }))) : ''
 	);
 
 	let ctrl: AbortController | null = null;
@@ -113,18 +114,18 @@
 			{size === 'sm' ? 'h-7 px-2 text-[0.8125rem]' : 'h-8.5 px-2.5 text-sm'} {value ? 'rounded-r-none' : ''}"
 		aria-haspopup="dialog"
 		aria-expanded={open}
-		aria-label={value ? `Gerät: ${display} – ändern` : 'Gerät wählen'}
+		aria-label={value ? t('Gerät: {name} – ändern', { name: display }) : t('Gerät wählen')}
 		onclick={toggle}
 	>
 		<Icon name="devices" size={14} class="text-fg-subtle" />
-		<span class="truncate">{value ? display : 'Alle Geräte'}</span>
+		<span class="truncate">{value ? display : t('Alle Geräte')}</span>
 		<Icon name="chevron-down" size={14} class="text-fg-subtle" />
 	</button>
 	{#if value}
 		<Button
 			size={size === 'sm' ? 'sm' : 'md'}
 			icon="x"
-			label="Gerätefilter entfernen"
+			label={t('Gerätefilter entfernen')}
 			class="-ml-px rounded-l-none"
 			onclick={() => choose(null)}
 		/>
@@ -135,11 +136,11 @@
 	bind:open
 	{anchor}
 	placement="bottom-start"
-	label="Gerät wählen"
+	label={t('Gerät wählen')}
 	class="w-80 max-w-[calc(100vw-1rem)]"
 >
 	<div class="border-b border-border p-2">
-		<label for="{uid}-q" class="sr-only">Gerät suchen</label>
+		<label for="{uid}-q" class="sr-only">{t('Gerät suchen')}</label>
 		<div class="relative flex items-center">
 			<span class="pointer-events-none absolute left-2 text-fg-subtle"><Icon name="search" size={14} /></span>
 			<input
@@ -159,9 +160,12 @@
 			/>
 		</div>
 	</div>
-	<ul id="{uid}-list" role="listbox" aria-label="Geräte" class="max-h-72 overflow-y-auto p-1">
+	<ul id="{uid}-list" role="listbox" aria-label={t('Geräte')} class="max-h-72 overflow-y-auto p-1">
 		{#if loading && !results.length}
-			<li class="flex items-center gap-2 px-2 py-3 text-sm text-fg-muted"><Spinner size={14} /> Suche …</li>
+			<li class="flex items-center gap-2 px-2 py-3 text-sm text-fg-muted">
+				<Spinner size={14} />
+				{t('Suche …')}
+			</li>
 		{:else if error}
 			<li class="px-2 py-3 text-sm text-danger">{error}</li>
 		{:else}
@@ -183,7 +187,7 @@
 					{#if d.ip && d.ip !== d.name}<span class="mono shrink-0 text-xs text-fg-subtle">{d.ip}</span>{/if}
 				</li>
 			{:else}
-				<li class="px-2 py-3 text-sm text-fg-muted">Keine Geräte gefunden</li>
+				<li class="px-2 py-3 text-sm text-fg-muted">{t('Keine Geräte gefunden')}</li>
 			{/each}
 		{/if}
 	</ul>

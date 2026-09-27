@@ -9,6 +9,7 @@
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import StatusDot from '$lib/components/ui/StatusDot.svelte';
 	import { debounce } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		value: number | null;
@@ -86,7 +87,7 @@
 	{label}
 	{error}
 	{required}
-	hint={picked ? `#${picked.id} · ${picked.ip || picked.mac}` : 'Name, IP oder MAC eingeben'}
+	hint={picked ? `#${picked.id} · ${picked.ip || picked.mac}` : t('Name, IP oder MAC eingeben')}
 >
 	{#snippet children(id, describedby)}
 		<div class="relative">
@@ -113,7 +114,7 @@
 					}
 				}}
 				onblur={() => setTimeout(() => (openList = false), 150)}
-				placeholder="Gerät suchen …"
+				placeholder={t('Gerät suchen …')}
 				class="h-8.5 w-full rounded-md border bg-surface pr-8 pl-8 text-sm shadow-sm focus:border-accent focus:ring-2 focus:ring-focus focus:outline-none {error
 					? 'border-danger'
 					: 'border-border hover:border-border-strong'}"
@@ -127,7 +128,7 @@
 				<ul
 					id="{uid}-list"
 					role="listbox"
-					aria-label="Gefundene Geräte"
+					aria-label={t('Gefundene Geräte')}
 					class="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-surface py-1 shadow-md"
 				>
 					{#each results as d, i (d.id)}
@@ -149,7 +150,7 @@
 							<span class="mono text-xs text-fg-subtle">{d.ip}</span>
 						</li>
 					{:else}
-						<li class="px-2.5 py-1.5 text-sm text-fg-subtle">Suche …</li>
+						<li class="px-2.5 py-1.5 text-sm text-fg-subtle">{t('Suche …')}</li>
 					{/each}
 				</ul>
 			{/if}

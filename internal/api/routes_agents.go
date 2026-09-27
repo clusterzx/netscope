@@ -15,6 +15,7 @@ import (
 	"netscope/internal/agent"
 	"netscope/internal/agent/proto"
 	"netscope/internal/auth"
+	"netscope/internal/i18n"
 )
 
 type agentsResponse struct {
@@ -73,9 +74,9 @@ func (s *Server) registerAgents() {
 	s.mux.HandleFunc("GET "+proto.PathBinary+"{file}", s.handleAgentBinary)
 }
 
-func (s *Server) agentsAvailable(w http.ResponseWriter) bool {
+func (s *Server) agentsAvailable(w http.ResponseWriter, r *http.Request) bool {
 	if s.Agents == nil {
-		writeError(w, http.StatusNotFound, "not_found", "Agents sind in dieser Instanz nicht verfügbar", nil)
+		writeError(w, r, http.StatusNotFound, "not_found", "Agents sind in dieser Instanz nicht verfügbar", nil)
 		return false
 	}
 	return true
@@ -110,13 +111,13 @@ func decodeAgent(r *http.Request, v any) error {
 func (s *Server) agentFail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, agent.ErrUnauthenticated):
-		writeError(w, http.StatusUnauthorized, "unauthenticated", err.Error(), nil)
+		writeError(w, r, http.StatusUnauthorized, "unauthenticated", err.Error(), nil)
 	case errors.Is(err, agent.ErrInvalidToken):
-		writeError(w, http.StatusForbidden, "invalid_token", err.Error(), nil)
+		writeError(w, r, http.StatusForbidden, "invalid_token", err.Error(), nil)
 	case errors.Is(err, agent.ErrDisabled):
-		writeError(w, http.StatusServiceUnavailable, "disabled", err.Error(), nil)
+		writeError(w, r, http.StatusServiceUnavailable, "disabled", err.Error(), nil)
 	case errors.Is(err, agent.ErrNoDevice):
-		writeError(w, http.StatusConflict, "no_device", err.Error(), nil)
+		writeError(w, r, http.StatusConflict, "no_device", err.Error(), nil)
 	default:
 		s.fail(w, r, err)
 	}
@@ -124,12 +125,12 @@ func (s *Server) agentFail(w http.ResponseWriter, r *http.Request, err error) {
 
 // agentSession authenticates an agent request.
 func (s *Server) agentSession(w http.ResponseWriter, r *http.Request) (*agent.Session, bool) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return nil, false
 	}
 	tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthenticated", "Agent-Secret fehlt", nil)
+		writeError(w, r, http.StatusUnauthorized, "unauthenticated", "Agent-Secret fehlt", nil)
 		return nil, false
 	}
 	sess, err := s.Agents.Authenticate(r.Context(), strings.TrimSpace(tok), client(r).IP)
@@ -141,7 +142,7 @@ func (s *Server) agentSession(w http.ResponseWriter, r *http.Request) (*agent.Se
 }
 
 func (s *Server) handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	var req proto.EnrollRequest
@@ -208,7 +209,7 @@ func (s *Server) handleAgentMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	list, err := s.Agents.Agents(r.Context(), int64(qInt(r, "device", 0)))
@@ -216,11 +217,15 @@ func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	loc := requestLocale(r)
+	for i := range list {
+		list[i].LastError = i18n.Err(loc, list[i].LastError)
+	}
 	writeJSON(w, http.StatusOK, agentsResponse{Agents: list, Binaries: s.Agents.Binaries(), Version: s.Version, BaseURL: s.agentBase(r)})
 }
 
 func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	id, err := pathID(r, "id")
@@ -233,11 +238,12 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	a.LastError = i18n.Err(requestLocale(r), a.LastError)
 	writeJSON(w, http.StatusOK, a)
 }
 
 func (s *Server) handleAgentRefresh(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	id, err := pathID(r, "id")
@@ -253,7 +259,7 @@ func (s *Server) handleAgentRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAgentDelete(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	id, err := pathID(r, "id")
@@ -275,7 +281,7 @@ func (s *Server) handleAgentDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEnrollments(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	list, err := s.Agents.Enrollments(r.Context())
@@ -306,7 +312,7 @@ func installCommandWindows(base, token string) string {
 }
 
 func (s *Server) handleCreateEnrollment(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	var in agent.EnrollmentInput
@@ -326,7 +332,7 @@ func (s *Server) handleCreateEnrollment(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleRevokeEnrollment(w http.ResponseWriter, r *http.Request) {
-	if !s.agentsAvailable(w) {
+	if !s.agentsAvailable(w, r) {
 		return
 	}
 	id, err := pathID(r, "id")
@@ -363,7 +369,7 @@ func (s *Server) handleAgentBinary(w http.ResponseWriter, r *http.Request) {
 	platform, sum := strings.CutSuffix(file, ".sha256")
 	b := s.Agents.Binary(platform)
 	if b == nil {
-		writeError(w, http.StatusNotFound, "not_found", "Kein Agent-Build für "+platform+" in dieser Instanz (Plattformen: "+
+		writeError(w, r, http.StatusNotFound, "not_found", "Kein Agent-Build für "+platform+" in dieser Instanz (Plattformen: "+
 			strings.Join(agent.Platforms, ", ")+")", nil)
 		return
 	}

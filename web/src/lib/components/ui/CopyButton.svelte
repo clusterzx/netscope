@@ -1,6 +1,7 @@
 <!-- Copies text to the clipboard. <CopyButton text={mac} /> -->
 <script lang="ts">
 	import Button from './Button.svelte';
+	import { t } from '$lib/i18n';
 	import { toast } from '$lib/stores/toast.svelte';
 
 	interface Props {
@@ -10,7 +11,7 @@
 		class?: string;
 	}
 
-	let { text, label = 'Kopieren', size = 'xs', class: klass = '' }: Props = $props();
+	let { text, label = t('Kopieren'), size = 'xs', class: klass = '' }: Props = $props();
 	let done = $state(false);
 
 	async function copy() {
@@ -27,7 +28,7 @@
 			const ok = document.execCommand('copy');
 			ta.remove();
 			if (!ok) {
-				toast.error('Kopieren nicht möglich');
+				toast.error(t('Kopieren nicht möglich'));
 				return;
 			}
 		}
@@ -40,7 +41,7 @@
 	variant="ghost"
 	{size}
 	icon={done ? 'check' : 'copy'}
-	label={done ? 'Kopiert' : label}
+	label={done ? t('Kopiert') : label}
 	onclick={copy}
 	class={klass}
 />

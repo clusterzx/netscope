@@ -6,6 +6,7 @@
 	import RuleEditor from '$lib/components/rules/RuleEditor.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
+	import { t } from '$lib/i18n';
 
 	const canManage = $derived(auth.can('rules.manage'));
 
@@ -24,21 +25,21 @@
 </script>
 
 {#if !canManage}
-	<PageHeader title="Neue Regel" />
+	<PageHeader title={t('Neue Regel')} />
 	<EmptyState
 		icon="lock"
-		title="Keine Berechtigung"
-		description="Zum Anlegen von Regeln fehlt die Berechtigung „Regeln verwalten“."
+		title={t('Keine Berechtigung')}
+		description={t('Zum Anlegen von Regeln fehlt die Berechtigung „Regeln verwalten“.')}
 	>
 		{#snippet actions()}
-			<Button href="/rules">Zur Regelliste</Button>
+			<Button href="/rules">{t('Zur Regelliste')}</Button>
 		{/snippet}
 	</EmptyState>
 {:else if data.error && !data.data}
-	<PageHeader title="Neue Regel" />
+	<PageHeader title={t('Neue Regel')} />
 	<ErrorState error={data.error} onretry={() => data.reload()} />
 {:else if !data.data}
-	<PageHeader title="Neue Regel" />
+	<PageHeader title={t('Neue Regel')} />
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_27rem]">
 		<Card><Skeleton lines={12} /></Card>
 		<Card><Skeleton lines={8} /></Card>

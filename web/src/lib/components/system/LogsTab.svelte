@@ -18,6 +18,7 @@
 		Select,
 		Skeleton
 	} from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -136,8 +137,10 @@
 	<Card>
 		<EmptyState
 			icon="lock"
-			title="Keine Berechtigung"
-			description="Zum Anzeigen des Server-Protokolls fehlt die Berechtigung „Audit-Log und Server-Protokoll einsehen“."
+			title={t('Keine Berechtigung')}
+			description={t(
+				'Zum Anzeigen des Server-Protokolls fehlt die Berechtigung „Audit-Log und Server-Protokoll einsehen“.'
+			)}
 		/>
 	</Card>
 {:else}
@@ -146,7 +149,7 @@
 			<div class="flex w-full flex-col gap-2 py-1">
 				<div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
 					<Select
-						label="Level (mindestens)"
+						label={t('Level (mindestens)')}
 						size="sm"
 						value={level}
 						options={LOG_LEVELS.map((l) => ({ value: l, label: logLevelLabel[l] }))}
@@ -164,7 +167,7 @@
 						size="sm"
 						bind:value={pluginText}
 						oninput={() => applyPlugin(pluginText)}
-						placeholder="z. B. nmap"
+						placeholder={t('z. B. nmap')}
 						class="sm:w-36"
 					/>
 					<Input
@@ -174,14 +177,17 @@
 						icon="search"
 						bind:value={text}
 						oninput={() => applyText(text)}
-						placeholder="in Meldungen suchen"
+						placeholder={t('in Meldungen suchen')}
 						class="col-span-2 sm:w-56"
 					/>
 					<Select
-						label="Anzahl"
+						label={t('Anzahl')}
 						size="sm"
 						value={String(limit)}
-						options={LIMITS.map((l) => ({ value: String(l), label: `letzte ${l}` }))}
+						options={LIMITS.map((l) => ({
+							value: String(l),
+							label: t('letzte {n}', { n: formatNumber(l) })
+						}))}
 						onchange={(e) =>
 							setParams({
 								limit:
@@ -195,14 +201,16 @@
 				<div class="flex flex-wrap items-center gap-2">
 					{#if paused}
 						<Button size="sm" variant="primary" icon="play" onclick={resume}>
-							Fortsetzen{buffered.length ? ` (${formatNumber(buffered.length)} neu)` : ''}
+							{buffered.length
+								? t('Fortsetzen ({n} neu)', { n: formatNumber(buffered.length) })
+								: t('Fortsetzen')}
 						</Button>
 					{:else}
-						<Button size="sm" icon="pause" onclick={() => (paused = true)}>Pausieren</Button>
+						<Button size="sm" icon="pause" onclick={() => (paused = true)}>{t('Pausieren')}</Button>
 					{/if}
 					<Checkbox
 						bind:checked={autoScroll}
-						label="Automatisch scrollen"
+						label={t('Automatisch scrollen')}
 						onchange={() => autoScroll && scrollDown(true)}
 					/>
 					<span class="flex items-center gap-1.5 text-xs text-fg-subtle">
@@ -212,17 +220,19 @@
 								: 'bg-offline'}"
 							aria-hidden="true"
 						></span>
-						{live.status === 'open' ? (paused ? 'Live pausiert' : 'Live') : 'Keine Live-Verbindung'}
+						{live.status === 'open' ? (paused ? t('Live pausiert') : 'Live') : t('Keine Live-Verbindung')}
 					</span>
 					<span class="ml-auto text-xs text-fg-subtle">
-						{formatNumber(entries.length)} Zeilen{#if serverLevel}
-							· Server-Level {serverLevel} (<a href="?tab=settings" class="link">ändern</a>){/if}
+						{tn(entries.length, '{n} Zeile', '{n} Zeilen')}{#if serverLevel}
+							· {t('Server-Level {level}', { level: serverLevel })} (<a href="?tab=settings" class="link"
+								>{t('ändern')}</a
+							>){/if}
 					</span>
 					<Button
 						size="sm"
 						variant="ghost"
 						icon="refresh"
-						label="Neu laden"
+						label={t('Neu laden')}
 						loading={data.loading}
 						onclick={() => data.reload()}
 					/>
@@ -242,13 +252,13 @@
 				onscroll={onScroll}
 				class="mono h-[calc(100dvh-22rem)] min-h-80 overflow-auto bg-surface-2 text-[0.78rem] leading-relaxed"
 				role="log"
-				aria-label="Anwendungsprotokoll"
+				aria-label={t('Anwendungsprotokoll')}
 				aria-live="off"
 				tabindex="0"
 			>
 				{#if entries.length === 0}
 					<p class="px-4 py-6 text-center font-sans text-sm text-fg-subtle">
-						Keine Protokollzeilen für diese Filter.
+						{t('Keine Protokollzeilen für diese Filter.')}
 					</p>
 				{/if}
 				{#each entries as e (e.seq)}
@@ -276,7 +286,9 @@
 									class="ml-auto shrink-0 rounded px-1 font-sans text-xs text-fg-subtle hover:bg-surface-3 hover:text-fg sm:ml-0"
 									aria-expanded={!!expanded[e.seq]}
 									onclick={() => (expanded[e.seq] = !expanded[e.seq])}
-									>{expanded[e.seq] ? 'weniger' : `${Object.keys(e.attrs ?? {}).length} Attribute`}</button
+									>{expanded[e.seq]
+										? t('weniger')
+										: tn(Object.keys(e.attrs ?? {}).length, '{n} Attribut', '{n} Attribute')}</button
 								>
 							{/if}
 						</div>
@@ -303,7 +315,7 @@
 						size="xs"
 						variant="ghost"
 						icon="arrow-down"
-						onclick={() => ((autoScroll = true), scrollDown(true))}>Zum Ende springen</Button
+						onclick={() => ((autoScroll = true), scrollDown(true))}>{t('Zum Ende springen')}</Button
 					>
 				</div>
 			{/if}

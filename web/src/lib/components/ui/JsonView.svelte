@@ -3,6 +3,7 @@
 	<JsonView value={obs.data} openDepth={2} />
 -->
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import CodeBlock from './CodeBlock.svelte';
 	import CopyButton from './CopyButton.svelte';
 	import JsonNode from './JsonNode.svelte';
@@ -25,7 +26,7 @@
 			type="button"
 			class="rounded px-2 py-0.5 text-xs {raw ? 'text-fg-muted hover:text-fg' : 'bg-surface-3 text-fg'}"
 			aria-pressed={!raw}
-			onclick={() => (raw = false)}>Baum</button
+			onclick={() => (raw = false)}>{t('Baum')}</button
 		>
 		<button
 			type="button"
@@ -33,7 +34,7 @@
 			aria-pressed={raw}
 			onclick={() => (raw = true)}>JSON</button
 		>
-		{#if !raw}<CopyButton {text} label="JSON kopieren" />{/if}
+		{#if !raw}<CopyButton {text} label={t('JSON kopieren')} />{/if}
 	</div>
 	{#if raw}
 		<CodeBlock code={text} {maxHeight} />

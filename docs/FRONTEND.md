@@ -6,7 +6,8 @@ embedded into the Go binary). Plugin development: [PLUGINS.md](PLUGINS.md).
 ```text
 
 Stack: SvelteKit 2 SPA (adapter-static, ssr=false) · Svelte 5 runes · TypeScript strict · Tailwind v4
-(CSS-first, tokens in src/app.css). UI texts German, code English. No component library.
+(CSS-first, tokens in src/app.css). UI texts German (source language, English via catalogs – section 9),
+code English. No component library.
 
 Quality gates: `npm run check` (0 errors/0 warnings, a11y warnings fail!), `npm run lint` (prettier:
 tabs, single quotes, printWidth 110), `npm run build` (→ ../internal/webui/dist, then
@@ -184,10 +185,12 @@ scopes/conditions (plugin scope.query, rules conditions.deviceQuery, report filt
 
 7. Utilities  (src/lib/utils)
 -----------------------------
-format.ts   formatDateTime (dd.MM.yyyy HH:mm), formatDate, formatTime, formatRelative ("vor 5 Minuten"),
-            formatDuration(ms), formatSeconds, formatNumber (de-DE), formatPercent, formatBytes, formatMs,
-            plural, toDateTimeLocal / fromDateTimeLocal (for <input type="datetime-local">), toDate
-labels.ts   German labels + tones: severityLabel/severityTone/severityFromCvss, stateLabel/stateTone,
+format.ts   in the UI language (Intl with intlLocale): formatDateTime (de: dd.MM.yyyy HH:mm, en: the
+            browser's English variant, en-GB by default), formatDate, formatDayMonth, formatWeekdayDate,
+            formatTime, formatRelative ("vor 5 Minuten" / "5 minutes ago"), formatDuration(ms),
+            formatSeconds, formatNumber, formatPercent + percentUnit ("12 %" / "12%"), formatBytes,
+            formatMs, plural, toDateTimeLocal / fromDateTimeLocal (for <input type="datetime-local">), toDate
+labels.ts   labels (translated with t()) + tones: severityLabel/severityTone/severityFromCvss, stateLabel/stateTone,
             criticalityLabel, pluginKindLabel, runStatusLabel/runStatusTone, runTriggerLabel,
             healthStateLabel/healthTone, deviceTypeName, relationKindLabel, diffKindLabel,
             eventCategoryLabel, customFieldTypeLabel, label(map, value)
@@ -208,5 +211,37 @@ markdown.ts renderMarkdown(source) → sanitized HTML
 - Links to devices: /devices/<id>; events: /events?…; diff: /diff?runA=&runB=&device=.
 - Icon-only buttons need `label`. Every input needs a label (use label/hideLabel/aria-label).
 - Live refresh: subscribe with $effect(() => live.on(topic, handler)) and debounce refetches.
-- German UI texts, "Du" is not used; short imperative labels ("Speichern", "Jetzt ausführen").
+- UI texts are written in German and wrapped in t() (section 9); short imperative labels
+  ("Speichern", "Jetzt ausführen").
+
+
+9. Texts and languages  (src/lib/i18n)
+---------------------------------------
+The UI is German and English. German is the source: every German text is wrapped in t(), the
+English catalog maps the German text to its translation (src/lib/i18n/en/*.json, one file per
+area, shared texts in common.json).
+
+  import { t, tn, msg, locale, intlLocale } from '$lib/i18n';
+  t('Gerät löschen')                         // "Delete device"
+  t('Gerät {name} gelöscht', { name })       // placeholders in braces, same set in the translation
+  tn(n, '{n} Gerät', '{n} Geräte')           // singular/plural, {n} is formatted
+  msg('Geräte')                             // marks a key kept in data (translate later with t())
+  t('Benutzer@@Mehrzahl')                  // context after @@: one German word, two English meanings
+  items.sort((a, b) => a.localeCompare(b, locale))
+
+- t() is typed: its argument must be a key of the English catalog, so a new German text without
+  translation is a svelte-check error. Add the English text to the catalog file of the area.
+- Never build sentences from translated fragments or template literals – use placeholders.
+  Language-neutral texts (NetScope, SNMP, IP, Status, Name …) stay unwrapped.
+- Texts from the server (plugin names and settings, event catalog and titles, error messages) are
+  already in the user's language: the client sends Accept-Language with every request.
+- The language is fixed for the lifetime of the page: decided at startup (stored preference of the
+  signed-in user in localStorage "netscope.locale", otherwise the browser language, otherwise
+  German; the login page always follows the browser) – so t() may be used in module constants.
+  Changing it (System → Konto → Sprache, PUT /api/v1/auth/preferences) reloads the page;
+  +layout.ts reloads as well when the user's stored preference differs from the page language.
+- `npm run check` also runs scripts/i18n-check.mjs: keys in exactly one catalog file, no unused
+  keys, identical placeholders, and no German text outside t()/tn()/msg() (heuristic: umlauts,
+  common German words, words of catalog keys). A line that must keep German on purpose (data, not
+  display text) carries a comment with "i18n-ignore". `npm run check:i18n` lists findings only.
 ```

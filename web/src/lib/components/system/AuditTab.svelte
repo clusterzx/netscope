@@ -17,6 +17,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { locale, t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { formatDateTime } from '$lib/utils/format';
@@ -60,7 +61,7 @@
 
 	const entityOptions = Object.entries(entityLabel)
 		.map(([value, label]) => ({ value, label }))
-		.sort((a, b) => a.label.localeCompare(b.label, 'de'));
+		.sort((a, b) => a.label.localeCompare(b.label, locale));
 
 	const hasFilter = $derived(!!(entity || entityId || action || q));
 	function reset() {
@@ -68,20 +69,22 @@
 		setParams({ entity: null, id: null, action: null, q: null, offset: null });
 	}
 
+	// audit action keys ("user.login_failed", "device.create" …) are technical, not display text
 	function actionTone(a: string) {
-		if (a.includes('delete') || a.includes('login_failed') || a.includes('restore') || a.includes('rotate'))
+		const failed = a.includes('login_failed'); // i18n-ignore
+		if (a.includes('delete') || failed || a.includes('restore') || a.includes('rotate'))
 			return 'danger' as const;
-		if (a.includes('create') || a.includes('login')) return 'ok' as const;
+		if (a.includes('create') || a.includes('login')) return 'ok' as const; // i18n-ignore
 		if (a.includes('update') || a.includes('settings') || a.includes('config')) return 'accent' as const;
 		return 'neutral' as const;
 	}
 
 	const columns: Column<AuditEntry>[] = [
-		{ key: 'ts', label: 'Zeit', width: '9.5rem' },
-		{ key: 'actor', label: 'Akteur', hideBelow: 'md' },
-		{ key: 'action', label: 'Aktion' },
-		{ key: 'entity', label: 'Objekt', hideBelow: 'lg' },
-		{ key: 'summary', label: 'Beschreibung', hideBelow: 'sm' },
+		{ key: 'ts', label: t('Zeit'), width: '9.5rem' },
+		{ key: 'actor', label: t('Akteur'), hideBelow: 'md' },
+		{ key: 'action', label: t('Aktion') },
+		{ key: 'entity', label: t('Objekt'), hideBelow: 'lg' },
+		{ key: 'summary', label: t('Beschreibung'), hideBelow: 'sm' },
 		{ key: 'toggle', label: '', align: 'right', width: '3rem' }
 	];
 </script>
@@ -90,43 +93,45 @@
 	<Card>
 		<EmptyState
 			icon="lock"
-			title="Keine Berechtigung"
-			description="Zum Anzeigen des Audit-Logs fehlt die Berechtigung „Audit-Log und Server-Protokoll einsehen“."
+			title={t('Keine Berechtigung')}
+			description={t(
+				'Zum Anzeigen des Audit-Logs fehlt die Berechtigung „Audit-Log und Server-Protokoll einsehen“.'
+			)}
 		/>
 	</Card>
 {:else}
 	<Card
-		title="Audit-Log"
-		description="Alle manuellen Änderungen über UI und API"
+		title={t('Audit-Log')}
+		description={t('Alle manuellen Änderungen über UI und API')}
 		icon="history"
 		padding="none"
 	>
 		<div class="grid grid-cols-2 gap-2 border-b border-border p-3 sm:flex sm:flex-wrap sm:items-end">
 			<Select
-				label="Objekttyp"
+				label={t('Objekttyp')}
 				size="sm"
 				value={entity}
 				options={entityOptions}
-				placeholder="Alle"
+				placeholder={t('Alle')}
 				class="sm:w-44"
 				onchange={(e) =>
 					setParams({ entity: (e.currentTarget as HTMLSelectElement).value || null, offset: null })}
 			/>
 			<Input
-				label="Objekt-ID"
+				label={t('Objekt-ID')}
 				size="sm"
 				bind:value={idText}
 				oninput={() => apply('id', idText)}
 				class="sm:w-28"
-				placeholder="z. B. 12"
+				placeholder={t('z. B. 12')}
 			/>
 			<Input
-				label="Aktion"
+				label={t('Aktion')}
 				size="sm"
 				bind:value={actionText}
 				oninput={() => apply('action', actionText)}
 				class="sm:w-44"
-				placeholder="z. B. device.*"
+				placeholder={t('z. B. device.*')}
 				mono
 			/>
 			<Input
@@ -137,9 +142,10 @@
 				bind:value={qText}
 				oninput={() => apply('q', qText)}
 				class="col-span-2 sm:w-60"
-				placeholder="Beschreibung oder Akteur"
+				placeholder={t('Beschreibung oder Akteur')}
 			/>
-			{#if hasFilter}<Button size="sm" variant="ghost" icon="x" onclick={reset}>Zurücksetzen</Button>{/if}
+			{#if hasFilter}<Button size="sm" variant="ghost" icon="x" onclick={reset}>{t('Zurücksetzen')}</Button
+				>{/if}
 		</div>
 		{#if data.error && !data.data}
 			<ErrorState error={data.error} onretry={() => data.reload()} />
@@ -151,7 +157,7 @@
 				loading={data.loading}
 				dense
 				class="rounded-none border-0"
-				caption="Audit-Log"
+				caption={t('Audit-Log')}
 				onrowclick={(e) => hasDiff(e) && (open[e.id] = !open[e.id])}
 			>
 				{#snippet cell(e, col)}
@@ -182,7 +188,7 @@
 								size="xs"
 								variant="ghost"
 								icon={open[e.id] ? 'chevron-up' : 'chevron-down'}
-								label={open[e.id] ? 'Änderungen ausblenden' : 'Änderungen anzeigen'}
+								label={open[e.id] ? t('Änderungen ausblenden') : t('Änderungen anzeigen')}
 								aria-expanded={!!open[e.id]}
 								onclick={() => (open[e.id] = !open[e.id])}
 							/>
@@ -202,7 +208,7 @@
 					<EmptyState
 						compact
 						icon="history"
-						title={hasFilter ? 'Keine Einträge für diese Filter' : 'Noch keine Einträge'}
+						title={hasFilter ? t('Keine Einträge für diese Filter') : t('Noch keine Einträge')}
 					/>
 				{/snippet}
 			</Table>

@@ -5,6 +5,7 @@
 <script lang="ts">
 	import { Card, Icon, Skeleton } from '$lib/components/ui';
 	import { formatNumber } from '$lib/utils/format';
+	import { t, tn } from '$lib/i18n';
 	import { cveSeverityLabel, severityMin } from './cve';
 
 	interface Props {
@@ -37,8 +38,8 @@
 </script>
 
 <Card
-	title="Übersicht"
-	description="Aktive Treffer (Gerät × CVE), ohne irrelevante"
+	title={t('Übersicht')}
+	description={t('Aktive Treffer (Gerät × CVE), ohne irrelevante')}
 	icon="shield"
 	class={klass}
 >
@@ -48,8 +49,7 @@
 		<div class="flex items-baseline gap-2">
 			<span class="text-3xl font-semibold tracking-tight tabular">{formatNumber(summary.total ?? 0)}</span>
 			<span class="text-sm text-fg-muted">
-				Treffer auf {formatNumber(summary.devices ?? 0)}
-				{(summary.devices ?? 0) === 1 ? 'Gerät' : 'Geräten'}
+				{tn(summary.devices ?? 0, 'Treffer auf {n} Gerät', 'Treffer auf {n} Geräten')}
 			</span>
 		</div>
 		<ul class="mt-3 flex flex-col gap-1">
@@ -61,7 +61,7 @@
 					<button
 						type="button"
 						aria-pressed={active}
-						title="Liste auf {cveSeverityLabel[s]} filtern"
+						title={t('Liste auf {severity} filtern', { severity: cveSeverityLabel[s] })}
 						onclick={() => onpick(active ? null : min)}
 						class="grid w-full grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3 rounded px-1.5 py-1 text-left text-sm transition-colors
 							{active ? 'bg-accent-soft' : 'hover:bg-surface-2'}"
@@ -82,7 +82,7 @@
 			<button
 				type="button"
 				aria-pressed={exploitedActive}
-				title="Nur Schwachstellen zeigen, die laut CISA aktiv ausgenutzt werden"
+				title={t('Nur Schwachstellen zeigen, die laut CISA aktiv ausgenutzt werden')}
 				onclick={onexploited}
 				class="mt-3 flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors
 					{exploitedActive ? 'border-danger bg-danger-soft' : 'border-danger/40 hover:bg-danger-soft'}"
@@ -90,14 +90,17 @@
 				<Icon name="zap" size={15} class="shrink-0 text-danger" />
 				<span class="font-medium text-danger tabular">{formatNumber(summary.exploited)}</span>
 				<span class="text-fg-muted">
-					aktiv ausgenutzt auf {formatNumber(summary.exploitedDevices ?? 0)}
-					{(summary.exploitedDevices ?? 0) === 1 ? 'Gerät' : 'Geräten'}
+					{tn(
+						summary.exploitedDevices ?? 0,
+						'aktiv ausgenutzt auf {n} Gerät',
+						'aktiv ausgenutzt auf {n} Geräten'
+					)}
 				</span>
 			</button>
 		{/if}
 		{#if (summary.unknown ?? 0) + (summary.none ?? 0) > 0}
 			<p class="mt-2 text-xs text-fg-subtle">
-				{formatNumber((summary.unknown ?? 0) + (summary.none ?? 0))} ohne CVSS-Bewertung
+				{t('{n} ohne CVSS-Bewertung', { n: formatNumber((summary.unknown ?? 0) + (summary.none ?? 0)) })}
 			</p>
 		{/if}
 	{/if}

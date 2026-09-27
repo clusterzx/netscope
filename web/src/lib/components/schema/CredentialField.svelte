@@ -5,6 +5,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import MultiSelect from '$lib/components/ui/MultiSelect.svelte';
+	import { t } from '$lib/i18n';
 	import Select from '$lib/components/ui/Select.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { credentials } from '$lib/stores/catalog.svelte';
@@ -43,14 +44,14 @@
 			.filter((c) => !types.length || types.includes(c.type))
 			.map((c) => ({ value: String(c.id), label: `${c.name} (${c.type})`, description: c.description }))
 	);
-	const typeHint = $derived(types.length ? `Typ: ${types.join(', ')}` : '');
+	const typeHint = $derived(types.length ? t('Typ: {types}', { types: types.join(', ') }) : '');
 	const fullHint = $derived(
 		[
 			hint,
 			!canView
-				? 'Auswahl nicht einsehbar – dafür fehlt die Berechtigung „Credentials einsehen“.'
+				? t('Auswahl nicht einsehbar – dafür fehlt die Berechtigung „Credentials einsehen“.')
 				: credentials.value && options.length === 0
-					? 'Noch kein passendes Credential – unter „Credentials“ anlegen.'
+					? t('Noch kein passendes Credential – unter „Credentials“ anlegen.')
 					: typeHint
 		]
 			.filter(Boolean)
@@ -76,7 +77,7 @@
 		{options}
 		value={many}
 		onchange={(v) => (value = v.map(Number))}
-		placeholder={credentials.loading ? 'Lädt …' : 'Credentials wählen …'}
+		placeholder={credentials.loading ? t('Lädt …') : t('Credentials wählen …')}
 	/>
 {:else}
 	<Select
@@ -87,7 +88,7 @@
 		{id}
 		{disabled}
 		options={options.map((o) => ({ value: o.value, label: o.label }))}
-		placeholder={credentials.loading ? 'Lädt …' : '— kein Credential —'}
+		placeholder={credentials.loading ? t('Lädt …') : t('— kein Credential —')}
 		value={single}
 		onchange={(e) => (value = Number((e.currentTarget as HTMLSelectElement).value) || 0)}
 	/>

@@ -5,6 +5,7 @@
 	import { Button, Card, EmptyState, ErrorState, PageHeader, Skeleton } from '$lib/components/ui';
 	import RuleEditor from '$lib/components/rules/RuleEditor.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
+	import { t } from '$lib/i18n';
 
 	const id = $derived(Number(page.params.id));
 
@@ -20,17 +21,21 @@
 </script>
 
 {#if notFound}
-	<PageHeader title="Regel" />
-	<EmptyState icon="rules" title="Regel nicht gefunden" description="Die Regel existiert nicht (mehr).">
+	<PageHeader title={t('Regel')} />
+	<EmptyState
+		icon="rules"
+		title={t('Regel nicht gefunden')}
+		description={t('Die Regel existiert nicht (mehr).')}
+	>
 		{#snippet actions()}
-			<Button href="/rules">Zur Regelliste</Button>
+			<Button href="/rules">{t('Zur Regelliste')}</Button>
 		{/snippet}
 	</EmptyState>
 {:else if data.error && !data.data}
-	<PageHeader title="Regel" />
+	<PageHeader title={t('Regel')} />
 	<ErrorState error={data.error} onretry={() => data.reload()} />
 {:else if !data.data || data.data.id !== id}
-	<PageHeader title="Regel" />
+	<PageHeader title={t('Regel')} />
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_27rem]">
 		<Card><Skeleton lines={12} /></Card>
 		<Card><Skeleton lines={8} /></Card>

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"netscope/internal/db"
+	"netscope/internal/i18n"
 )
 
 // Kind is one of the four plugin types.
@@ -245,6 +246,17 @@ type Env struct {
 	Location  *time.Location // configured time zone
 	Version   string
 	DataRoot  string // NetScope data directory (/data); plugins use DataDir for own files
+	// Language of texts NetScope sends on its own: notifications and scheduled reports
+	// (system setting; German by default). Texts shown in the web UI follow the user.
+	Language i18n.Locale
+}
+
+// Lang returns the language for notifications and reports (German if unset).
+func (e Env) Lang() i18n.Locale {
+	if e.Language == "" {
+		return i18n.Default
+	}
+	return e.Language
 }
 
 // Sink receives observations. Observe writes synchronously (one transaction per call)

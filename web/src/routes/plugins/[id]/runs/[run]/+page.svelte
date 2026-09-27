@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError, errorMessage } from '$lib/api';
 	import type { RunMessageData, RunView } from '$lib/api';
+	import { t } from '$lib/i18n';
 	import {
 		Alert,
 		Button,
@@ -104,20 +105,20 @@
 	async function cancel() {
 		if (!run) return;
 		const ok = await confirm({
-			title: `Lauf #${run.id} abbrechen?`,
-			message: 'Bereits gespeicherte Ergebnisse bleiben erhalten.',
-			confirmLabel: 'Abbrechen',
-			cancelLabel: 'Weiterlaufen lassen',
+			title: t('Lauf #{id} abbrechen?', { id: run.id }),
+			message: t('Bereits gespeicherte Ergebnisse bleiben erhalten.'),
+			confirmLabel: t('Abbrechen'),
+			cancelLabel: t('Weiterlaufen lassen'),
 			danger: true
 		});
 		if (!ok) return;
 		cancelling = true;
 		try {
 			await api.post('/api/v1/runs/{id}/cancel', { path: { id: run.id } });
-			toast.info(`Lauf #${run.id} wird abgebrochen`);
+			toast.info(t('Lauf #{id} wird abgebrochen', { id: run.id }));
 			refresh();
 		} catch (e) {
-			toast.error(errorMessage(e), { title: 'Abbrechen fehlgeschlagen' });
+			toast.error(errorMessage(e), { title: t('Abbrechen fehlgeschlagen') });
 		} finally {
 			cancelling = false;
 		}
@@ -129,7 +130,7 @@
 		diffing = true;
 		try {
 			const prev = await previousSuccessfulRun(run);
-			if (!prev) toast.info('Es gibt keinen früheren erfolgreichen Lauf dieses Plugins zum Vergleichen.');
+			if (!prev) toast.info(t('Es gibt keinen früheren erfolgreichen Lauf dieses Plugins zum Vergleichen.'));
 			else await goto(diffUrl(prev, run));
 		} catch (e) {
 			toast.error(e);
@@ -139,10 +140,12 @@
 	}
 
 	const pluginHref = $derived(`/plugins/${encodeURIComponent(run?.pluginId ?? pluginId)}`);
+	// "beendet vor 5 Minuten": the relative time is a component, the sentence is split at its placeholder
+	const finishedText = t('beendet {time}').split('{time}');
 </script>
 
 <PageHeader
-	title={run ? `Lauf #${run.id}` : `Lauf #${page.params.run}`}
+	title={t('Lauf #{id}', { id: run?.id ?? page.params.run ?? '' })}
 	description={run ? `${run.pluginName} · ${pluginKindLabel[run.kind] ?? run.kind}` : undefined}
 >
 	{#snippet breadcrumb()}
@@ -150,35 +153,39 @@
 		<span aria-hidden="true">›</span>
 		<a href={pluginHref} class="hover:text-fg">{run?.pluginName ?? pluginId}</a>
 		<span aria-hidden="true">›</span>
-		<a href="{pluginHref}?tab=runs" class="hover:text-fg">Läufe</a>
+		<a href="{pluginHref}?tab=runs" class="hover:text-fg">{t('Läufe')}</a>
 	{/snippet}
 	{#snippet meta()}
 		{#if run}
 			<RunStatusBadge status={run.status} />
 			<span>{runTriggerLabel[run.trigger] ?? run.trigger}</span>
-			{#if run.attempt > 1}<span>· Versuch {run.attempt}</span>{/if}
-			{#if run.finishedAt}<span>· beendet <RelativeTime value={run.finishedAt} /></span>{/if}
+			{#if run.attempt > 1}<span>· {t('Versuch {n}', { n: run.attempt })}</span>{/if}
+			{#if run.finishedAt}<span
+					>· {finishedText[0]}<RelativeTime value={run.finishedAt} />{finishedText[1]}</span
+				>{/if}
 		{/if}
 	{/snippet}
 	{#snippet actions()}
 		{#if run && active && auth.can('devices.scan')}
-			<Button variant="danger" icon="stop" loading={cancelling} onclick={cancel}>Abbrechen</Button>
+			<Button variant="danger" icon="stop" loading={cancelling} onclick={cancel}>{t('Abbrechen')}</Button>
 		{/if}
 		{#if run && !discarded && diffable(run.kind) && run.status === 'success' && run.trigger !== 'action'}
-			<Button icon="diff" loading={diffing} onclick={openDiff}>Diff zum vorherigen Lauf</Button>
+			<Button icon="diff" loading={diffing} onclick={openDiff}>{t('Diff zum vorherigen Lauf')}</Button>
 		{/if}
-		<Button variant="ghost" icon="history" href="{pluginHref}?tab=runs">Alle Läufe</Button>
+		<Button variant="ghost" icon="history" href="{pluginHref}?tab=runs">{t('Alle Läufe')}</Button>
 	{/snippet}
 </PageHeader>
 
 {#if notFound}
 	<EmptyState
 		icon="history"
-		title="Lauf nicht gefunden"
-		description="Der Lauf existiert nicht (mehr). Routineläufe nach Zeitplan ohne Änderungen werden nicht in der Historie behalten."
+		title={t('Lauf nicht gefunden')}
+		description={t(
+			'Der Lauf existiert nicht (mehr). Routineläufe nach Zeitplan ohne Änderungen werden nicht in der Historie behalten.'
+		)}
 	>
 		{#snippet actions()}
-			<Button href="{pluginHref}?tab=runs">Zur Laufhistorie</Button>
+			<Button href="{pluginHref}?tab=runs">{t('Zur Laufhistorie')}</Button>
 		{/snippet}
 	</EmptyState>
 {:else if data.error && !data.data}
@@ -191,16 +198,17 @@
 {:else}
 	<div class="flex flex-col gap-4">
 		{#if discarded}
-			<Alert tone="info" title="Lauf wurde nicht gespeichert">
-				Routinelauf nach Zeitplan ohne Änderungen – er wird nicht in der Laufhistorie behalten. Die Angaben
-				hier bleiben nur bis zum Verlassen der Seite sichtbar.
+			<Alert tone="info" title={t('Lauf wurde nicht gespeichert')}>
+				{t(
+					'Routinelauf nach Zeitplan ohne Änderungen – er wird nicht in der Laufhistorie behalten. Die Angaben hier bleiben nur bis zum Verlassen der Seite sichtbar.'
+				)}
 			</Alert>
 		{/if}
 		{#if active}
 			<Card padding="sm">
 				<div class="flex flex-col gap-1.5">
 					<span class="text-sm font-medium"
-						>{run.status === 'queued' ? 'Wartet auf Ausführung' : 'Läuft'}</span
+						>{run.status === 'queued' ? t('Wartet auf Ausführung') : t('Läuft')}</span
 					>
 					<RunProgress {run} />
 				</div>
@@ -209,13 +217,13 @@
 		{#if run.error}
 			<Alert
 				tone={run.status === 'cancelled' ? 'warn' : 'danger'}
-				title={run.status === 'cancelled' ? 'Abgebrochen' : 'Fehler'}
+				title={run.status === 'cancelled' ? t('Abgebrochen') : t('Fehler')}
 			>
 				<span class="break-words whitespace-pre-wrap">{run.error}</span>
 			</Alert>
 		{/if}
 		{#if result?.message || result?.data !== undefined}
-			<Card title="Ergebnis der Aktion" icon="check-circle">
+			<Card title={t('Ergebnis der Aktion')} icon="check-circle">
 				{#if result?.message}<p class="text-sm">{result.message}</p>{/if}
 				{#if result?.data !== undefined && result?.data !== null}
 					<JsonView value={result.data} class="mt-3" />
@@ -224,48 +232,52 @@
 		{/if}
 
 		<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-			<Card title="Überblick" icon="info">
+			<Card title={t('Überblick')} icon="info">
 				<DescList cols={2}>
 					<DescItem label="Status"><RunStatusBadge status={run.status} /></DescItem>
-					<DescItem label="Auslöser" value={runTriggerLabel[run.trigger] ?? run.trigger} />
-					<DescItem label="Angefordert von" value={run.requestedBy} />
-					<DescItem label="Versuch" value={run.attempt} />
-					<DescItem label="Erstellt">{formatDateTime(run.createdAt, true)}</DescItem>
-					<DescItem label="Gestartet">{formatDateTime(run.startedAt, true)}</DescItem>
-					<DescItem label="Beendet">{formatDateTime(run.finishedAt, true)}</DescItem>
+					<DescItem label={t('Auslöser')} value={runTriggerLabel[run.trigger] ?? run.trigger} />
+					<DescItem label={t('Angefordert von')} value={run.requestedBy} />
+					<DescItem label={t('Versuch')} value={run.attempt} />
+					<DescItem label={t('Erstellt')}>{formatDateTime(run.createdAt, true)}</DescItem>
+					<DescItem label={t('Gestartet')}>{formatDateTime(run.startedAt, true)}</DescItem>
+					<DescItem label={t('Beendet')}>{formatDateTime(run.finishedAt, true)}</DescItem>
 					<DescItem
-						label="Dauer"
+						label={t('Dauer')}
 						value={active
 							? run.status === 'queued'
-								? 'wartet'
-								: 'läuft noch'
+								? t('wartet')
+								: t('läuft noch')
 							: run.startedAt
 								? formatDuration(run.durationMs)
 								: '–'}
 					/>
 					{#if typeof run.params?._action === 'string'}
-						<DescItem label="Aktion" value={run.params._action} mono />
+						<DescItem label={t('Aktion')} value={run.params._action} mono />
 					{/if}
 					{#if run.notBefore}
-						<DescItem label="Frühestens ab">{formatDateTime(run.notBefore, true)}</DescItem>
+						<DescItem label={t('Frühestens ab')}>{formatDateTime(run.notBefore, true)}</DescItem>
 					{/if}
 					{#if run.parentRunId}
-						<DescItem label="Vorheriger Versuch">
+						<DescItem label={t('Vorheriger Versuch')}>
 							<a class="link mono" href="{pluginHref}/runs/{run.parentRunId}">#{run.parentRunId}</a>
 						</DescItem>
 					{/if}
-					<DescItem label="Bereich" class="sm:col-span-2" value={scopeSummary(run.scope, groupName)} />
+					<DescItem label={t('Bereich')} class="sm:col-span-2" value={scopeSummary(run.scope, groupName)} />
 				</DescList>
 				{#if params.length}
-					<h3 class="mt-4 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">Parameter</h3>
+					<h3 class="mt-4 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+						{t('Parameter')}
+					</h3>
 					<JsonView value={Object.fromEntries(params)} openDepth={1} maxHeight="16rem" />
 				{/if}
 			</Card>
 
-			<Card title="Statistik" icon="activity">
+			<Card title={t('Statistik')} icon="activity">
 				{#if !scalars.length && !complex.length}
 					<p class="text-sm text-fg-subtle">
-						{active ? 'Statistiken liegen nach Abschluss des Laufs vor.' : 'Keine Statistiken vorhanden.'}
+						{active
+							? t('Statistiken liegen nach Abschluss des Laufs vor.')
+							: t('Keine Statistiken vorhanden.')}
 					</p>
 				{:else}
 					{#if scalars.length}
@@ -288,7 +300,7 @@
 			</Card>
 		</div>
 
-		<Card title="Protokoll" icon="terminal">
+		<Card title={t('Laufprotokoll')} icon="terminal">
 			<RunLogViewer runId={run.id} {active} frozen={discarded} />
 		</Card>
 	</div>

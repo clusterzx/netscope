@@ -11,6 +11,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { locale, t, tn } from '$lib/i18n';
 
 	interface Props {
 		activeId: number | null;
@@ -36,11 +37,20 @@
 			(active.query !== query || active.sort !== sort || (active.columns ?? []).join() !== columns.join())
 	);
 
+	// the filter is set in monospace: the sentence is split at its placeholder
+	const savedText = $derived(
+		tn(
+			columns.length,
+			'Gespeichert werden Filter {filter}, Sortierung und {n} Spalte.',
+			'Gespeichert werden Filter {filter}, Sortierung und {n} Spalten.'
+		).split('{filter}')
+	);
+
 	async function load() {
 		try {
-			views = ((await api.get('/api/v1/views')) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+			views = ((await api.get('/api/v1/views')) ?? []).sort((a, b) => a.name.localeCompare(b.name, locale));
 		} catch (e) {
-			toast.error(e, { title: 'Ansichten konnten nicht geladen werden' });
+			toast.error(e, { title: t('Ansichten konnten nicht geladen werden') });
 		}
 	}
 	onMount(load);
@@ -54,7 +64,7 @@
 
 	async function saveNew() {
 		if (!name.trim()) {
-			nameError = 'Name erforderlich';
+			nameError = t('Name erforderlich');
 			return;
 		}
 		busy = true;
@@ -62,7 +72,7 @@
 			// id/timestamps are set by the server (the generated type marks them required)
 			const body = { name: name.trim(), query, columns, sort } as SavedView;
 			const v = await api.post('/api/v1/views', { body });
-			toast.success(`Ansicht „${v.name}“ gespeichert`);
+			toast.success(t('Ansicht „{name}“ gespeichert', { name: v.name }));
 			saveOpen = false;
 			await load();
 			onapply(v);
@@ -81,7 +91,7 @@
 				path: { id: active.id },
 				body: { ...active, query, columns, sort }
 			});
-			toast.success(`Ansicht „${active.name}“ aktualisiert`);
+			toast.success(t('Ansicht „{name}“ aktualisiert', { name: active.name }));
 			await load();
 		} catch (e) {
 			toast.error(e);
@@ -92,15 +102,15 @@
 		if (!active) return;
 		open = false;
 		const ok = await confirm({
-			title: 'Ansicht löschen?',
-			message: `Die gespeicherte Ansicht „${active.name}“ wird gelöscht.`,
-			confirmLabel: 'Löschen',
+			title: t('Ansicht löschen?'),
+			message: t('Die gespeicherte Ansicht „{name}“ wird gelöscht.', { name: active.name }),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/views/{id}', { path: { id: active.id } });
-			toast.success('Ansicht gelöscht');
+			toast.success(t('Ansicht gelöscht'));
 			onapply(null);
 			await load();
 		} catch (e) {
@@ -113,21 +123,25 @@
 	<Button
 		icon="bookmark"
 		iconRight="chevron-down"
-		label={active ? `Ansicht: ${active.name}${dirty ? ' (geändert)' : ''}` : 'Gespeicherte Ansichten'}
+		label={active
+			? dirty
+				? t('Ansicht: {name} (geändert)', { name: active.name })
+				: t('Ansicht: {name}', { name: active.name })
+			: t('Gespeicherte Ansichten')}
 		aria-haspopup="dialog"
 		aria-expanded={open}
 		onclick={() => (open = !open)}
 	>
 		<span class="hidden max-w-40 truncate sm:inline"
-			>{active ? active.name : 'Ansichten'}{dirty ? ' *' : ''}</span
+			>{active ? active.name : t('Ansichten')}{dirty ? ' *' : ''}</span
 		>
 	</Button>
 </span>
 
-<Popover bind:open {anchor} placement="bottom-end" label="Gespeicherte Ansichten" class="w-72">
+<Popover bind:open {anchor} placement="bottom-end" label={t('Gespeicherte Ansichten')} class="w-72">
 	<div class="py-1">
 		<p class="px-3 pt-1.5 pb-1 text-[0.7rem] font-semibold tracking-wider text-fg-subtle uppercase">
-			Gespeicherte Ansichten
+			{t('Gespeicherte Ansichten')}
 		</p>
 		<button
 			type="button"
@@ -140,7 +154,7 @@
 			<span class="w-4"
 				>{#if !activeId}<Icon name="check" size={14} class="text-accent" />{/if}</span
 			>
-			Alle Geräte (Standard)
+			{t('Alle Geräte (Standard)')}
 		</button>
 		{#each views as v (v.id)}
 			<button
@@ -160,7 +174,7 @@
 				</span>
 			</button>
 		{:else}
-			<p class="px-3 py-1.5 text-sm text-fg-subtle">Noch keine Ansichten gespeichert.</p>
+			<p class="px-3 py-1.5 text-sm text-fg-subtle">{t('Noch keine Ansichten gespeichert.')}</p>
 		{/each}
 	</div>
 	{#if auth.can('inventory.config')}
@@ -170,7 +184,8 @@
 				class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2"
 				onclick={openSave}
 			>
-				<Icon name="plus" size={14} class="text-fg-subtle" /> Als neue Ansicht speichern …
+				<Icon name="plus" size={14} class="text-fg-subtle" />
+				{t('Als neue Ansicht speichern …')}
 			</button>
 			{#if active}
 				<button
@@ -179,30 +194,31 @@
 					disabled={!dirty}
 					onclick={overwrite}
 				>
-					<Icon name="save" size={14} class="text-fg-subtle" /> „{active.name}“ aktualisieren
+					<Icon name="save" size={14} class="text-fg-subtle" />
+					{t('„{name}“ aktualisieren', { name: active.name })}
 				</button>
 				<button
 					type="button"
 					class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-danger hover:bg-surface-2"
 					onclick={remove}
 				>
-					<Icon name="trash" size={14} /> „{active.name}“ löschen
+					<Icon name="trash" size={14} />
+					{t('„{name}“ löschen', { name: active.name })}
 				</button>
 			{/if}
 		</div>
 	{/if}
 </Popover>
 
-<Modal bind:open={saveOpen} title="Ansicht speichern" size="sm" as="form" onsubmit={saveNew} {busy}>
+<Modal bind:open={saveOpen} title={t('Ansicht speichern')} size="sm" as="form" onsubmit={saveNew} {busy}>
 	<div class="flex flex-col gap-3">
 		<Input label="Name" bind:value={name} error={nameError} required maxlength={80} />
 		<div class="text-xs text-fg-muted">
-			Gespeichert werden Filter <span class="mono">{query || '(keiner)'}</span>, Sortierung und {columns.length}
-			Spalten.
+			{savedText[0]}<span class="mono">{query || t('(keiner)')}</span>{savedText[1] ?? ''}
 		</div>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (saveOpen = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" loading={busy}>Speichern</Button>
+		<Button onclick={() => (saveOpen = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" loading={busy}>{t('Speichern')}</Button>
 	{/snippet}
 </Modal>

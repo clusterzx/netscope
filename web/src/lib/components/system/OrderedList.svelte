@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
 	import { Button, FormField } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		value: string[];
@@ -24,7 +25,7 @@
 		error,
 		suggestions = [],
 		itemLabel = (v: string) => v,
-		placeholder = 'Quelle hinzufügen',
+		placeholder = t('Quelle hinzufügen'),
 		normalize = (s: string) => s.trim().toLowerCase()
 	}: Props = $props();
 
@@ -41,7 +42,7 @@
 		const next = [...value];
 		[next[i], next[j]] = [next[j], next[i]];
 		value = next;
-		announce = `${itemLabel(next[j])} auf Position ${j + 1}`;
+		announce = t('{item} auf Position {n}', { item: itemLabel(next[j]), n: j + 1 });
 		// keep focus on the moved item's button
 		requestAnimationFrame(() => {
 			listEl
@@ -51,7 +52,7 @@
 	}
 
 	function remove(i: number) {
-		announce = `${itemLabel(value[i])} entfernt`;
+		announce = t('{item} entfernt', { item: itemLabel(value[i]) });
 		value = value.filter((_, k) => k !== i);
 	}
 
@@ -63,7 +64,7 @@
 		}
 		value = [...value, v];
 		text = '';
-		announce = `${itemLabel(v)} hinzugefügt`;
+		announce = t('{item} hinzugefügt', { item: itemLabel(v) });
 	}
 </script>
 
@@ -87,7 +88,7 @@
 							size="xs"
 							variant="ghost"
 							icon="arrow-up"
-							label="{itemLabel(v)} nach oben"
+							label={t('{item} nach oben', { item: itemLabel(v) })}
 							data-move="up"
 							disabled={i === 0}
 							onclick={() => move(i, -1)}
@@ -96,7 +97,7 @@
 							size="xs"
 							variant="ghost"
 							icon="arrow-down"
-							label="{itemLabel(v)} nach unten"
+							label={t('{item} nach unten', { item: itemLabel(v) })}
 							data-move="down"
 							disabled={i === value.length - 1}
 							onclick={() => move(i, 1)}
@@ -105,12 +106,12 @@
 							size="xs"
 							variant="ghost"
 							icon="x"
-							label="{itemLabel(v)} entfernen"
+							label={t('{item} entfernen', { item: itemLabel(v) })}
 							onclick={() => remove(i)}
 						/>
 					</li>
 				{:else}
-					<li class="px-3 py-2 text-sm text-fg-subtle">Keine Einträge</li>
+					<li class="px-3 py-2 text-sm text-fg-subtle">{t('Keine Einträge')}</li>
 				{/each}
 			</ol>
 			<div class="flex gap-2">
@@ -118,7 +119,7 @@
 					type="text"
 					bind:value={text}
 					list="{uid}-sugg"
-					aria-label="{label}: Eintrag hinzufügen"
+					aria-label={t('{label}: Eintrag hinzufügen', { label })}
 					{placeholder}
 					onkeydown={(e) => {
 						if (e.key === 'Enter') {
@@ -131,7 +132,9 @@
 				<datalist id="{uid}-sugg">
 					{#each available as s (s)}<option value={s}>{itemLabel(s)}</option>{/each}
 				</datalist>
-				<Button size="sm" icon="plus" disabled={!text.trim()} onclick={() => add(text)}>Hinzufügen</Button>
+				<Button size="sm" icon="plus" disabled={!text.trim()} onclick={() => add(text)}
+					>{t('Hinzufügen')}</Button
+				>
 			</div>
 			<span class="sr-only" aria-live="polite">{announce}</span>
 		</div>

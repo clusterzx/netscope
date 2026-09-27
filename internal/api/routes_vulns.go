@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"netscope/internal/auth"
+	"netscope/internal/i18n"
 	"netscope/internal/plugins/cve"
 )
 
@@ -84,7 +85,7 @@ func (s *Server) handleVulns(w http.ResponseWriter, r *http.Request) {
 	if items == nil {
 		items = []cve.VulnRow{}
 	}
-	writeJSON(w, http.StatusOK, vulnList{Total: total, Items: items, Disclaimer: cve.Disclaimer})
+	writeJSON(w, http.StatusOK, vulnList{Total: total, Items: items, Disclaimer: i18n.T(requestLocale(r), cve.Disclaimer)})
 }
 
 func (s *Server) handleVulnStatus(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +99,8 @@ func (s *Server) handleVulnStatus(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, vulnStatus{Status: st, Summary: sum, Disclaimer: cve.Disclaimer})
+	loc := requestLocale(r)
+	writeJSON(w, http.StatusOK, vulnStatus{Status: localizeCVEStatus(st, loc), Summary: sum, Disclaimer: i18n.T(loc, cve.Disclaimer)})
 }
 
 func (s *Server) handleVulnDetail(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +117,7 @@ func (s *Server) handleVulnDetail(w http.ResponseWriter, r *http.Request) {
 	if devs == nil {
 		devs = []cve.DeviceCVE{}
 	}
-	writeJSON(w, http.StatusOK, cveDetail{CVE: info, Devices: devs, Disclaimer: cve.Disclaimer})
+	writeJSON(w, http.StatusOK, cveDetail{CVE: info, Devices: devs, Disclaimer: i18n.T(requestLocale(r), cve.Disclaimer)})
 }
 
 func (s *Server) handleIgnoreCVE(w http.ResponseWriter, r *http.Request) {
@@ -154,5 +156,5 @@ func (s *Server) handleDeviceCVEs(w http.ResponseWriter, r *http.Request) {
 	if items == nil {
 		items = []cve.DeviceCVE{}
 	}
-	writeJSON(w, http.StatusOK, deviceCVEList{Items: items, Disclaimer: cve.Disclaimer})
+	writeJSON(w, http.StatusOK, deviceCVEList{Items: items, Disclaimer: i18n.T(requestLocale(r), cve.Disclaimer)})
 }

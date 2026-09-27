@@ -7,6 +7,7 @@
 	import { Badge, RelativeTime } from '$lib/components/ui';
 	import { formatDateTime, formatSeconds } from '$lib/utils/format';
 	import { healthStateLabel, healthTone } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		outages: Outage[];
@@ -41,7 +42,7 @@
 							{#if o.deviceId}
 								<span class="text-fg-subtle">{' · '}</span><a
 									href="/devices/{o.deviceId}"
-									class="link text-xs">zum Gerät</a
+									class="link text-xs">{t('zum Gerät')}</a
 								>
 							{/if}
 						</p>
@@ -62,7 +63,7 @@
 						{formatSeconds(o.seconds)}
 					{:else}
 						<Badge tone={o.state === 'down' ? 'danger' : 'warn'} dot
-							>andauernd · {formatSeconds(o.seconds)}</Badge
+							>{t('andauernd · {duration}', { duration: formatSeconds(o.seconds) })}</Badge
 						>
 					{/if}
 				</span>

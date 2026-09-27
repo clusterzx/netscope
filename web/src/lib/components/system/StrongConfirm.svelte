@@ -6,6 +6,7 @@
 	import type { Snippet } from 'svelte';
 	import { untrack } from 'svelte';
 	import { Button, Input, Modal } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		open?: boolean;
@@ -38,16 +39,16 @@
 	<div class="flex flex-col gap-4 text-sm">
 		{@render children()}
 		<Input
-			label="Zur Bestätigung „{word}“ eingeben"
+			label={t('Zur Bestätigung „{word}“ eingeben', { word })}
 			bind:value={typed}
 			mono
 			autocomplete="off"
 			spellcheck={false}
-			error={typed && !ok && typed.length >= word.length ? 'Eingabe stimmt nicht überein' : undefined}
+			error={typed && !ok && typed.length >= word.length ? t('Eingabe stimmt nicht überein') : undefined}
 		/>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="danger" disabled={!ok} loading={busy}>{confirmLabel}</Button>
 	{/snippet}
 </Modal>

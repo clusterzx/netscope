@@ -17,6 +17,7 @@
 		StatusDot
 	} from '$lib/components/ui';
 	import TimeSeriesChart from '$lib/components/ui/TimeSeriesChart.svelte';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatBytes, formatNumber, formatPercent } from '$lib/utils/format';
@@ -34,8 +35,8 @@
 
 	const RANGES = [
 		{ id: '24h', label: '24 h', ms: 24 * 3600_000 },
-		{ id: '7d', label: '7 Tage', ms: 7 * 86400_000 },
-		{ id: '30d', label: '30 Tage', ms: 30 * 86400_000 }
+		{ id: '7d', label: t('7 Tage'), ms: 7 * 86400_000 },
+		{ id: '30d', label: t('30 Tage'), ms: 30 * 86400_000 }
 	] as const;
 	type RangeId = (typeof RANGES)[number]['id'];
 	let range = $state<RangeId>(loadPref<RangeId>('device.usageRange', '24h'));
@@ -116,7 +117,7 @@
 		asking = true;
 		try {
 			await api.post('/api/v1/agents/{id}/refresh', { path: { id: agent.id } });
-			toast.success('Inventar angefordert – kommt in wenigen Sekunden');
+			toast.success(t('Inventar angefordert – kommt in wenigen Sekunden'));
 		} catch (e) {
 			toast.error(e);
 		} finally {
@@ -126,11 +127,11 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<Card title="NetScope-Agent" icon="cpu" padding="md">
+	<Card title={t('NetScope-Agent')} icon="cpu" padding="md">
 		{#snippet actions()}
 			{#if auth.can('devices.scan')}
 				<Button size="sm" variant="ghost" icon="refresh" loading={asking} onclick={refresh}
-					>Inventar jetzt anfordern</Button
+					>{t('Inventar jetzt anfordern')}</Button
 				>
 			{/if}
 		{/snippet}
@@ -139,17 +140,17 @@
 				<dt class="text-xs text-fg-subtle">Status</dt>
 				<dd class="flex items-center gap-1.5 font-medium">
 					<StatusDot status={agent.online ? 'online' : 'offline'} pulse={false} />
-					{agent.online ? 'meldet sich' : 'keine Meldung'}
+					{agent.online ? t('meldet sich') : t('keine Meldung')}
 				</dd>
 			</div>
 			<div>
-				<dt class="text-xs text-fg-subtle">Letzter Kontakt</dt>
+				<dt class="text-xs text-fg-subtle">{t('Letzter Kontakt')}</dt>
 				<dd>
 					{#if agent.lastSeenAt}<RelativeTime value={agent.lastSeenAt} />{:else}–{/if}
 				</dd>
 			</div>
 			<div>
-				<dt class="text-xs text-fg-subtle">Letztes Inventar</dt>
+				<dt class="text-xs text-fg-subtle">{t('Letztes Inventar')}</dt>
 				<dd>
 					{#if agent.lastInventoryAt}<RelativeTime value={agent.lastInventoryAt} />{:else}–{/if}
 				</dd>
@@ -158,16 +159,16 @@
 				<dt class="text-xs text-fg-subtle">Version</dt>
 				<dd class="mono text-xs">
 					{agent.version || '–'}
-					{#if agent.outdated}<Badge tone="info">Update folgt</Badge>{/if}
+					{#if agent.outdated}<Badge tone="info">{t('Update folgt')}</Badge>{/if}
 				</dd>
 			</div>
 		</dl>
 		{#if agent.lastError}<p class="mt-2 text-xs text-warn">{agent.lastError}</p>{/if}
 	</Card>
 
-	<Card title="Auslastung" icon="activity" padding="md">
+	<Card title={t('Auslastung')} icon="activity" padding="md">
 		{#snippet actions()}
-			<div class="flex rounded-md border border-border p-0.5" role="group" aria-label="Zeitraum">
+			<div class="flex rounded-md border border-border p-0.5" role="group" aria-label={t('Zeitraum')}>
 				{#each RANGES as r (r.id)}
 					<button
 						type="button"
@@ -188,8 +189,8 @@
 			<EmptyState
 				compact
 				icon="activity"
-				title="Noch keine Messwerte"
-				description="Der Agent sendet seine Messungen gesammelt, standardmäßig alle 5 Minuten."
+				title={t('Noch keine Messwerte')}
+				description={t('Der Agent sendet seine Messungen gesammelt, standardmäßig alle 5 Minuten.')}
 			/>
 		{:else}
 			{@const u = data.data}
@@ -199,20 +200,20 @@
 					<dd class="font-medium tabular">{formatPercent(last(u.cpu), 0)}</dd>
 				</div>
 				<div>
-					<dt class="text-xs text-fg-subtle">Arbeitsspeicher</dt>
+					<dt class="text-xs text-fg-subtle">{t('Arbeitsspeicher')}</dt>
 					<dd class="font-medium tabular">{formatPercent(last(u.mem), 0)}</dd>
 				</div>
 				{#if u.load.length}
 					<!-- Windows has no load average -->
 					<div>
-						<dt class="text-xs text-fg-subtle">Last (1 min)</dt>
+						<dt class="text-xs text-fg-subtle">{t('Last (1 min)')}</dt>
 						<dd class="font-medium tabular">
 							{last(u.load) === null ? '–' : formatNumber(last(u.load) ?? 0, 2)}
 						</dd>
 					</div>
 				{/if}
 				<div>
-					<dt class="text-xs text-fg-subtle">Vollstes Dateisystem</dt>
+					<dt class="text-xs text-fg-subtle">{t('Vollstes Dateisystem')}</dt>
 					<dd class="font-medium tabular">
 						{#if u.disks.length}
 							{@const top = u.disks
@@ -242,10 +243,10 @@
 					/>
 				</div>
 				<div>
-					<h3 class="mb-1 text-xs font-medium text-fg-muted">Arbeitsspeicher</h3>
+					<h3 class="mb-1 text-xs font-medium text-fg-muted">{t('Arbeitsspeicher')}</h3>
 					<TimeSeriesChart
 						points={u.mem}
-						label="Arbeitsspeicher"
+						label={t('Arbeitsspeicher')}
 						format={(v) => formatPercent(v, 0)}
 						height={150}
 						yMax={100}
@@ -257,11 +258,11 @@
 				{#each u.disks as [mount, pts] (mount)}
 					<div>
 						<h3 class="mb-1 text-xs font-medium text-fg-muted">
-							Dateisystem <span class="mono">{mount}</span>
+							{t('Dateisystem')} <span class="mono">{mount}</span>
 						</h3>
 						<TimeSeriesChart
 							points={pts}
-							label="Belegung {mount}"
+							label={t('Belegung {mount}', { mount })}
 							format={(v) => formatPercent(v, 0)}
 							height={120}
 							yMax={100}
@@ -275,11 +276,11 @@
 				{#each u.net as [iface, rx, tx] (iface)}
 					<div>
 						<h3 class="mb-1 text-xs font-medium text-fg-muted">
-							Netz <span class="mono">{iface}</span> – empfangen
+							{t('Netz {iface} – empfangen', { iface })}
 						</h3>
 						<TimeSeriesChart
 							points={rx}
-							label="{iface} empfangen"
+							label={t('{iface} empfangen', { iface })}
 							format={rate}
 							height={120}
 							color="var(--chart-4)"
@@ -289,11 +290,11 @@
 					</div>
 					<div>
 						<h3 class="mb-1 text-xs font-medium text-fg-muted">
-							Netz <span class="mono">{iface}</span> – gesendet
+							{t('Netz {iface} – gesendet', { iface })}
 						</h3>
 						<TimeSeriesChart
 							points={tx}
-							label="{iface} gesendet"
+							label={t('{iface} gesendet', { iface })}
 							format={rate}
 							height={120}
 							color="var(--chart-1)"
@@ -304,10 +305,10 @@
 				{/each}
 				{#if u.load.length}
 					<div>
-						<h3 class="mb-1 text-xs font-medium text-fg-muted">Systemlast (1 min)</h3>
+						<h3 class="mb-1 text-xs font-medium text-fg-muted">{t('Systemlast (1 min)')}</h3>
 						<TimeSeriesChart
 							points={u.load}
-							label="Systemlast"
+							label={t('Systemlast')}
 							format={(v) => formatNumber(v, 2)}
 							height={120}
 							band={false}

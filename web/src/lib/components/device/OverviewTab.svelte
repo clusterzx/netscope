@@ -17,7 +17,8 @@
 	import { customFields } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatDateTime, formatNumber } from '$lib/utils/format';
+	import { formatDateTime, formatNumber, percentUnit } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
 	import { deviceTypeName, factKindLabel, relationKindLabel } from '$lib/utils/labels';
 	import CredentialsCard from './CredentialsCard.svelte';
 	import NotesCard from './NotesCard.svelte';
@@ -52,6 +53,12 @@
 	const filledDefs = $derived(
 		defs.map((def) => ({ def, v: formatCustom(d.custom?.[def.key], def.type) })).filter((x) => x.v)
 	);
+	const emptyFields = $derived(
+		defs
+			.filter((x) => !filledDefs.some((f) => f.def.id === x.id))
+			.map((x) => x.label)
+			.join(', ')
+	);
 
 	// parent/children from the relations (small request, shared shape with the Beziehungen tab)
 	const rel = new LazyData<Relation[]>();
@@ -80,7 +87,7 @@
 	async function addIp() {
 		const v = newIp.trim();
 		if (!v) {
-			ipError = 'IP-Adresse eingeben';
+			ipError = t('IP-Adresse eingeben');
 			return;
 		}
 		ipBusy = true;
@@ -90,7 +97,7 @@
 			onchanged(next);
 			newIp = '';
 			ipAdding = false;
-			toast.success(`${v} vergeben`);
+			toast.success(t('{ip} vergeben', { ip: v }));
 		} catch (e) {
 			ipError = fieldErrors(e).ip ?? errorMessage(e);
 		} finally {
@@ -100,21 +107,27 @@
 
 	async function removeIp(ip: string) {
 		const ok = await confirm({
-			title: `${ip} entfernen?`,
-			message:
-				'Die von Hand vergebene Adresse wird entfernt; Scanner prüfen sie danach nicht mehr für dieses Gerät.',
-			confirmLabel: 'Entfernen',
+			title: t('{ip} entfernen?', { ip }),
+			message: t(
+				'Die von Hand vergebene Adresse wird entfernt; Scanner prüfen sie danach nicht mehr für dieses Gerät.'
+			),
+			confirmLabel: t('Entfernen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			const next = await api.delete('/api/v1/devices/{id}/ips/{ip}', { path: { id: d.id, ip } });
 			onchanged(next);
-			toast.success(`${ip} entfernt`);
+			toast.success(t('{ip} entfernt', { ip }));
 		} catch (e) {
 			toast.error(e);
 		}
 	}
+
+	// the sentence links to the system page: split at the placeholder
+	const priorityText = t(
+		'Manuelle Werte haben immer Vorrang. Die Reihenfolge der übrigen Quellen für den Hostnamen lässt sich unter {system} einstellen.'
+	).split('{system}');
 
 	function factValue(kind: string, value: string): string {
 		return kind === 'type' ? deviceTypeName(value) : value;
@@ -134,24 +147,24 @@
 		<PingCharts deviceId={d.id} {version} {active} />
 
 		<Card
-			title="Eigenschaften nach Quelle"
-			description="Welche Quelle was meldet – markiert ist der verwendete Wert"
+			title={t('Eigenschaften nach Quelle')}
+			description={t('Welche Quelle was meldet – markiert ist der verwendete Wert')}
 			icon="layers"
 			padding="none"
 		>
 			{#if factGroups.length}
 				<div class="relative overflow-x-auto">
 					<table class="w-full border-separate border-spacing-0 text-sm">
-						<caption class="sr-only">Eigenschaften nach Quelle</caption>
+						<caption class="sr-only">{t('Eigenschaften nach Quelle')}</caption>
 						<thead>
 							<tr class="text-left text-xs text-fg-muted">
-								<th scope="col" class="border-b border-border px-4 py-2 font-semibold">Merkmal</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Wert</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Quelle</th>
+								<th scope="col" class="border-b border-border px-4 py-2 font-semibold">{t('Merkmal')}</th>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">{t('Wert')}</th>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">{t('Quelle')}</th>
 								<th
 									scope="col"
 									class="hidden border-b border-border px-3 py-2 font-semibold whitespace-nowrap sm:table-cell"
-									>Zuletzt gemeldet</th
+									>{t('Zuletzt gemeldet')}</th
 								>
 							</tr>
 						</thead>
@@ -174,13 +187,15 @@
 											<span class={used ? 'font-medium text-fg' : 'text-fg-muted'}
 												>{factValue(f.kind, f.value)}</span
 											>
-											{#if acc !== null}<span class="ml-1 text-xs text-fg-subtle">({acc} %)</span>{/if}
+											{#if acc !== null}<span class="ml-1 text-xs text-fg-subtle">({percentUnit(acc)})</span
+												>{/if}
 										</td>
 										<td class="border-b border-border px-3 py-1.5">
 											<span class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap">
 												{sourceName(f.source)}
 												{#if used}
-													<Badge tone="accent" title="Dieser Wert wird verwendet">verwendet</Badge>
+													<Badge tone="accent" title={t('Dieser Wert wird verwendet')}>{t('verwendet')}</Badge
+													>
 												{/if}
 											</span>
 										</td>
@@ -194,18 +209,24 @@
 					</table>
 				</div>
 				<p class="px-4 py-2 text-xs text-fg-subtle">
-					Manuelle Werte haben immer Vorrang. Die Reihenfolge der übrigen Quellen für den Hostnamen lässt sich
-					unter <a href="/system" class="link">System</a> einstellen.
+					{priorityText[0]}<a href="/system" class="link">System</a>{priorityText[1] ?? ''}
 				</p>
 			{:else}
-				<p class="px-4 py-3 text-sm text-fg-subtle">Noch keine Eigenschaften gemeldet.</p>
+				<p class="px-4 py-3 text-sm text-fg-subtle">{t('Noch keine Eigenschaften gemeldet.')}</p>
 			{/if}
 		</Card>
 
-		<Card title="IP-Adressen" icon="network" padding="none" description="Aktuelle und frühere Zuordnungen">
+		<Card
+			title={t('IP-Adressen')}
+			icon="network"
+			padding="none"
+			description={t('Aktuelle und frühere Zuordnungen')}
+		>
 			{#snippet actions()}
 				{#if canEditIPs && !ipAdding}
-					<Button size="sm" variant="ghost" icon="plus" onclick={() => (ipAdding = true)}>IP vergeben</Button>
+					<Button size="sm" variant="ghost" icon="plus" onclick={() => (ipAdding = true)}
+						>{t('IP vergeben')}</Button
+					>
 				{/if}
 			{/snippet}
 			{#if ipAdding}
@@ -218,43 +239,44 @@
 				>
 					<div class="flex flex-wrap items-start gap-2">
 						<Input
-							label="IP-Adresse"
+							label={t('IP-Adresse')}
 							bind:value={newIp}
-							placeholder="z. B. 192.168.1.20"
+							placeholder={t('z. B. {example}', { example: '192.168.1.20' })}
 							error={ipError}
 							mono
 							class="w-56"
 							autofocus
 						/>
 						<div class="flex gap-2 pt-6">
-							<Button type="submit" variant="primary" icon="plus" loading={ipBusy}>Vergeben</Button>
+							<Button type="submit" variant="primary" icon="plus" loading={ipBusy}>{t('Vergeben')}</Button>
 							<Button
 								onclick={() => {
 									ipAdding = false;
 									ipError = null;
 									newIp = '';
 								}}
-								disabled={ipBusy}>Abbrechen</Button
+								disabled={ipBusy}>{t('Abbrechen')}</Button
 							>
 						</div>
 					</div>
 					<p class="text-xs text-fg-subtle">
-						Für Geräte, deren Adresse kein Scanner findet – z. B. VMs ohne Gast-Agent. Ping, Ports und Dienste
-						werden danach auch für diese Adresse geprüft. Ist sie bisher einem Gerät zugeordnet, das nur über
-						diese IP bekannt ist, wird es mit diesem zusammengeführt.
+						{t(
+							'Für Geräte, deren Adresse kein Scanner findet – z. B. VMs ohne Gast-Agent. Ping, Ports und Dienste werden danach auch für diese Adresse geprüft. Ist sie bisher einem Gerät zugeordnet, das nur über diese IP bekannt ist, wird es mit diesem zusammengeführt.'
+						)}
 					</p>
 				</form>
 			{/if}
 			{#if d.ipHistory?.length}
 				<div class="relative overflow-x-auto">
 					<table class="w-full border-separate border-spacing-0 text-sm">
-						<caption class="sr-only">IP-Historie</caption>
+						<caption class="sr-only">{t('IP-Historie')}</caption>
 						<thead>
 							<tr class="text-left text-xs text-fg-muted">
 								<th scope="col" class="border-b border-border px-4 py-2 font-semibold">IP</th>
 								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">MAC</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Quelle</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Erstsichtung</th>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">{t('Quelle')}</th>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">{t('Erstsichtung')}</th
+								>
 								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Status</th>
 							</tr>
 						</thead>
@@ -272,20 +294,21 @@
 									</td>
 									<td class="border-b border-border px-3 py-1.5 whitespace-nowrap">
 										{#if ip.goneAt}
-											nicht mehr seit {formatDateTime(ip.goneAt)}
+											{t('nicht mehr seit {date}', { date: formatDateTime(ip.goneAt) })}
 										{:else}
 											<span class="inline-flex items-center gap-1.5">
 												<span aria-hidden="true" class="inline-flex"
 													><StatusDot status="ok" pulse={false} /></span
 												>
-												aktuell · gesehen <RelativeTime value={ip.lastSeen} />
+												{t('aktuell · gesehen')}
+												<RelativeTime value={ip.lastSeen} />
 											</span>
 											{#if ip.source === 'manual' && canEditIPs}
 												<Button
 													size="xs"
 													variant="ghost"
 													icon="trash"
-													label="{ip.ip} entfernen"
+													label={t('{ip} entfernen', { ip: ip.ip })}
 													class="ml-1"
 													onclick={() => removeIp(ip.ip)}
 												/>
@@ -298,22 +321,27 @@
 					</table>
 				</div>
 			{:else if !ipAdding}
-				<p class="px-4 py-3 text-sm text-fg-subtle">Keine IP-Adresse bekannt.</p>
+				<p class="px-4 py-3 text-sm text-fg-subtle">{t('Keine IP-Adresse bekannt.')}</p>
 			{/if}
 		</Card>
 
-		<Card title="MAC-Adressen" icon="link" padding="none">
+		<Card title={t('MAC-Adressen')} icon="link" padding="none">
 			{#if d.macList?.length}
 				<div class="relative overflow-x-auto">
 					<table class="w-full border-separate border-spacing-0 text-sm">
-						<caption class="sr-only">MAC-Adressen</caption>
+						<caption class="sr-only">{t('MAC-Adressen')}</caption>
 						<thead>
 							<tr class="text-left text-xs text-fg-muted">
 								<th scope="col" class="border-b border-border px-4 py-2 font-semibold">MAC</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Hersteller (OUI)</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Quelle</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Erstsichtung</th>
-								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">Zuletzt</th>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold"
+									>{t('Hersteller (OUI)')}</th
+								>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">{t('Quelle')}</th>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold">{t('Erstsichtung')}</th
+								>
+								<th scope="col" class="border-b border-border px-3 py-2 font-semibold"
+									>{t('Zuletzt gesehen')}</th
+								>
 							</tr>
 						</thead>
 						<tbody>
@@ -322,8 +350,10 @@
 									<td class="border-b border-border px-4 py-1.5 whitespace-nowrap">
 										<span class="mono">{m.mac}</span>
 										{#if m.randomized}
-											<Badge tone="warn" title="Lokal verwaltete, zufällige MAC (z. B. Privatsphäre-Modus)"
-												>zufällig</Badge
+											<Badge
+												tone="warn"
+												title={t('Lokal verwaltete, zufällige MAC (z. B. Privatsphäre-Modus)')}
+												>{t('zufällig')}</Badge
 											>
 										{/if}
 									</td>
@@ -341,7 +371,7 @@
 					</table>
 				</div>
 			{:else}
-				<p class="px-4 py-3 text-sm text-fg-subtle">Keine MAC-Adresse bekannt.</p>
+				<p class="px-4 py-3 text-sm text-fg-subtle">{t('Keine MAC-Adresse bekannt.')}</p>
 			{/if}
 		</Card>
 	</div>
@@ -353,7 +383,7 @@
 			<Card title="Custom Fields" icon="tag" padding="md">
 				{#snippet actions()}
 					{#if canEdit}
-						<Button size="xs" variant="ghost" icon="edit" onclick={onedit}>Bearbeiten</Button>
+						<Button size="xs" variant="ghost" icon="edit" onclick={onedit}>{t('Bearbeiten')}</Button>
 					{/if}
 				{/snippet}
 				{#if filledDefs.length}
@@ -374,17 +404,20 @@
 				{/if}
 				{#if filledDefs.length < defs.length}
 					<p class="text-xs text-fg-subtle {filledDefs.length ? 'mt-2.5' : ''}">
-						{filledDefs.length ? 'Ohne Wert' : 'Noch keine Werte'}:
-						{defs
-							.filter((x) => !filledDefs.some((f) => f.def.id === x.id))
-							.map((x) => x.label)
-							.join(', ')}
+						{filledDefs.length
+							? t('Ohne Wert: {fields}', { fields: emptyFields })
+							: t('Noch keine Werte: {fields}', { fields: emptyFields })}
 					</p>
 				{/if}
 			</Card>
 		{/if}
 
-		<Card title="Anwesenheit je Plugin" icon="radar" padding="none" description="Verpasste Läufe in Folge">
+		<Card
+			title={t('Anwesenheit je Plugin')}
+			icon="radar"
+			padding="none"
+			description={t('Verpasste Läufe in Folge')}
+		>
 			{#if d.presence?.length}
 				<ul class="divide-y divide-border">
 					{#each d.presence as p (p.plugin)}
@@ -394,8 +427,8 @@
 							</span>
 							<span class="min-w-0 flex-1 truncate">{sourceName(p.plugin)}</span>
 							{#if p.missed > 0}
-								<Badge tone="warn" title="Läufe ohne Antwort seit der letzten Sichtung">
-									{formatNumber(p.missed)}× verpasst
+								<Badge tone="warn" title={t('Läufe ohne Antwort seit der letzten Sichtung')}>
+									{t('{n}× verpasst', { n: formatNumber(p.missed) })}
 								</Badge>
 							{/if}
 							<RelativeTime value={p.lastSeen} class="text-xs text-fg-subtle" />
@@ -403,22 +436,26 @@
 					{/each}
 				</ul>
 			{:else}
-				<p class="px-4 py-3 text-sm text-fg-subtle">Noch von keinem Scanner gesehen.</p>
+				<p class="px-4 py-3 text-sm text-fg-subtle">{t('Noch von keinem Scanner gesehen.')}</p>
 			{/if}
 		</Card>
 
-		<Card title="Eltern & Kinder" icon="topology" padding="none">
+		<Card title={t('Eltern & Kinder')} icon="topology" padding="none">
 			{#snippet actions()}
 				{#if (rel.data?.length ?? 0) > 0}
-					<Button size="xs" variant="ghost" iconRight="arrow-right" onclick={onshowrelations}>Alle</Button>
+					<Button size="xs" variant="ghost" iconRight="arrow-right" onclick={onshowrelations}
+						>{t('Alle')}</Button
+					>
 				{/if}
 			{/snippet}
 			{#if !rel.data}
-				<p class="px-4 py-3 text-sm text-fg-subtle">{rel.error ? 'Nicht verfügbar' : 'Wird geladen …'}</p>
+				<p class="px-4 py-3 text-sm text-fg-subtle">
+					{rel.error ? t('Nicht verfügbar') : t('Wird geladen …')}
+				</p>
 			{:else if !parents.length && !children.length}
-				<p class="px-4 py-3 text-sm text-fg-subtle">Keine Beziehungen bekannt.</p>
+				<p class="px-4 py-3 text-sm text-fg-subtle">{t('Keine Beziehungen bekannt.')}</p>
 			{:else}
-				{#each [{ label: 'Eltern', list: parents, parent: true }, { label: 'Kinder', list: children, parent: false }] as grp (grp.label)}
+				{#each [{ label: t('Eltern'), list: parents, parent: true }, { label: t('Kinder'), list: children, parent: false }] as grp (grp.label)}
 					{#if grp.list.length}
 						<h3 class="px-4 pt-2.5 text-[0.7rem] font-semibold tracking-wider text-fg-subtle uppercase">
 							{grp.label} ({grp.list.length})
@@ -437,7 +474,7 @@
 							{#if grp.list.length > 6}
 								<li class="px-4 py-1">
 									<button type="button" class="text-xs text-accent hover:underline" onclick={onshowrelations}>
-										+ {grp.list.length - 6} weitere
+										{t('+ {n} weitere', { n: grp.list.length - 6 })}
 									</button>
 								</li>
 							{/if}
@@ -453,7 +490,7 @@
 		{/if}
 
 		{#if d.refs?.length}
-			<Card title="Externe Referenzen" icon="external" padding="none">
+			<Card title={t('Externe Referenzen')} icon="external" padding="none">
 				<ul class="divide-y divide-border">
 					{#each d.refs as r (r.source + r.ref)}
 						<li class="px-4 py-2 text-sm">
@@ -464,7 +501,7 @@
 							</div>
 							{#if r.data && typeof r.data === 'object' && Object.keys(r.data).length}
 								<details class="mt-1">
-									<summary class="cursor-pointer text-xs text-fg-subtle hover:text-fg">Daten</summary>
+									<summary class="cursor-pointer text-xs text-fg-subtle hover:text-fg">{t('Daten')}</summary>
 									<JsonView value={r.data} openDepth={1} maxHeight="16rem" class="mt-1" />
 								</details>
 							{/if}

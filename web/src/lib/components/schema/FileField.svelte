@@ -3,6 +3,7 @@
 	import { api, errorMessage } from '$lib/api/client';
 	import Button from '$lib/components/ui/Button.svelte';
 	import FormField from '$lib/components/ui/FormField.svelte';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { formatBytes } from '$lib/utils/format';
 
@@ -31,7 +32,7 @@
 		try {
 			const res = await api.upload(f);
 			value = res.path;
-			info = `${res.name} (${formatBytes(res.size)}) hochgeladen`;
+			info = t('{name} ({size}) hochgeladen', { name: res.name, size: formatBytes(res.size) });
 		} catch (err) {
 			uploadError = errorMessage(err);
 		} finally {
@@ -49,7 +50,7 @@
 				bind:value
 				{disabled}
 				aria-describedby={describedby}
-				placeholder="Pfad auf dem Server oder Datei hochladen"
+				placeholder={t('Pfad auf dem Server oder Datei hochladen')}
 				class="mono h-8.5 min-w-0 flex-1 rounded-md border bg-surface px-2.5 text-sm text-fg shadow-sm placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-focus focus:outline-none
 					{error || uploadError ? 'border-danger' : 'border-border'}"
 			/>
@@ -63,7 +64,7 @@
 					aria-hidden="true"
 				/>
 				<Button icon="upload" loading={busy} {disabled} onclick={() => fileInput?.click()}
-					>Datei hochladen</Button
+					>{t('Datei hochladen')}</Button
 				>
 			{/if}
 		</div>

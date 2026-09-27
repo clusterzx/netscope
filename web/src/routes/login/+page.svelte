@@ -9,6 +9,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Alert from '$lib/components/ui/Alert.svelte';
 	import { auth, type MfaStep } from '$lib/stores/auth.svelte';
+	import { applyPreference, t } from '$lib/i18n';
 	import { theme } from '$lib/stores/theme.svelte';
 	import { passkeysSupported } from '$lib/utils/webauthn';
 
@@ -33,7 +34,11 @@
 	const methods = $derived(
 		(mfa?.methods ?? []).filter((m) => m !== 'passkey' || canPasskey) as ('totp' | 'passkey' | 'recovery')[]
 	);
-	const methodLabel = { totp: 'Code aus der App', passkey: 'Passkey', recovery: 'Wiederherstellungscode' };
+	const methodLabel = {
+		totp: t('Code aus der App'),
+		passkey: 'Passkey',
+		recovery: t('Wiederherstellungscode')
+	};
 
 	/** only local paths are accepted as redirect target */
 	function target(): string {
@@ -62,7 +67,10 @@
 
 	/** after the login: finish a pending setup first */
 	async function proceed() {
-		await goto(auth.restricted ? '/setup' : target(), { replaceState: true });
+		const next = auth.restricted ? '/setup' : target();
+		// the user's language preference may differ from the browser language of this page
+		if (applyPreference(auth.me?.user?.locale)) window.location.assign(next);
+		else await goto(next, { replaceState: true });
 	}
 
 	function useMethod(m: 'totp' | 'passkey' | 'recovery') {
@@ -86,8 +94,8 @@
 		if (method !== 'passkey' && !code.trim()) {
 			error =
 				method === 'totp'
-					? 'Den 6-stelligen Code aus der App eingeben'
-					: 'Einen Wiederherstellungscode eingeben';
+					? t('Den 6-stelligen Code aus der App eingeben')
+					: t('Einen Wiederherstellungscode eingeben');
 			return;
 		}
 		busy = true;
@@ -112,7 +120,7 @@
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		if (!username.trim() || !password) {
-			error = 'Benutzername und Passwort eingeben';
+			error = t('Benutzername und Passwort eingeben');
 			return;
 		}
 		busy = true;
@@ -129,7 +137,7 @@
 		} catch (err) {
 			error =
 				err instanceof ApiError && err.status === 401
-					? 'Benutzername oder Passwort falsch'
+					? t('Benutzername oder Passwort falsch')
 					: errorMessage(err);
 			password = '';
 			pwInput?.focus();
@@ -140,7 +148,7 @@
 </script>
 
 <svelte:head>
-	<title>Anmelden · NetScope</title>
+	<title>{t('Anmelden')} · NetScope</title>
 </svelte:head>
 
 <div class="relative flex min-h-dvh items-center justify-center overflow-hidden bg-bg px-4 py-10">
@@ -164,7 +172,7 @@
 			<img src="/favicon.svg" alt="" width="52" height="52" class="rounded-xl shadow-md" />
 			<div>
 				<h1 class="text-2xl font-semibold tracking-tight text-fg">NetScope</h1>
-				<p class="mt-1 text-sm text-fg-muted">Netzwerk-Inventar &amp; Asset-Monitoring</p>
+				<p class="mt-1 text-sm text-fg-muted">{t('Netzwerk-Inventar & Asset-Monitoring')}</p>
 			</div>
 		</div>
 
@@ -172,13 +180,15 @@
 			<form onsubmit={second} class="rounded-xl border border-border bg-surface p-6 shadow-md" novalidate>
 				<div class="flex flex-col gap-4">
 					<div>
-						<h2 class="text-base font-semibold text-fg">Zweiter Faktor</h2>
+						<h2 class="text-base font-semibold text-fg">{t('Zweiter Faktor')}</h2>
 						<p class="mt-0.5 text-sm text-fg-muted">
 							{method === 'totp'
-								? 'Den aktuellen Code aus deiner Authenticator-App eingeben.'
+								? t('Den aktuellen Code aus deiner Authenticator-App eingeben.')
 								: method === 'passkey'
-									? 'Mit deinem Passkey bestätigen (Fingerabdruck, Gesicht, PIN oder Sicherheitsschlüssel).'
-									: 'Einen deiner Wiederherstellungscodes eingeben – jeder gilt nur einmal.'}
+									? t(
+											'Mit deinem Passkey bestätigen (Fingerabdruck, Gesicht, PIN oder Sicherheitsschlüssel).'
+										)
+									: t('Einen deiner Wiederherstellungscodes eingeben – jeder gilt nur einmal.')}
 						</p>
 					</div>
 					{#if error}
@@ -186,7 +196,7 @@
 					{/if}
 					{#if method === 'passkey'}
 						<Button type="submit" variant="primary" icon="key" full loading={busy}
-							>Mit Passkey bestätigen</Button
+							>{t('Mit Passkey bestätigen')}</Button
 						>
 					{:else}
 						<Input
@@ -201,13 +211,15 @@
 							mono
 							required
 						/>
-						<Button type="submit" variant="primary" full loading={busy}>Bestätigen</Button>
+						<Button type="submit" variant="primary" full loading={busy}>{t('Bestätigen')}</Button>
 					{/if}
 					{#if methods.length > 1}
 						<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs">
 							{#each methods.filter((m) => m !== method) as m (m)}
 								<button type="button" class="text-accent hover:underline" onclick={() => useMethod(m)}>
-									{m === 'recovery' ? 'Wiederherstellungscode verwenden' : 'Stattdessen: ' + methodLabel[m]}
+									{m === 'recovery'
+										? t('Wiederherstellungscode verwenden')
+										: t('Stattdessen: {method}', { method: methodLabel[m] })}
 								</button>
 							{/each}
 						</div>
@@ -217,7 +229,7 @@
 						class="self-start text-xs text-fg-subtle hover:text-fg hover:underline"
 						onclick={() => restart()}
 					>
-						Zurück zur Anmeldung
+						{t('Zurück zur Anmeldung')}
 					</button>
 				</div>
 			</form>
@@ -228,7 +240,7 @@
 						<Alert tone="danger">{error}</Alert>
 					{/if}
 					<Input
-						label="Benutzername"
+						label={t('Benutzername')}
 						bind:value={username}
 						bind:ref={userInput}
 						autocomplete="username"
@@ -237,17 +249,18 @@
 						required
 					/>
 					<Input
-						label="Passwort"
+						label={t('Passwort')}
 						type="password"
 						bind:value={password}
 						bind:ref={pwInput}
 						autocomplete="current-password"
 						required
 					/>
-					<Button type="submit" variant="primary" full loading={busy}>Anmelden</Button>
+					<Button type="submit" variant="primary" full loading={busy}>{t('Anmelden')}</Button>
 					{#if providers?.oidc}
 						<div class="flex items-center gap-3 text-xs text-fg-subtle" aria-hidden="true">
-							<span class="h-px flex-1 bg-border"></span>oder<span class="h-px flex-1 bg-border"></span>
+							<span class="h-px flex-1 bg-border"></span>{t('oder')}<span class="h-px flex-1 bg-border"
+							></span>
 						</div>
 						<!-- a full page load: the server redirects to the identity provider -->
 						<a
@@ -255,25 +268,27 @@
 							data-sveltekit-reload
 							class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium text-fg shadow-sm transition-colors hover:border-border-strong hover:bg-surface-2"
 						>
-							<Icon name="key" size={15} />Anmelden mit {providers.oidcName || 'Single Sign-on'}
+							<Icon name="key" size={15} />{t('Anmelden mit {provider}', {
+								provider: providers.oidcName || 'Single Sign-on'
+							})}
 						</a>
 					{/if}
 					{#if providers?.ldap}
 						<p class="text-center text-xs text-fg-subtle">
-							Auch mit dem Konto aus dem Verzeichnis (LDAP / Active Directory).
+							{t('Auch mit dem Konto aus dem Verzeichnis (LDAP / Active Directory).')}
 						</p>
 					{/if}
 				</div>
 			</form>
 		{/if}
 		<p class="mt-5 text-center text-xs text-fg-subtle">
-			Darstellung:
+			{t('Darstellung:')}
 			<button
 				type="button"
 				class="underline-offset-2 hover:text-fg hover:underline"
 				onclick={() => theme.cycle()}
 			>
-				{theme.mode === 'system' ? 'System' : theme.mode === 'dark' ? 'Dunkel' : 'Hell'}
+				{theme.mode === 'system' ? 'System' : theme.mode === 'dark' ? t('Dunkel') : t('Hell')}
 			</button>
 		</p>
 	</div>

@@ -14,6 +14,7 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
+	import { t } from '$lib/i18n';
 	import { formatDateTime } from '$lib/utils/format';
 	import { httpStatusTone, LazyData, portStateLabel, sourceName } from './util';
 
@@ -90,13 +91,13 @@
 		{ key: 'port', label: 'Port', sortable: true, width: '6.5rem', cell: portCell },
 		...(multiIp ? [{ key: 'ip', label: 'IP', sortable: true, cell: ipCell } as Column<PortView>] : []),
 		{ key: 'state', label: 'Status', cell: stateCell },
-		{ key: 'service', label: 'Dienst', sortable: true, cell: serviceCell },
-		{ key: 'product', label: 'Produkt / Version', sortable: true, cell: productCell },
+		{ key: 'service', label: t('Dienst'), sortable: true, cell: serviceCell },
+		{ key: 'product', label: t('Produkt / Version'), sortable: true, cell: productCell },
 		{ key: 'cpes', label: 'CPE', hideBelow: 'lg', cell: cpeCell },
-		{ key: 'source', label: 'Quelle', hideBelow: 'md', value: (p) => sourceName(p.source) },
+		{ key: 'source', label: t('Quelle'), hideBelow: 'md', value: (p) => sourceName(p.source) },
 		{
 			key: 'firstSeen',
-			label: history ? 'Erstsichtung / weg' : 'Erstsichtung',
+			label: history ? t('Erstsichtung / weg') : t('Erstsichtung'),
 			sortable: true,
 			sortDesc: true,
 			hideBelow: 'sm',
@@ -117,7 +118,7 @@
 {#snippet ipCell(p: PortView)}<span class="mono text-fg-muted">{p.ip}</span>{/snippet}
 {#snippet stateCell(p: PortView)}
 	{#if p.goneAt}
-		<Badge tone="neutral">geschlossen</Badge>
+		<Badge tone="neutral">{t('geschlossen')}</Badge>
 	{:else}
 		<Badge tone={stateTone(p)}>{portStateLabel[p.state] ?? p.state}</Badge>
 	{/if}
@@ -141,19 +142,21 @@
 	{:else}<span class="text-fg-subtle">–</span>{/if}
 {/snippet}
 {#snippet seenCell(p: PortView)}
-	<span class="whitespace-nowrap text-fg-muted" title="Zuletzt gesehen {formatDateTime(p.lastSeen)}"
+	<span
+		class="whitespace-nowrap text-fg-muted"
+		title={t('Zuletzt gesehen {time}', { time: formatDateTime(p.lastSeen) })}
 		>{formatDateTime(p.firstSeen)}</span
 	>
 	{#if p.goneAt}<span class="block text-xs whitespace-nowrap text-danger"
-			>weg seit {formatDateTime(p.goneAt)}</span
+			>{t('weg seit {time}', { time: formatDateTime(p.goneAt) })}</span
 		>{/if}
 {/snippet}
 
 <div class="flex flex-col gap-4">
 	<section aria-labelledby="ports-h" class="flex flex-col gap-2">
 		<div class="flex flex-wrap items-center gap-3">
-			<h2 id="ports-h" class="flex-1 text-sm font-semibold">Ports & Dienste</h2>
-			<Toggle bind:checked={history} label="Geschlossene Ports anzeigen" size="sm" />
+			<h2 id="ports-h" class="flex-1 text-sm font-semibold">{t('Ports & Dienste')}</h2>
+			<Toggle bind:checked={history} label={t('Geschlossene Ports anzeigen')} size="sm" />
 		</div>
 		{#if ports.error && !ports.data}
 			<ErrorState error={ports.error} onretry={() => ports.reload()} />
@@ -166,15 +169,15 @@
 				onsort={(s) => (sort = s)}
 				loading={ports.loading}
 				dense
-				caption="Ports und Dienste"
+				caption={t('Ports und Dienste')}
 				rowClass={(p) => (p.goneAt ? 'opacity-70' : '')}
 			>
 				{#snippet empty()}
 					<EmptyState
 						compact
 						icon="network"
-						title={history ? 'Keine Ports bekannt' : 'Keine offenen Ports'}
-						description="Offene Ports ermittelt der Nmap-Scanner (Scan jetzt → Nmap)."
+						title={history ? t('Keine Ports bekannt') : t('Keine offenen Ports')}
+						description={t('Offene Ports ermittelt der Nmap-Scanner (Scan jetzt → Nmap).')}
 					/>
 				{/snippet}
 			</Table>
@@ -182,7 +185,7 @@
 	</section>
 
 	<section aria-labelledby="web-h" class="flex flex-col gap-2">
-		<h2 id="web-h" class="text-sm font-semibold">Web-Endpunkte</h2>
+		<h2 id="web-h" class="text-sm font-semibold">{t('Web-Endpunkte')}</h2>
 		{#if http.error && !http.data}
 			<ErrorState error={http.error} onretry={() => http.reload()} />
 		{:else if !http.data}
@@ -192,8 +195,10 @@
 				<EmptyState
 					compact
 					icon="globe"
-					title="Keine HTTP-Endpunkte"
-					description="Der HTTP-Scanner prüft alle offenen Web-Ports auf Titel, Server und bekannte Web-Apps."
+					title={t('Keine HTTP-Endpunkte')}
+					description={t(
+						'Der HTTP-Scanner prüft alle offenen Web-Ports auf Titel, Server und bekannte Web-Apps.'
+					)}
 				/>
 			</div>
 		{:else}
@@ -202,13 +207,15 @@
 					<Card padding="sm">
 						{#snippet header()}
 							<div class="flex min-w-0 flex-1 items-center gap-2">
-								<Badge tone={httpStatusTone(h.statusCode)} title="HTTP-Status">{h.statusCode || '–'}</Badge>
+								<Badge tone={httpStatusTone(h.statusCode)} title={t('HTTP-Status')}
+									>{h.statusCode || '–'}</Badge
+								>
 								<a
 									href={h.url}
 									target="_blank"
 									rel="noopener noreferrer"
 									class="link mono min-w-0 truncate text-sm"
-									title="{h.url} (öffnet in neuem Tab)"
+									title={t('{url} (öffnet in neuem Tab)', { url: h.url })}
 								>
 									{h.url}
 								</a>
@@ -218,13 +225,17 @@
 						<div class="flex flex-col gap-2 text-sm">
 							{#if h.title}<p class="font-medium break-words">{h.title}</p>{/if}
 							{#if h.apps?.length}
-								<div class="flex flex-wrap gap-1.5" aria-label="Erkannte Web-Apps">
+								<div class="flex flex-wrap gap-1.5" aria-label={t('Erkannte Web-Apps')}>
 									{#each h.apps as app (app.name)}
 										<Badge
 											tone="accent"
-											title="Konfidenz: {app.confidence}{app.evidence
-												? ` · Hinweis: ${app.evidence}`
-												: ''}{app.cpe ? ` · ${app.cpe}` : ''}"
+											title={[
+												t('Konfidenz: {confidence}', { confidence: app.confidence }),
+												app.evidence ? t('Hinweis: {evidence}', { evidence: app.evidence }) : '',
+												app.cpe ?? ''
+											]
+												.filter(Boolean)
+												.join(' · ')}
 										>
 											{app.name}{#if app.version}&nbsp;<span class="mono">{app.version}</span>{/if}
 										</Badge>
@@ -237,7 +248,7 @@
 									<dd class="mono break-all">{h.server}</dd>
 								{/if}
 								{#if h.redirects?.length || (h.finalUrl && h.finalUrl !== h.url)}
-									<dt class="text-fg-subtle">Weiterleitung</dt>
+									<dt class="text-fg-subtle">{t('Weiterleitung')}</dt>
 									<dd class="mono break-all">
 										{[...(h.redirects ?? []), h.finalUrl].filter(Boolean).join(' → ')}
 									</dd>
@@ -254,15 +265,16 @@
 											>{/if}
 									</dd>
 								{/if}
-								<dt class="text-fg-subtle">Gesehen</dt>
+								<dt class="text-fg-subtle">{t('Gesehen')}</dt>
 								<dd>
-									seit {formatDateTime(h.firstSeen)} · zuletzt <RelativeTime value={h.lastSeen} />
+									{t('seit {time}', { time: formatDateTime(h.firstSeen) })} · {t('zuletzt')}
+									<RelativeTime value={h.lastSeen} />
 								</dd>
 							</dl>
 							{#if h.headers && Object.keys(h.headers).length}
 								<details>
 									<summary class="cursor-pointer text-xs text-fg-subtle hover:text-fg">
-										Antwort-Header ({Object.keys(h.headers).length})
+										{t('Antwort-Header ({n})', { n: Object.keys(h.headers).length })}
 									</summary>
 									<dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
 										{#each Object.entries(h.headers) as [k, v] (k)}

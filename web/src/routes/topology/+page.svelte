@@ -21,6 +21,7 @@
 		Spinner,
 		Toggle
 	} from '$lib/components/ui';
+	import { intlLocale, t, tn } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { subnets, tags } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
@@ -28,7 +29,7 @@
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatNumber, plural } from '$lib/utils/format';
+	import { formatNumber } from '$lib/utils/format';
 	import { deviceTypeName, label, relationKindLabel } from '$lib/utils/labels';
 	import { debounce, loadPref, savePref, setParams } from '$lib/utils/url';
 
@@ -141,7 +142,7 @@
 		[...nodes].sort(
 			(a, b) =>
 				Number(a.kind === 'container') - Number(b.kind === 'container') ||
-				a.label.localeCompare(b.label, 'de', { numeric: true })
+				a.label.localeCompare(b.label, intlLocale, { numeric: true })
 		)
 	);
 	const presentKinds = $derived([...new Set(edges.map((e) => e.kind))]);
@@ -283,7 +284,7 @@
 	function pickEndpoint(n: GraphNode) {
 		if (!connect) return;
 		if (!n.deviceId) {
-			toast.warning('Container können nicht manuell verbunden werden – bitte ein Gerät wählen.');
+			toast.warning(t('Container können nicht manuell verbunden werden – bitte ein Gerät wählen.'));
 			return;
 		}
 		if (!connect.from) {
@@ -310,15 +311,19 @@
 		const from = nodesById.get(e.source)?.label ?? e.source;
 		const to = nodesById.get(e.target)?.label ?? e.target;
 		const ok = await confirm({
-			title: 'Verbindung löschen?',
-			message: `Die manuelle Verbindung „${from} → ${to}“ (${label(relationKindLabel, e.kind)}) wird entfernt.`,
-			confirmLabel: 'Löschen',
+			title: t('Verbindung löschen?'),
+			message: t('Die manuelle Verbindung „{from} → {to}“ ({kind}) wird entfernt.', {
+				from,
+				to,
+				kind: label(relationKindLabel, e.kind)
+			}),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/topology/edges/{id}', { path: { id: e.relationId } });
-			toast.success('Verbindung gelöscht');
+			toast.success(t('Verbindung gelöscht'));
 			if (selectedEdge === e.id) selectedEdge = null;
 			await data.reload();
 		} catch (err) {
@@ -340,8 +345,16 @@
 	}
 
 	const graphLabel = $derived(
-		`Topologie-Graph mit ${plural(deviceNodes.length, 'Gerät', 'Geräten')} und ${plural(edges.length, 'Verbindung', 'Verbindungen')}. Pfeiltasten verschieben, Plus/Minus zoomen, 0 zeigt alles.`
+		t(
+			'Topologie-Graph mit {devices} und {connections}. Pfeiltasten verschieben, Plus/Minus zoomen, 0 zeigt alles.',
+			{
+				devices: tn(deviceNodes.length, '{n} Gerät', '{n} Geräten'),
+				connections: tn(edges.length, '{n} Verbindung', '{n} Verbindungen')
+			}
+		)
 	);
+	// "Von <device> – jetzt das zweite Gerät wählen": the device name is set in bold
+	const [connectBefore, connectAfter] = t('Von {device} – jetzt das zweite Gerät wählen').split('{device}');
 	// legend: open by default on large screens only; the choice is remembered once toggled
 	let legendOpen = $state(
 		loadPref<boolean | null>('topology.legend', null) ?? window.matchMedia('(min-width: 1024px)').matches
@@ -362,16 +375,16 @@
 <svelte:window onkeydown={onWindowKey} />
 
 <PageHeader
-	title="Topologie"
-	description="Verbindungen zwischen den Geräten – automatisch erkannt oder manuell gepflegt"
+	title={t('Topologie')}
+	description={t('Verbindungen zwischen den Geräten – automatisch erkannt oder manuell gepflegt')}
 >
 	{#snippet meta()}
 		{#if data.data}
-			<span>{plural(deviceNodes.length, 'Gerät', 'Geräte')}</span>
+			<span>{tn(deviceNodes.length, '{n} Gerät', '{n} Geräte')}</span>
 			{#if containerCount}<span class="text-fg-subtle">·</span>
-				<span>{plural(containerCount, 'Container', 'Container')}</span>{/if}
+				<span>{tn(containerCount, '1 Container', '{n} Container')}</span>{/if}
 			<span class="text-fg-subtle">·</span>
-			<span>{plural(edges.length, 'Verbindung', 'Verbindungen')}</span>
+			<span>{tn(edges.length, '{n} Verbindung', '{n} Verbindungen')}</span>
 		{/if}
 	{/snippet}
 	{#snippet actions()}
@@ -382,12 +395,12 @@
 				onclick={() => (connect ? (connect = null) : startConnect(selected))}
 				disabled={deviceNodes.length < 2}
 			>
-				{connect ? 'Abbrechen' : 'Verbindung anlegen'}
+				{connect ? t('Abbrechen') : t('Verbindung anlegen')}
 			</Button>
 		{/if}
 		<Button
 			icon="refresh"
-			label="Aktualisieren"
+			label={t('Aktualisieren')}
 			loading={data.loading && !!data.data}
 			onclick={() => data.reload()}
 		/>
@@ -403,9 +416,9 @@
 	/>
 	<div class="flex flex-wrap items-center gap-2">
 		<Select
-			aria-label="Subnetz"
+			aria-label={t('Subnetz')}
 			options={subnetOptions}
-			placeholder="Alle Subnetze"
+			placeholder={t('Alle Subnetze')}
 			value={subnet}
 			onchange={(e) => setParams({ subnet: e.currentTarget.value || null })}
 			class="w-44"
@@ -413,7 +426,7 @@
 		<Select
 			aria-label="Tag"
 			options={tagOptions}
-			placeholder="Alle Tags"
+			placeholder={t('Alle Tags')}
 			value={tag}
 			onchange={(e) => setParams({ tag: e.currentTarget.value || null })}
 			class="w-40"
@@ -425,7 +438,7 @@
 			onchange={(v) => setParams({ containers: v ? '1' : null })}
 		/>
 		<Toggle
-			label="Ignorierte"
+			label={t('Ignorierte')}
 			size="sm"
 			checked={ignored}
 			onchange={(v) => setParams({ ignored: v ? '1' : null })}
@@ -439,7 +452,7 @@
 	<div class="grid grid-cols-1 gap-3 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
 		<aside
 			class="order-2 flex max-h-72 min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-sm lg:order-1 lg:h-[calc(100dvh-14.5rem)] lg:max-h-none lg:min-h-[26rem]"
-			aria-label="Geräteliste der Topologie"
+			aria-label={t('Geräteliste der Topologie')}
 		>
 			<NodeList
 				nodes={listNodes}
@@ -481,29 +494,35 @@
 			<div
 				class="absolute top-2 left-2 flex flex-col gap-0.5 rounded-lg border border-border bg-surface/95 p-0.5 shadow-md backdrop-blur-sm"
 				role="toolbar"
-				aria-label="Ansicht"
+				aria-label={t('Ansicht')}
 				aria-orientation="vertical"
 			>
-				<Button variant="ghost" size="sm" icon="zoom-in" label="Vergrößern" onclick={() => view?.zoomIn()} />
+				<Button
+					variant="ghost"
+					size="sm"
+					icon="zoom-in"
+					label={t('Vergrößern')}
+					onclick={() => view?.zoomIn()}
+				/>
 				<Button
 					variant="ghost"
 					size="sm"
 					icon="zoom-out"
-					label="Verkleinern"
+					label={t('Verkleinern')}
 					onclick={() => view?.zoomOut()}
 				/>
 				<Button
 					variant="ghost"
 					size="sm"
 					icon="maximize"
-					label="Alles anzeigen"
+					label={t('Alles anzeigen')}
 					onclick={() => view?.fit()}
 				/>
 				<Button
 					variant="ghost"
 					size="sm"
 					icon="refresh"
-					label="Layout neu berechnen"
+					label={t('Layout neu berechnen')}
 					onclick={() => view?.relayout()}
 				/>
 				<span class="mx-1 my-0.5 h-px bg-border" aria-hidden="true"></span>
@@ -511,7 +530,7 @@
 					variant="ghost"
 					size="sm"
 					icon="topology"
-					label="Anordnung: frei (Kräfte, Knoten lassen sich fixieren)"
+					label={t('Anordnung: frei (Kräfte, Knoten lassen sich fixieren)')}
 					active={layout === 'force'}
 					aria-pressed={layout === 'force'}
 					onclick={() => setLayout('force')}
@@ -520,7 +539,7 @@
 					variant="ghost"
 					size="sm"
 					icon="radar"
-					label="Anordnung: Kreise (Kinder rund um ihr Gerät, Container rund um ihren Host)"
+					label={t('Anordnung: Kreise (Kinder rund um ihr Gerät, Container rund um ihren Host)')}
 					active={layout === 'radial'}
 					aria-pressed={layout === 'radial'}
 					onclick={() => setLayout('radial')}
@@ -530,7 +549,7 @@
 						variant="ghost"
 						size="sm"
 						icon="pin"
-						label="Alle Fixierungen lösen"
+						label={t('Alle Fixierungen lösen')}
 						onclick={() => view?.unpinAll()}
 					/>
 				{/if}
@@ -543,57 +562,59 @@
 				>
 					<span class="min-w-0 flex-1">
 						{#if connect.from}
-							<span class="text-fg-muted">Von</span>
-							<strong class="font-medium">{nodesById.get(connect.from)?.label}</strong> –
-							<span class="text-fg-muted">jetzt das zweite Gerät wählen</span>
+							<span class="text-fg-muted">{connectBefore}</span><strong class="font-medium"
+								>{nodesById.get(connect.from)?.label}</strong
+							><span class="text-fg-muted">{connectAfter}</span>
 						{:else}
-							<span class="text-fg-muted">Erstes Gerät im Graph oder in der Liste wählen</span>
+							<span class="text-fg-muted">{t('Erstes Gerät im Graph oder in der Liste wählen')}</span>
 						{/if}
 					</span>
-					<Button size="xs" variant="ghost" onclick={openEdgeDialog}>Formular</Button>
-					<Button size="xs" onclick={() => (connect = null)}>Abbrechen</Button>
+					<Button size="xs" variant="ghost" onclick={openEdgeDialog}>{t('Formular')}</Button>
+					<Button size="xs" onclick={() => (connect = null)}>{t('Abbrechen')}</Button>
 				</div>
 			{/if}
 
 			{#if data.loading && !data.data}
 				<div class="absolute inset-0 flex items-center justify-center gap-2 text-sm text-fg-muted">
-					<Spinner /> Topologie wird geladen …
+					<Spinner />
+					{t('Topologie wird geladen …')}
 				</div>
 			{:else if data.data && nodes.length === 0}
 				<div class="absolute inset-0 flex items-center justify-center p-4">
 					{#if queryError}
-						<EmptyState icon="alert" title="Filter ungültig" description={queryError}>
+						<EmptyState icon="alert" title={t('Filter ungültig')} description={queryError}>
 							{#snippet actions()}
-								<Button onclick={resetFilters}>Filter zurücksetzen</Button>
+								<Button onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 							{/snippet}
 						</EmptyState>
 					{:else if filtered}
 						<EmptyState
 							icon="filter"
-							title="Keine Geräte für diesen Filter"
-							description="Kein Gerät passt zu Subnetz, Tag oder Filter."
+							title={t('Keine Geräte für diesen Filter')}
+							description={t('Kein Gerät passt zu Subnetz, Tag oder Filter.')}
 						>
 							{#snippet actions()}
-								<Button onclick={resetFilters}>Filter zurücksetzen</Button>
+								<Button onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 							{/snippet}
 						</EmptyState>
 					{:else}
 						<EmptyState
 							icon="topology"
-							title="Noch keine Geräte"
-							description="Sobald Scanner Geräte gefunden haben, erscheinen sie hier als Graph."
+							title={t('Noch keine Geräte')}
+							description={t('Sobald Scanner Geräte gefunden haben, erscheinen sie hier als Graph.')}
 						>
 							{#snippet actions()}
-								<Button href="/plugins" icon="plugins">Scanner konfigurieren</Button>
+								<Button href="/plugins" icon="plugins">{t('Scanner konfigurieren')}</Button>
 							{/snippet}
 						</EmptyState>
 					{/if}
 				</div>
 			{:else if data.data && edges.length === 0 && !connect}
 				<div class="absolute top-2 right-2 left-14 z-[5] sm:left-auto sm:w-96">
-					<Alert tone="info" title="Noch keine Verbindungen">
-						Das Topologie-Plugin leitet Verbindungen aus ARP/LLDP/SNMP ab. Verbindungen lassen sich auch
-						manuell anlegen.
+					<Alert tone="info" title={t('Noch keine Verbindungen')}>
+						{t(
+							'Das Topologie-Plugin leitet Verbindungen aus ARP/LLDP/SNMP ab. Verbindungen lassen sich auch manuell anlegen.'
+						)}
 					</Alert>
 				</div>
 			{/if}
@@ -609,7 +630,7 @@
 			{#if data.data}
 				<span
 					class="pointer-events-none absolute right-2 bottom-1.5 text-[0.6875rem] text-fg-subtle tabular"
-					title="Antwortzeit der Topologie-Abfrage im Backend"
+					title={t('Antwortzeit der Topologie-Abfrage im Backend')}
 				>
 					{formatNumber(data.data.tookMs)} ms
 				</span>

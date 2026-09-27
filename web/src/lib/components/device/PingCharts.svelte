@@ -10,6 +10,7 @@
 	import ErrorState from '$lib/components/ui/ErrorState.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import TimeSeriesChart from '$lib/components/ui/TimeSeriesChart.svelte';
+	import { t } from '$lib/i18n';
 	import { formatMs, formatPercent } from '$lib/utils/format';
 	import { loadPref, savePref } from '$lib/utils/url';
 	import { LazyData } from './util';
@@ -24,8 +25,8 @@
 
 	const RANGES = [
 		{ id: '24h', label: '24 h', ms: 24 * 3600_000 },
-		{ id: '7d', label: '7 Tage', ms: 7 * 86400_000 },
-		{ id: '30d', label: '30 Tage', ms: 30 * 86400_000 }
+		{ id: '7d', label: t('7 Tage'), ms: 7 * 86400_000 },
+		{ id: '30d', label: t('30 Tage'), ms: 30 * 86400_000 }
 	] as const;
 	type RangeId = (typeof RANGES)[number]['id'];
 
@@ -83,9 +84,9 @@
 	});
 </script>
 
-<Card title="Erreichbarkeit (Ping)" icon="activity" padding="md">
+<Card title={t('Erreichbarkeit (Ping)')} icon="activity" padding="md">
 	{#snippet actions()}
-		<div class="flex rounded-md border border-border p-0.5" role="group" aria-label="Zeitraum">
+		<div class="flex rounded-md border border-border p-0.5" role="group" aria-label={t('Zeitraum')}>
 			{#each RANGES as r (r.id)}
 				<button
 					type="button"
@@ -106,18 +107,18 @@
 		<EmptyState
 			compact
 			icon="activity"
-			title="Keine Ping-Messwerte"
-			description="Der ICMP-Scanner hat dieses Gerät noch nicht gemessen."
+			title={t('Keine Ping-Messwerte')}
+			description={t('Der ICMP-Scanner hat dieses Gerät noch nicht gemessen.')}
 		/>
 	{:else}
 		{#if stats}
 			<dl class="mb-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
 				<div>
-					<dt class="text-xs text-fg-subtle">Zuletzt</dt>
+					<dt class="text-xs text-fg-subtle">{t('Zuletzt')}</dt>
 					<dd class="font-medium tabular">{formatMs(stats.last)}</dd>
 				</div>
 				<div>
-					<dt class="text-xs text-fg-subtle">Ø Latenz</dt>
+					<dt class="text-xs text-fg-subtle">{t('Ø Latenz')}</dt>
 					<dd class="font-medium tabular">{formatMs(stats.avg)}</dd>
 				</div>
 				<div>
@@ -125,7 +126,7 @@
 					<dd class="font-medium tabular">{formatMs(stats.max)}</dd>
 				</div>
 				<div>
-					<dt class="text-xs text-fg-subtle">Ø Paketverlust</dt>
+					<dt class="text-xs text-fg-subtle">{t('Ø Paketverlust')}</dt>
 					<dd class="font-medium tabular {stats.loss && stats.loss > 0 ? 'text-warn' : ''}">
 						{formatPercent(stats.loss, 1)}
 					</dd>
@@ -134,10 +135,10 @@
 		{/if}
 		<div class="flex flex-col gap-4 {data.loading ? 'opacity-60 transition-opacity' : ''}">
 			<div>
-				<h3 class="mb-1 text-xs font-medium text-fg-muted">Latenz (Min / Ø / Max)</h3>
+				<h3 class="mb-1 text-xs font-medium text-fg-muted">{t('Latenz (Min / Ø / Max)')}</h3>
 				<TimeSeriesChart
 					points={rttPts}
-					label="Ping-Latenz"
+					label={t('Ping-Latenz')}
 					format={formatMs}
 					height={170}
 					from={win.from}
@@ -145,10 +146,10 @@
 				/>
 			</div>
 			<div>
-				<h3 class="mb-1 text-xs font-medium text-fg-muted">Paketverlust</h3>
+				<h3 class="mb-1 text-xs font-medium text-fg-muted">{t('Paketverlust')}</h3>
 				<TimeSeriesChart
 					points={lossPts}
-					label="Paketverlust"
+					label={t('Paketverlust')}
 					format={(v) => formatPercent(v, 0)}
 					height={110}
 					band={false}

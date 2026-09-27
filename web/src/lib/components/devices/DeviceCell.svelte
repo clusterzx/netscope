@@ -17,6 +17,7 @@
 		stateTone
 	} from '$lib/utils/labels';
 	import { formatDate } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		row: DeviceRow;
@@ -29,7 +30,7 @@
 	const certDays = $derived(
 		d.certExpiry ? Math.floor((new Date(d.certExpiry).getTime() - Date.now()) / 86400000) : null
 	);
-	const title = $derived(d.name || d.ip || d.mac || `Gerät ${d.id}`);
+	const title = $derived(d.name || d.ip || d.mac || t('Gerät {id}', { id: d.id }));
 </script>
 
 {#if colKey === 'status'}
@@ -51,12 +52,12 @@
 		{#if d.site}
 			<span
 				class="shrink-0 rounded bg-surface-3 px-1.5 text-[0.7rem] leading-5 font-medium text-fg-muted"
-				title="Geliefert vom Standort {d.site}">{d.site}</span
+				title={t('Geliefert vom Standort {site}', { site: d.site })}>{d.site}</span
 			>
 		{/if}
 	</div>
 {:else if colKey === 'site'}
-	<span class="whitespace-nowrap {d.site ? '' : 'text-fg-subtle'}">{d.site || 'hier'}</span>
+	<span class="whitespace-nowrap {d.site ? '' : 'text-fg-subtle'}">{d.site || t('hier')}</span>
 {:else if colKey === 'ip'}
 	<span class="mono whitespace-nowrap">{d.ip || '–'}</span>
 	{#if (d.ips?.length ?? 0) > 1}<span class="text-xs text-fg-subtle"> +{d.ips.length - 1}</span>{/if}
@@ -99,7 +100,7 @@
 {:else if colKey === 'certExpiry'}
 	{#if d.certExpiry && certDays !== null}
 		<Badge tone={certDays < 0 ? 'critical' : certDays <= 14 ? 'high' : certDays <= 30 ? 'medium' : 'neutral'}>
-			{certDays < 0 ? 'abgelaufen' : formatDate(d.certExpiry)}
+			{certDays < 0 ? t('abgelaufen') : formatDate(d.certExpiry)}
 		</Badge>
 	{:else}<span class="text-fg-subtle">–</span>{/if}
 {:else if colKey === 'healthState'}
@@ -112,10 +113,10 @@
 	<Badge tone={criticalityTone(d.criticality)}>{criticalityLabel[d.criticality] ?? d.criticality}</Badge>
 {:else if colKey === 'tags'}
 	<span class="flex max-w-[14rem] flex-wrap gap-1">
-		{#each (d.tags ?? []).slice(0, 4) as t (t)}
+		{#each (d.tags ?? []).slice(0, 4) as tag (tag)}
 			<a
-				href="/devices?q={encodeURIComponent('tag:' + t)}"
-				class="rounded bg-accent-soft px-1.5 text-[0.72rem] text-accent hover:underline">{t}</a
+				href="/devices?q={encodeURIComponent('tag:' + tag)}"
+				class="rounded bg-accent-soft px-1.5 text-[0.72rem] text-accent hover:underline">{tag}</a
 			>
 		{:else}<span class="text-fg-subtle">–</span>{/each}
 		{#if (d.tags?.length ?? 0) > 4}<span class="text-xs text-fg-subtle">+{d.tags.length - 4}</span>{/if}
@@ -127,7 +128,7 @@
 		{:else}<span class="text-fg-subtle">–</span>{/each}
 	</span>
 {:else if colKey === 'notes'}
-	{#if d.hasNotes}<Icon name="note" size={15} label="Hat Notizen" class="text-fg-muted" />{/if}
+	{#if d.hasNotes}<Icon name="note" size={15} label={t('Hat Notizen')} class="text-fg-muted" />{/if}
 {:else if colKey === 'firstSeen'}
 	<RelativeTime value={d.firstSeen} class="text-fg-muted" />
 {:else if colKey === 'lastSeen'}

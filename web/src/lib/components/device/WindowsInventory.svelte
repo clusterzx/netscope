@@ -4,13 +4,14 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
+	import { t, tn } from '$lib/i18n';
 	import {
 		formatBps,
 		formatBytes,
 		formatDate,
 		formatDateTime,
-		formatNumber,
-		formatSeconds
+		formatSeconds,
+		percentUnit
 	} from '$lib/utils/format';
 
 	interface WinData {
@@ -117,7 +118,7 @@
 	);
 	const chassisLabel: Record<string, string> = {
 		desktop: 'Desktop',
-		laptop: 'Notebook',
+		laptop: t('Notebook'),
 		tablet: 'Tablet',
 		server: 'Server'
 	};
@@ -125,16 +126,21 @@
 	const severityTone = (s?: string) =>
 		s === 'Critical' ? 'danger' : s === 'Important' ? 'warn' : s ? 'info' : 'neutral';
 	const severityLabel: Record<string, string> = {
-		Critical: 'Kritisch',
-		Important: 'Wichtig',
-		Moderate: 'Mittel',
-		Low: 'Niedrig'
+		Critical: t('Kritisch'),
+		Important: t('Wichtig'),
+		Moderate: t('Mittel'),
+		Low: t('Niedrig')
 	};
 	const adapterStatus: Record<string, string> = {
-		Up: 'verbunden',
-		Disconnected: 'getrennt',
-		Disabled: 'deaktiviert',
-		'Not Present': 'nicht vorhanden'
+		Up: t('verbunden'),
+		Disconnected: t('getrennt'),
+		Disabled: t('deaktiviert'),
+		'Not Present': t('nicht vorhanden')
+	};
+	const startModeLabel: Record<string, string> = {
+		Auto: t('automatisch'),
+		Manual: t('manuell'),
+		Disabled: t('deaktiviert')
 	};
 	const linkLocal = (a: string) => a.startsWith('fe80:') || a.startsWith('169.254.');
 	const firewallOff = $derived((data.firewall ?? []).filter((f) => !f.enabled).map((f) => f.profile));
@@ -142,9 +148,9 @@
 	let svcFilter = $state('');
 	let svcScope = $state<'running' | 'stopped-auto' | 'all'>('running');
 	const SVC_SCOPES = [
-		{ value: 'running', label: 'Laufende' },
-		{ value: 'stopped-auto', label: 'Automatisch, aber gestoppt' },
-		{ value: 'all', label: 'Alle' }
+		{ value: 'running', label: t('Laufende') },
+		{ value: 'stopped-auto', label: t('Automatisch, aber gestoppt') },
+		{ value: 'all', label: t('Alle') }
 	];
 	const services = $derived.by(() => {
 		const q = svcFilter.trim().toLowerCase();
@@ -179,7 +185,7 @@
 <div class="flex flex-col gap-5">
 	<dl class="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2 xl:grid-cols-3">
 		<div>
-			<dt class="text-xs text-fg-subtle">Betriebssystem</dt>
+			<dt class="text-xs text-fg-subtle">{t('Betriebssystem')}</dt>
 			<dd class="text-sm">
 				{osName}
 				{#if data.os?.installationType && data.os.installationType !== 'Client'}
@@ -196,7 +202,7 @@
 			</dd>
 		</div>
 		<div>
-			<dt class="text-xs text-fg-subtle">{data.domain ? 'Domäne' : 'Arbeitsgruppe'}</dt>
+			<dt class="text-xs text-fg-subtle">{data.domain ? t('Domäne') : t('Arbeitsgruppe')}</dt>
 			<dd class="text-sm">
 				{data.domain || data.workgroup || '–'}
 				{#if data.domainRole}<span class="text-xs text-fg-subtle">· {data.domainRole}</span>{/if}
@@ -213,16 +219,17 @@
 			<dt class="text-xs text-fg-subtle">Uptime</dt>
 			<dd class="text-sm">
 				{formatSeconds(data.uptimeSeconds)}
-				{#if data.bootTime}<span class="text-xs text-fg-subtle">(Start {formatDateTime(data.bootTime)})</span
+				{#if data.bootTime}<span class="text-xs text-fg-subtle"
+						>({t('Start {time}', { time: formatDateTime(data.bootTime) })})</span
 					>{/if}
 			</dd>
 		</div>
 		<div>
-			<dt class="text-xs text-fg-subtle">Installiert</dt>
+			<dt class="text-xs text-fg-subtle">{t('Installiert')}</dt>
 			<dd class="text-sm">
 				{formatDate(data.os?.installDate)}
 				{#if data.softwareCount}<span class="text-xs text-fg-subtle"
-						>· {formatNumber(data.softwareCount)} Programme</span
+						>· {tn(data.softwareCount, '{n} Programm', '{n} Programme')}</span
 					>{/if}
 			</dd>
 		</div>
@@ -231,7 +238,7 @@
 				<dt class="text-xs text-fg-subtle">Hardware</dt>
 				<dd class="text-sm">
 					{hardware || '–'}
-					{#if data.hardware?.virtual}<Badge tone="info">virtuell</Badge
+					{#if data.hardware?.virtual}<Badge tone="info">{t('virtuell')}</Badge
 						>{:else if data.hardware?.chassis}<span class="text-xs text-fg-subtle"
 							>({chassisLabel[data.hardware.chassis] ?? data.hardware.chassis})</span
 						>{/if}
@@ -262,19 +269,21 @@
 				<dt class="text-xs text-fg-subtle">CPU</dt>
 				<dd class="text-sm">
 					{c.name}
-					<span class="block text-xs text-fg-subtle">{c.cores} Kerne · {c.threads} Threads</span>
+					<span class="block text-xs text-fg-subtle"
+						>{t('{cores} Kerne · {threads} Threads', { cores: c.cores, threads: c.threads })}</span
+					>
 				</dd>
 			</div>
 		{/each}
 		{#if data.memoryBytes}
 			<div>
-				<dt class="text-xs text-fg-subtle">Arbeitsspeicher</dt>
+				<dt class="text-xs text-fg-subtle">{t('Arbeitsspeicher')}</dt>
 				<dd class="text-sm">{formatBytes(data.memoryBytes)}</dd>
 			</div>
 		{/if}
 		{#if data.os?.timezone}
 			<div>
-				<dt class="text-xs text-fg-subtle">Zeitzone</dt>
+				<dt class="text-xs text-fg-subtle">{t('Zeitzone')}</dt>
 				<dd class="text-sm">{data.os.timezone}</dd>
 			</div>
 		{/if}
@@ -284,29 +293,31 @@
 		<div class="rounded-md border border-border p-3">
 			<h4 class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-muted">
 				Windows Update
-				{#if u?.rebootRequired}<Badge tone="warn">Neustart erforderlich</Badge>{/if}
+				{#if u?.rebootRequired}<Badge tone="warn">{t('Neustart erforderlich')}</Badge>{/if}
 			</h4>
 			{#if u}
 				<dl class="grid grid-cols-2 gap-2 text-sm">
 					<div>
-						<dt class="text-xs text-fg-subtle">Ausstehend</dt>
+						<dt class="text-xs text-fg-subtle">{t('Ausstehend')}</dt>
 						<dd>
 							{#if u.known}
 								{u.pending.length}
-								{#if u.pendingSecurity}<span class="text-danger">({u.pendingSecurity} Sicherheit)</span>{/if}
-							{:else}<span class="text-fg-subtle">nicht ermittelt</span>{/if}
+								{#if u.pendingSecurity}<span class="text-danger"
+										>({t('{n} Sicherheit', { n: u.pendingSecurity })})</span
+									>{/if}
+							{:else}<span class="text-fg-subtle">{t('nicht ermittelt')}</span>{/if}
 						</dd>
 					</div>
 					<div>
-						<dt class="text-xs text-fg-subtle">Zuletzt installiert</dt>
+						<dt class="text-xs text-fg-subtle">{t('Zuletzt installiert')}</dt>
 						<dd>{formatDateTime(u.lastInstall)}</dd>
 					</div>
 					<div>
-						<dt class="text-xs text-fg-subtle">Zuletzt gesucht</dt>
+						<dt class="text-xs text-fg-subtle">{t('Zuletzt gesucht')}</dt>
 						<dd>{formatDateTime(u.lastSearch)}</dd>
 					</div>
 					<div>
-						<dt class="text-xs text-fg-subtle">Letzter Hotfix</dt>
+						<dt class="text-xs text-fg-subtle">{t('Letzter Hotfix')}</dt>
 						<dd>
 							{#if u.lastHotfix}<span class="mono">{u.lastHotfix.id}</span>
 								<span class="text-xs text-fg-subtle">{formatDate(u.lastHotfix.installedOn)}</span
@@ -327,41 +338,45 @@
 					</ul>
 				{/if}
 			{:else}
-				<p class="text-sm text-fg-subtle">Nicht erfasst.</p>
+				<p class="text-sm text-fg-subtle">{t('Nicht erfasst.')}</p>
 			{/if}
 		</div>
 		<div class="rounded-md border border-border p-3">
-			<h4 class="mb-2 text-xs font-semibold text-fg-muted">Schutz</h4>
+			<h4 class="mb-2 text-xs font-semibold text-fg-muted">{t('Schutz')}</h4>
 			<dl class="grid grid-cols-2 gap-2 text-sm">
 				<div>
 					<dt class="text-xs text-fg-subtle">Firewall</dt>
 					<dd>
 						{#if !data.firewall?.length}–
-						{:else if firewallOff.length}<span class="text-warn">aus: {firewallOff.join(', ')}</span>
-						{:else}<span class="text-ok">alle Profile an</span>{/if}
+						{:else if firewallOff.length}<span class="text-warn"
+								>{t('aus: {profiles}', { profiles: firewallOff.join(', ') })}</span
+							>
+						{:else}<span class="text-ok">{t('alle Profile an')}</span>{/if}
 					</dd>
 				</div>
 				<div>
 					<dt class="text-xs text-fg-subtle">Microsoft Defender</dt>
 					<dd>
 						{#if !data.defender}–
-						{:else if data.defender.antivirus && data.defender.realtime}<span class="text-ok">aktiv</span>
-						{:else if data.defender.antivirus}<span class="text-warn">Echtzeitschutz aus</span>
-						{:else}<span class="text-fg-muted">inaktiv</span>{/if}
+						{:else if data.defender.antivirus && data.defender.realtime}<span class="text-ok"
+								>{t('aktiv')}</span
+							>
+						{:else if data.defender.antivirus}<span class="text-warn">{t('Echtzeitschutz aus')}</span>
+						{:else}<span class="text-fg-muted">{t('inaktiv')}</span>{/if}
 						{#if data.defender?.signatureUpdated}
 							<span class="block text-xs text-fg-subtle"
-								>Signaturen {formatDateTime(data.defender.signatureUpdated)}</span
+								>{t('Signaturen {time}', { time: formatDateTime(data.defender.signatureUpdated) })}</span
 							>
 						{/if}
 					</dd>
 				</div>
 				{#if data.antivirus?.length}
 					<div class="col-span-2">
-						<dt class="text-xs text-fg-subtle">Virenschutz (Sicherheitscenter)</dt>
+						<dt class="text-xs text-fg-subtle">{t('Virenschutz (Sicherheitscenter)')}</dt>
 						<dd class="flex flex-wrap gap-1.5">
 							{#each data.antivirus as av (av.name)}
 								<Badge tone={av.enabled ? (av.current ? 'ok' : 'warn') : 'neutral'}
-									>{av.name}{av.enabled ? (av.current ? '' : ' · veraltet') : ' · aus'}</Badge
+									>{av.name}{av.enabled ? (av.current ? '' : ` · ${t('veraltet')}`) : ` · ${t('aus')}`}</Badge
 								>
 							{/each}
 						</dd>
@@ -373,16 +388,16 @@
 
 	{#if data.volumes?.length}
 		<section>
-			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">Laufwerke</h4>
+			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">{t('Laufwerke')}</h4>
 			<div class="relative overflow-x-auto rounded-md border border-border">
 				<table class="w-full min-w-[30rem] border-separate border-spacing-0 text-xs">
 					<thead>
 						<tr class="bg-surface-2 text-left text-fg-muted">
-							<th scope="col" class={th}>Laufwerk</th>
-							<th scope="col" class={th}>Dateisystem</th>
-							<th scope="col" class="{th} text-right">Größe</th>
-							<th scope="col" class="{th} text-right">Frei</th>
-							<th scope="col" class="{th} w-40">Belegt</th>
+							<th scope="col" class={th}>{t('Laufwerk')}</th>
+							<th scope="col" class={th}>{t('Dateisystem')}</th>
+							<th scope="col" class="{th} text-right">{t('Größe')}</th>
+							<th scope="col" class="{th} text-right">{t('Frei')}</th>
+							<th scope="col" class="{th} w-40">{t('Belegt')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -400,7 +415,7 @@
 										<span class="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
 											<span class="block h-full rounded-full {barTone(p)}" style="width:{p}%"></span>
 										</span>
-										<span class="w-9 text-right tabular">{p} %</span>
+										<span class="w-9 text-right tabular">{percentUnit(p)}</span>
 									</span>
 								</td>
 							</tr>
@@ -410,9 +425,11 @@
 			</div>
 			{#if data.disks?.length}
 				<p class="mt-1.5 text-xs text-fg-subtle">
-					Datenträger: {data.disks
-						.map((d) => [d.model, d.size ? formatBytes(d.size) : ''].filter(Boolean).join(' '))
-						.join(' · ')}
+					{t('Datenträger: {disks}', {
+						disks: data.disks
+							.map((d) => [d.model, d.size ? formatBytes(d.size) : ''].filter(Boolean).join(' '))
+							.join(' · ')
+					})}
 				</p>
 			{/if}
 		</section>
@@ -420,7 +437,7 @@
 
 	{#if data.interfaces?.length}
 		<section>
-			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">Netzwerkadapter</h4>
+			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">{t('Netzwerkadapter')}</h4>
 			<div class="relative overflow-x-auto rounded-md border border-border">
 				<table class="w-full min-w-[36rem] border-separate border-spacing-0 text-xs">
 					<thead>
@@ -428,8 +445,8 @@
 							<th scope="col" class={th}>Name</th>
 							<th scope="col" class={th}>Status</th>
 							<th scope="col" class={th}>MAC</th>
-							<th scope="col" class={th}>Adressen</th>
-							<th scope="col" class="{th} text-right">Geschwindigkeit</th>
+							<th scope="col" class={th}>{t('Adressen')}</th>
+							<th scope="col" class="{th} text-right">{t('Geschwindigkeit')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -437,7 +454,9 @@
 							<tr class={it.status === 'Up' ? '' : 'text-fg-muted'}>
 								<td class={td}>
 									{it.name}
-									<span class="block text-fg-subtle">{it.description}{it.virtual ? ' · virtuell' : ''}</span>
+									<span class="block text-fg-subtle"
+										>{it.description}{it.virtual ? ` · ${t('virtuell')}` : ''}</span
+									>
 								</td>
 								<td class={td}>
 									<Badge tone={it.status === 'Up' ? 'ok' : 'neutral'}
@@ -453,9 +472,9 @@
 												>
 													DHCP</span
 												>{:else if a.suffixOrigin === 'Random'}<span class="font-sans text-fg-subtle">
-													temporär</span
+													{t('temporär')}</span
 												>{:else if linkLocal(a.address)}<span class="font-sans text-fg-subtle">
-													link-lokal</span
+													{t('link-lokal')}</span
 												>{/if}</span
 										>
 									{:else}<span class="text-fg-subtle">–</span>{/each}
@@ -474,17 +493,20 @@
 	{#if data.dhcp}
 		<section>
 			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">
-				DHCP-Server · {data.dhcp.leases} Leases, {data.dhcp.reservations} Reservierungen
+				{t('DHCP-Server · {leases} Leases, {reservations} Reservierungen', {
+					leases: data.dhcp.leases,
+					reservations: data.dhcp.reservations
+				})}
 			</h4>
 			<div class="relative overflow-x-auto rounded-md border border-border">
 				<table class="w-full min-w-[30rem] border-separate border-spacing-0 text-xs">
 					<thead>
 						<tr class="bg-surface-2 text-left text-fg-muted">
-							<th scope="col" class={th}>Bereich</th>
-							<th scope="col" class={th}>Adressen</th>
+							<th scope="col" class={th}>{t('Bereich')}</th>
+							<th scope="col" class={th}>{t('Adressen')}</th>
 							<th scope="col" class={th}>Status</th>
 							<th scope="col" class="{th} text-right">Leases</th>
-							<th scope="col" class="{th} text-right">Reservierungen</th>
+							<th scope="col" class="{th} text-right">{t('Reservierungen')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -497,7 +519,7 @@
 								<td class="{td} mono whitespace-nowrap">{s.start} – {s.end}</td>
 								<td class={td}>
 									<Badge tone={s.state === 'Active' ? 'ok' : 'neutral'}
-										>{s.state === 'Active' ? 'aktiv' : s.state || '–'}</Badge
+										>{s.state === 'Active' ? t('aktiv') : s.state || '–'}</Badge
 									>
 								</td>
 								<td class="{td} text-right tabular">{s.leases}</td>
@@ -508,8 +530,9 @@
 				</table>
 			</div>
 			<p class="mt-1.5 text-xs text-fg-subtle">
-				Die Leases ergänzen Namen und Adressen der Geräte im Netz (Quelle „Windows-DHCP“, Einstellungen im
-				Plugin NetScope-Agent).
+				{t(
+					'Die Leases ergänzen Namen und Adressen der Geräte im Netz (Quelle „Windows-DHCP“, Einstellungen im Plugin NetScope-Agent).'
+				)}
 			</p>
 		</section>
 	{/if}
@@ -518,21 +541,25 @@
 		<section>
 			<div class="mb-1.5 flex flex-wrap items-center gap-2">
 				<h4 class="flex-1 text-xs font-semibold text-fg-muted">
-					Offene Ports ({tcpListening.length} TCP{showUdp
-						? `, ${data.listening.length - tcpListening.length} UDP`
-						: ''})
+					{showUdp
+						? t('Offene Ports ({tcp} TCP, {udp} UDP)', {
+								tcp: tcpListening.length,
+								udp: data.listening.length - tcpListening.length
+							})
+						: t('Offene Ports ({tcp} TCP)', { tcp: tcpListening.length })}
 				</h4>
 				<label class="flex items-center gap-1.5 text-xs text-fg-muted">
-					<input type="checkbox" bind:checked={showUdp} /> UDP anzeigen
+					<input type="checkbox" bind:checked={showUdp} />
+					{t('UDP anzeigen')}
 				</label>
 			</div>
 			<div class="relative max-h-80 overflow-auto rounded-md border border-border">
 				<table class="w-full min-w-[26rem] border-separate border-spacing-0 text-xs">
 					<thead class="sticky top-0">
 						<tr class="bg-surface-2 text-left text-fg-muted">
-							<th scope="col" class={th}>Protokoll</th>
-							<th scope="col" class={th}>Adresse</th>
-							<th scope="col" class={th}>Prozess</th>
+							<th scope="col" class={th}>{t('Protokoll')}</th>
+							<th scope="col" class={th}>{t('Adresse')}</th>
+							<th scope="col" class={th}>{t('Prozess')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -553,21 +580,21 @@
 		<section>
 			<div class="mb-1.5 flex flex-wrap items-center gap-2">
 				<h4 class="flex-1 text-xs font-semibold text-fg-muted">
-					Dienste ({running} von {data.services.length} laufen)
+					{t('Dienste ({running} von {total} laufen)', { running, total: data.services.length })}
 				</h4>
 				<Select
 					size="sm"
 					bind:value={svcScope}
 					options={SVC_SCOPES}
-					aria-label="Dienste"
+					aria-label={t('Dienste')}
 					class="w-full sm:w-56"
 				/>
 				<Input
 					size="sm"
 					icon="search"
 					bind:value={svcFilter}
-					placeholder="Dienste filtern"
-					aria-label="Dienste filtern"
+					placeholder={t('Dienste filtern')}
+					aria-label={t('Dienste filtern')}
 					class="w-full sm:w-56"
 				/>
 			</div>
@@ -579,18 +606,13 @@
 						<span>{s.displayName || s.name}</span>
 						<span class="mono text-fg-subtle">{s.name}</span>
 						<span class="ml-auto text-fg-subtle">
-							{s.state === 'Running' ? 'läuft' : s.state === 'Stopped' ? 'gestoppt' : s.state} · {s.startMode ===
-							'Auto'
-								? 'automatisch'
-								: s.startMode === 'Manual'
-									? 'manuell'
-									: s.startMode === 'Disabled'
-										? 'deaktiviert'
-										: s.startMode}
+							{s.state === 'Running' ? t('läuft') : s.state === 'Stopped' ? t('gestoppt') : s.state} · {startModeLabel[
+								s.startMode
+							] ?? s.startMode}
 						</span>
 					</li>
 				{:else}
-					<li class="px-2.5 py-2 text-fg-subtle">Kein Dienst passt zum Filter.</li>
+					<li class="px-2.5 py-2 text-fg-subtle">{t('Kein Dienst passt zum Filter.')}</li>
 				{/each}
 			</ul>
 		</section>
@@ -603,7 +625,7 @@
 				class="text-xs font-semibold text-fg-muted hover:text-fg"
 				aria-expanded={showHotfixes}
 				onclick={() => (showHotfixes = !showHotfixes)}
-				>{showHotfixes ? '▾' : '▸'} Installierte Hotfixes ({u.hotfixes.length})</button
+				>{showHotfixes ? '▾' : '▸'} {t('Installierte Hotfixes ({n})', { n: u.hotfixes.length })}</button
 			>
 			{#if showHotfixes}
 				<ul class="mt-1.5 grid grid-cols-1 gap-x-4 text-xs sm:grid-cols-2 lg:grid-cols-3">
@@ -620,7 +642,7 @@
 	{/if}
 
 	{#if data.errors && Object.keys(data.errors).length}
-		<Alert tone="warn" title="Teilweise nicht erfasst">
+		<Alert tone="warn" title={t('Teilweise nicht erfasst')}>
 			<ul class="text-xs">
 				{#each Object.entries(data.errors) as [k, v] (k)}
 					<li><span class="mono">{k}</span>: {v}</li>
@@ -630,7 +652,7 @@
 	{/if}
 	{#if data.unavailable?.length}
 		<p class="text-xs text-fg-subtle">
-			Auf diesem System nicht vorhanden: <span class="mono">{data.unavailable.join(', ')}</span>
+			{t('Auf diesem System nicht vorhanden:')} <span class="mono">{data.unavailable.join(', ')}</span>
 		</p>
 	{/if}
 </div>

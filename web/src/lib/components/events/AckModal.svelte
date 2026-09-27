@@ -7,7 +7,7 @@
 	import type { AckRequest } from '$lib/api';
 	import { Alert, Button, Modal, Textarea } from '$lib/components/ui';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatNumber, plural } from '$lib/utils/format';
+	import { t, tn } from '$lib/i18n';
 
 	interface Props {
 		open?: boolean;
@@ -42,15 +42,15 @@
 	const title = $derived(
 		byFilter
 			? count < 0
-				? 'Alle passenden offenen Events quittieren'
-				: `${formatNumber(count)} passende ${count === 1 ? 'Event' : 'Events'} quittieren`
-			: `${plural(count, 'Event', 'Events')} quittieren`
+				? t('Alle passenden offenen Events quittieren')
+				: tn(count, '{n} passende Event quittieren', '{n} passende Events quittieren')
+			: tn(count, '{n} Event quittieren', '{n} Events quittieren')
 	);
 
 	async function submit() {
 		error = noteError = null;
 		if (note.length > 1000) {
-			noteError = 'Höchstens 1000 Zeichen';
+			noteError = t('Höchstens 1000 Zeichen');
 			return;
 		}
 		busy = true;
@@ -58,7 +58,9 @@
 			const body: AckRequest = byFilter ? { filter: filter!, note: note.trim() } : { ids, note: note.trim() };
 			const res = await api.post('/api/v1/events/ack', { body });
 			const n = res.acknowledged;
-			toast.success(n === 0 ? 'Keine offenen Events betroffen' : `${plural(n, 'Event', 'Events')} quittiert`);
+			toast.success(
+				n === 0 ? t('Keine offenen Events betroffen') : tn(n, '{n} Event quittiert', '{n} Events quittiert')
+			);
 			open = false;
 			ondone?.(n);
 		} catch (e) {
@@ -75,15 +77,16 @@
 	<div class="flex flex-col gap-3">
 		{#if byFilter}
 			<Alert tone="warn">
-				Quittiert alle <strong>offenen</strong> Events, die zum Filter passen – auch solche auf anderen Seiten
-				der Liste.
+				{t('Quittiert alle')}
+				<strong>{t('offenen')}</strong>
+				{t('Events, die zum Filter passen – auch solche auf anderen Seiten der Liste.')}
 				{#if summary}<span class="mt-1 block text-fg-muted">Filter: {summary}</span>{/if}
 			</Alert>
 		{/if}
 		{#if error}<Alert tone="danger">{error}</Alert>{/if}
 		<Textarea
-			label="Notiz"
-			hint="Optional – z. B. warum das Event erwartet war. Wird beim Event gespeichert."
+			label={t('Notiz')}
+			hint={t('Optional – z. B. warum das Event erwartet war. Wird beim Event gespeichert.')}
 			bind:value={note}
 			rows={3}
 			maxlength={1000}
@@ -91,7 +94,7 @@
 		/>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="check" loading={busy}>Quittieren</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="check" loading={busy}>{t('Quittieren')}</Button>
 	{/snippet}
 </Modal>

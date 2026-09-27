@@ -7,13 +7,14 @@
 	import { untrack } from 'svelte';
 	import { api, errorMessage } from '$lib/api';
 	import type { PluginScope, PluginView } from '$lib/api';
+	import { t } from '$lib/i18n';
 	import {
 		CronField,
 		SchemaForm,
 		schemaInitial,
 		schemaPayload,
 		validateSchema
-	} from '$lib/components/schema';
+	} from '$lib/components/schema'; // i18n-ignore (import path)
 	import { Alert, Badge, Button, Card, Icon, Input, RelativeTime, Toggle } from '$lib/components/ui';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -110,22 +111,22 @@
 	});
 
 	function intError(v: number | null, min: number, max: number, what: string): string | null {
-		if (v === null || v === undefined || (v as unknown) === '') return 'Pflichtfeld';
-		if (!Number.isInteger(Number(v))) return 'Ganzzahl erwartet';
-		if (v < min || v > max) return `${what}: ${min}–${max} erlaubt`;
+		if (v === null || v === undefined || (v as unknown) === '') return t('Pflichtfeld');
+		if (!Number.isInteger(Number(v))) return t('Ganzzahl erwartet');
+		if (v < min || v > max) return t('{what}: {min}–{max} erlaubt', { what, min, max });
 		return null;
 	}
 
 	function validateGeneric(): Record<string, string> {
 		const e: Record<string, string> = {};
-		const t = intError(generic.timeoutSeconds, 10, 86400, 'Sekunden');
-		if (t) e.timeoutSeconds = t;
+		const to = intError(generic.timeoutSeconds, 10, 86400, t('Sekunden'));
+		if (to) e.timeoutSeconds = to;
 		if (!publisher) {
-			const r = intError(generic.retries, 0, 10, 'Wiederholungen');
+			const r = intError(generic.retries, 0, 10, t('Wiederholungen'));
 			if (r) e.retries = r;
-			const b = intError(generic.retryBackoffSeconds, 5, 86400, 'Sekunden');
+			const b = intError(generic.retryBackoffSeconds, 5, 86400, t('Sekunden'));
 			if (b) e.retryBackoffSeconds = b;
-			const c = intError(generic.concurrency, 1, 256, 'Parallelität');
+			const c = intError(generic.concurrency, 1, 256, t('Parallelität'));
 			if (c) e.concurrency = c;
 		}
 		return e;
@@ -137,7 +138,7 @@
 		const se = validateSchema(fields, values);
 		settingsErrors = Object.fromEntries(Object.entries(se).map(([k, v]) => ['settings.' + k, v]));
 		if (Object.keys(genericErrors).length || Object.keys(se).length) {
-			formError = 'Bitte die markierten Felder korrigieren.';
+			formError = t('Bitte die markierten Felder korrigieren.');
 			return;
 		}
 		saving = true;
@@ -168,7 +169,7 @@
 				body
 			});
 			reset(next);
-			toast.success('Einstellungen gespeichert – sie gelten ab sofort.', { title: next.info.name });
+			toast.success(t('Einstellungen gespeichert – sie gelten ab sofort.'), { title: next.info.name });
 			onsaved?.(next);
 		} catch (e) {
 			const split = splitConfigErrors(e);
@@ -176,7 +177,7 @@
 			settingsErrors = split.settings;
 			formError =
 				Object.keys(split.generic).length || Object.keys(split.settings).length
-					? 'Bitte die markierten Felder korrigieren.'
+					? t('Bitte die markierten Felder korrigieren.')
 					: errorMessage(e);
 		} finally {
 			saving = false;
@@ -197,42 +198,45 @@
 	}}
 >
 	{#if !canManage}
-		<p class="text-xs text-fg-subtle">Nur lesen – dafür fehlt die Berechtigung „Plugins konfigurieren“.</p>
+		<p class="text-xs text-fg-subtle">
+			{t('Nur lesen – dafür fehlt die Berechtigung „Plugins konfigurieren“.')}
+		</p>
 	{/if}
 	{#if changedMeanwhile}
-		<Alert tone="warn" title="Konfiguration wurde zwischenzeitlich geändert">
-			Die gespeicherte Konfiguration wurde an anderer Stelle geändert. Beim Speichern werden diese Änderungen
-			überschrieben.
+		<Alert tone="warn" title={t('Konfiguration wurde zwischenzeitlich geändert')}>
+			{t(
+				'Die gespeicherte Konfiguration wurde an anderer Stelle geändert. Beim Speichern werden diese Änderungen überschrieben.'
+			)}
 			{#snippet actions()}
-				<Button size="xs" onclick={discard}>Neu laden</Button>
+				<Button size="xs" onclick={discard}>{t('Neu laden')}</Button>
 			{/snippet}
 		</Alert>
 	{/if}
 
 	<fieldset disabled={!canManage} class="contents">
-		<Card title="Allgemein" icon="system">
+		<Card title={t('Allgemein')} icon="system">
 			<div class="flex flex-col gap-5">
 				<Toggle
 					checked={plugin.config?.enabled ?? false}
 					onchange={(v) => onenabled?.(v)}
 					disabled={enabledBusy}
-					label="Plugin aktiv"
+					label={t('Plugin aktiv')}
 					description={runner
-						? 'Wirkt sofort. Inaktive Plugins laufen nicht nach Zeitplan; manuelle Läufe bleiben möglich.'
+						? t('Wirkt sofort. Inaktive Plugins laufen nicht nach Zeitplan; manuelle Läufe bleiben möglich.')
 						: publisher
-							? 'Wirkt sofort. Nur aktive Publisher stellen Benachrichtigungen zu.'
-							: 'Wirkt sofort.'}
+							? t('Wirkt sofort. Nur aktive Publisher stellen Benachrichtigungen zu.')
+							: t('Wirkt sofort.')}
 				/>
 
 				{#if runner}
 					<CronField
 						id="{idp}-schedule"
-						label="Zeitplan"
+						label={t('Zeitplan')}
 						bind:value={generic.schedule}
 						error={genericErrors.schedule}
 						hint={plugin.info.defaultSchedule
-							? `Standard: ${plugin.info.defaultSchedule}. Leer = nur manuell.`
-							: 'Leer = nur manuell ausführen.'}
+							? t('Standard: {schedule}. Leer = nur manuell.', { schedule: plugin.info.defaultSchedule })
+							: t('Leer = nur manuell ausführen.')}
 					/>
 				{/if}
 
@@ -240,53 +244,57 @@
 					<Input
 						id="{idp}-timeout"
 						type="number"
-						label="Timeout (Sekunden)"
+						label={t('Timeout (Sekunden)')}
 						min={10}
 						max={86400}
 						bind:value={generic.timeoutSeconds}
 						error={genericErrors.timeoutSeconds}
 						hint={generic.timeoutSeconds
 							? `= ${formatSeconds(Number(generic.timeoutSeconds))}`
-							: '10 s bis 24 h'}
+							: t('10 s bis 24 h')}
 					/>
 					{#if !publisher}
 						<Input
 							id="{idp}-retries"
 							type="number"
-							label="Wiederholungen"
+							label={t('Wiederholungen')}
 							min={0}
 							max={10}
 							bind:value={generic.retries}
 							error={genericErrors.retries}
-							hint="bei Fehlschlag, 0–10"
+							hint={t('bei Fehlschlag, 0–10')}
 						/>
 						<Input
 							id="{idp}-backoff"
 							type="number"
-							label="Wartezeit vor Wiederholung (s)"
+							label={t('Wartezeit vor Wiederholung (s)')}
 							min={5}
 							max={86400}
 							bind:value={generic.retryBackoffSeconds}
 							error={genericErrors.retryBackoffSeconds}
 							hint={generic.retryBackoffSeconds
-								? `= ${formatSeconds(Number(generic.retryBackoffSeconds))}, verdoppelt sich je Versuch`
-								: 'verdoppelt sich je Versuch'}
+								? t('= {duration}, verdoppelt sich je Versuch', {
+										duration: formatSeconds(Number(generic.retryBackoffSeconds))
+									})
+								: t('verdoppelt sich je Versuch')}
 						/>
 						<Input
 							id="{idp}-concurrency"
 							type="number"
-							label="Parallelität"
+							label={t('Parallelität')}
 							min={1}
 							max={256}
 							bind:value={generic.concurrency}
 							error={genericErrors.concurrency}
-							hint="gleichzeitige Ziele, 1–256"
+							hint={t('gleichzeitige Ziele, 1–256')}
 						/>
 					{/if}
 				</div>
 				{#if publisher}
 					<p class="text-xs text-fg-subtle">
-						Fehlgeschlagene Zustellungen wiederholt der Regel-Dispatcher automatisch (bis zu 5 Versuche).
+						{t(
+							'Fehlgeschlagene Zustellungen wiederholt der Regel-Dispatcher automatisch (bis zu 5 Versuche).'
+						)}
 					</p>
 				{/if}
 			</div>
@@ -294,11 +302,11 @@
 
 		{#if hasScope}
 			<Card
-				title="Bereich"
+				title={t('Bereich')}
 				icon="network"
 				description={plugin.info.targets === 'subnets'
-					? 'Welche Subnetze bzw. Geräte das Plugin abfragt.'
-					: 'Auf welchen Geräten das Plugin arbeitet.'}
+					? t('Welche Subnetze bzw. Geräte das Plugin abfragt.')
+					: t('Auf welchen Geräten das Plugin arbeitet.')}
 			>
 				<ScopeEditor
 					bind:value={generic.scope}
@@ -309,7 +317,7 @@
 			</Card>
 		{/if}
 
-		<Card title="Plugin-Einstellungen" icon="edit">
+		<Card title={t('Plugin-Einstellungen')} icon="edit">
 			<SchemaForm {fields} bind:values errors={settingsErrors} errorPrefix="settings." idPrefix="{idp}-set" />
 		</Card>
 	</fieldset>
@@ -324,17 +332,17 @@
 					<Icon name="x-circle" size={16} class="shrink-0 text-danger" />
 					<span class="min-w-0 truncate text-danger" title={formError}>{formError}</span>
 				{:else if dirty}
-					<Badge tone="warn" dot>Ungespeicherte Änderungen</Badge>
+					<Badge tone="warn" dot>{t('Ungespeicherte Änderungen')}</Badge>
 				{:else}
 					<span class="text-fg-subtle">
-						Gespeichert
+						{t('Gespeichert')}
 						{#if plugin.config?.updatedAt}<RelativeTime value={plugin.config.updatedAt} />{/if}
 					</span>
 				{/if}
 			</div>
-			<Button onclick={discard} disabled={!dirty || saving} icon="refresh">Zurücksetzen</Button>
+			<Button onclick={discard} disabled={!dirty || saving} icon="refresh">{t('Zurücksetzen')}</Button>
 			<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!dirty && !formError}>
-				Speichern
+				{t('Speichern')}
 			</Button>
 		</div>
 	{/if}

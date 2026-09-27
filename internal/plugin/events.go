@@ -4,6 +4,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"netscope/internal/i18n"
 )
 
 // Severity of an event.
@@ -49,6 +51,9 @@ func (s Severity) Label() string {
 	}
 	return string(s)
 }
+
+// LabelIn returns the label in a language.
+func (s Severity) LabelIn(loc i18n.Locale) string { return i18n.T(loc, s.Label()) }
 
 // SeverityFromCVSS maps a CVSS base score to a severity.
 func SeverityFromCVSS(score float64) Severity {

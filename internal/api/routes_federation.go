@@ -13,6 +13,7 @@ import (
 	"netscope/internal/auth"
 	"netscope/internal/federation"
 	"netscope/internal/federation/wire"
+	"netscope/internal/i18n"
 )
 
 // federationView is the federation state of this instance.
@@ -95,6 +96,7 @@ func (s *Server) federationState(r *http.Request) (*federationView, error) {
 	switch f.Role() {
 	case federation.RoleSite:
 		st := f.SiteStatus(r.Context())
+		st.LastError = i18n.Err(requestLocale(r), st.LastError)
 		out.Site = &st
 	case federation.RoleCentral:
 		sites, err := f.Sites(r.Context())
@@ -158,7 +160,9 @@ func (s *Server) handleTestFederation(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, errNoFederation)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.Federation.Test(r.Context()))
+	res := s.Federation.Test(r.Context())
+	res.Error = i18n.Err(requestLocale(r), res.Error)
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (s *Server) handleResyncFederation(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +188,7 @@ func (s *Server) handleSites(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeJSON(w, http.StatusOK, localizeSites(list, requestLocale(r)))
 }
 
 func (s *Server) handleSite(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +202,7 @@ func (s *Server) handleSite(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, st)
+	writeJSON(w, http.StatusOK, localizeSite(*st, requestLocale(r)))
 }
 
 func errNoFederationIfNil(f *federation.Service) error {
@@ -291,28 +295,28 @@ func (s *Server) handleDeleteSite(w http.ResponseWriter, r *http.Request) {
 // (never with sessions or API tokens) and answers with the acknowledged sequence number.
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	if s.Federation == nil {
-		writeError(w, http.StatusNotFound, "not_found", federation.ErrNotCentral.Error(), nil)
+		writeError(w, r, http.StatusNotFound, "not_found", federation.ErrNotCentral.Error(), nil)
 		return
 	}
 	tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthenticated", "Standort-Token fehlt", nil)
+		writeError(w, r, http.StatusUnauthorized, "unauthenticated", "Standort-Token fehlt", nil)
 		return
 	}
 	id, name, err := s.Federation.AuthenticateSite(r.Context(), strings.TrimSpace(tok))
 	if errors.Is(err, federation.ErrNotCentral) {
-		writeError(w, http.StatusNotFound, "not_central", err.Error(), nil)
+		writeError(w, r, http.StatusNotFound, "not_central", err.Error(), nil)
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthenticated", "Standort-Token ungültig", nil)
+		writeError(w, r, http.StatusUnauthorized, "unauthenticated", "Standort-Token ungültig", nil)
 		return
 	}
 	var body io.Reader = r.Body
 	if strings.EqualFold(r.Header.Get("Content-Encoding"), "gzip") {
 		zr, err := gzip.NewReader(r.Body)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "gzip: "+err.Error(), nil)
+			writeError(w, r, http.StatusBadRequest, "bad_request", "gzip: "+err.Error(), nil)
 			return
 		}
 		defer zr.Close()
@@ -320,14 +324,14 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 	var batch wire.Batch
 	if err := json.NewDecoder(io.LimitReader(body, maxIngestBody)).Decode(&batch); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "ungültige Lieferung: "+err.Error(), nil)
+		writeError(w, r, http.StatusBadRequest, "bad_request", "ungültige Lieferung: "+err.Error(), nil)
 		return
 	}
 	resp, err := s.Federation.Ingest(r.Context(), id, name, &batch, client(r).IP)
 	var pe *federation.ProtocolError
 	switch {
 	case errors.As(err, &pe):
-		writeError(w, http.StatusConflict, "protocol", pe.Error(), nil)
+		writeError(w, r, http.StatusConflict, "protocol", pe.Error(), nil)
 		return
 	case err != nil:
 		s.fail(w, r, err)

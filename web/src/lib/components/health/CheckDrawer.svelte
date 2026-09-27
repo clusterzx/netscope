@@ -27,6 +27,7 @@
 	import { formatDateTime, formatMs, formatPercent } from '$lib/utils/format';
 	import { healthStateLabel, healthTone } from '$lib/utils/labels';
 	import { debounce } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 	import OutageList from './OutageList.svelte';
 	import {
 		availabilityText,
@@ -64,8 +65,8 @@
 		{ id: '1h', label: '1 h', ms: 3600_000 },
 		{ id: '6h', label: '6 h', ms: 6 * 3600_000 },
 		{ id: '24h', label: '24 h', ms: 24 * 3600_000 },
-		{ id: '7d', label: '7 Tage', ms: 7 * 86400_000 },
-		{ id: '30d', label: '30 Tage', ms: 30 * 86400_000 }
+		{ id: '7d', label: t('7 Tage'), ms: 7 * 86400_000 },
+		{ id: '30d', label: t('30 Tage'), ms: 30 * 86400_000 }
 	];
 	let range = $state('24h');
 	let rangeTo = $state(Date.now());
@@ -76,7 +77,7 @@
 	const latency = new AsyncData<SeriesResponse>();
 	const latencyPts = $derived(latency.data?.points ?? []);
 	const chartTo = $derived(
-		Math.max(rangeTo, ...latencyPts.map((p) => new Date(p.t).getTime()).filter((t) => isFinite(t)))
+		Math.max(rangeTo, ...latencyPts.map((p) => new Date(p.t).getTime()).filter((ms) => isFinite(ms)))
 	);
 
 	let running = $state(false);
@@ -165,7 +166,7 @@
 			const saved = await api.put('/api/v1/health-checks/{id}', { path: { id: c.id }, body });
 			detail.set(saved);
 			onchanged?.(saved);
-			toast.success(v ? 'Check aktiviert' : 'Check deaktiviert');
+			toast.success(v ? t('Check aktiviert') : t('Check deaktiviert'));
 		} catch (e) {
 			toast.error(e);
 			detail.reload();
@@ -177,15 +178,15 @@
 	async function remove() {
 		if (!c) return;
 		const ok = await confirm({
-			title: 'Health-Check löschen?',
-			message: `„${c.name}“ wird mit Ausfallhistorie und Latenz-Zeitreihe gelöscht.`,
-			confirmLabel: 'Löschen',
+			title: t('Health-Check löschen?'),
+			message: t('„{name}“ wird mit Ausfallhistorie und Latenz-Zeitreihe gelöscht.', { name: c.name }),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/health-checks/{id}', { path: { id: c.id } });
-			toast.success('Health-Check gelöscht');
+			toast.success(t('Health-Check gelöscht'));
 			open = false;
 			ondeleted?.(c.id);
 		} catch (e) {
@@ -194,17 +195,17 @@
 	}
 
 	const windows = [
-		['24h', '24 Stunden'],
-		['7d', '7 Tage'],
-		['30d', '30 Tage']
+		['24h', t('24 Stunden')],
+		['7d', t('7 Tage')],
+		['30d', t('30 Tage')]
 	] as const;
 </script>
 
-<Drawer bind:open title={c?.name ?? 'Health-Check'} size="xl" {onclose}>
+<Drawer bind:open title={c?.name ?? t('Health-Check')} size="xl" {onclose}>
 	{#snippet headerExtra()}
 		{#if c}
 			<Badge tone={c.enabled ? healthTone(c.state) : 'neutral'} size="md" dot>
-				{c.enabled ? (healthStateLabel[c.state] ?? c.state) : 'Deaktiviert'}
+				{c.enabled ? (healthStateLabel[c.state] ?? c.state) : t('Deaktiviert')}
 			</Badge>
 		{/if}
 	{/snippet}
@@ -218,46 +219,47 @@
 			<!-- summary -->
 			<section class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
 				<div>
-					<div class="text-xs text-fg-subtle">Ziel</div>
+					<div class="text-xs text-fg-subtle">{t('Ziel')}</div>
 					<div class="mono">{targetText(c)}</div>
 				</div>
 				{#if c.deviceId}
 					<div>
-						<div class="text-xs text-fg-subtle">Gerät</div>
+						<div class="text-xs text-fg-subtle">{t('Gerät')}</div>
 						<a href="/devices/{c.deviceId}" class="link">{c.deviceName || `#${c.deviceId}`}</a>
 					</div>
 				{/if}
 				<div>
-					<div class="text-xs text-fg-subtle">Letzte Latenz</div>
+					<div class="text-xs text-fg-subtle">{t('Letzte Latenz')}</div>
 					<div class="tabular">{c.lastLatencyMs !== undefined ? formatMs(c.lastLatencyMs) : '–'}</div>
 				</div>
 				<div>
-					<div class="text-xs text-fg-subtle">Zuletzt geprüft</div>
+					<div class="text-xs text-fg-subtle">{t('Zuletzt geprüft')}</div>
 					<div>{formatDateTime(c.lastCheckAt, true)}</div>
 				</div>
 				{#if c.stateSince}
 					<div>
-						<div class="text-xs text-fg-subtle">Zustand seit</div>
+						<div class="text-xs text-fg-subtle">{t('Zustand seit')}</div>
 						<div>{formatDateTime(c.stateSince)}</div>
 					</div>
 				{/if}
 			</section>
 
 			{#if c.lastError}
-				<Alert tone={c.state === 'down' ? 'danger' : 'warn'} title="Letzter Fehler">{c.lastError}</Alert>
+				<Alert tone={c.state === 'down' ? 'danger' : 'warn'} title={t('Letzter Fehler')}>{c.lastError}</Alert>
 			{/if}
 
 			<!-- actions -->
 			{#if auth.can('health.manage')}
 				<section class="flex flex-wrap items-center gap-2">
-					<Button variant="primary" icon="play" loading={running} onclick={runNow}>Jetzt prüfen</Button>
-					<Button icon="edit" onclick={() => onedit?.(c)}>Bearbeiten</Button>
-					<Button variant="ghost" icon="trash" class="text-danger" onclick={remove}>Löschen</Button>
+					<Button variant="primary" icon="play" loading={running} onclick={runNow}>{t('Jetzt prüfen')}</Button
+					>
+					<Button icon="edit" onclick={() => onedit?.(c)}>{t('Bearbeiten')}</Button>
+					<Button variant="ghost" icon="trash" class="text-danger" onclick={remove}>{t('Löschen')}</Button>
 					<Toggle
 						class="ml-auto"
 						checked={c.enabled}
 						disabled={toggling}
-						label="Aktiv"
+						label={t('Aktiv')}
 						onchange={(v) => setEnabled(v)}
 					/>
 				</section>
@@ -267,17 +269,20 @@
 				<div aria-live="polite">
 					<Alert
 						tone={result.ok ? 'ok' : 'danger'}
-						title={result.ok ? 'Prüfung erfolgreich' : 'Prüfung fehlgeschlagen'}
+						title={result.ok ? t('Prüfung erfolgreich') : t('Prüfung fehlgeschlagen')}
 					>
 						{#if result.ok}
-							Antwortzeit {formatMs(result.latencyMs)}.
+							{t('Antwortzeit {latency}.', { latency: formatMs(result.latencyMs) })}
 						{:else}
-							{result.error || 'Unbekannter Fehler'}{#if result.latencyMs}
+							{result.error || t('Unbekannter Fehler')}{#if result.latencyMs}
 								· {formatMs(result.latencyMs)}{/if}
 						{/if}
 						{#if result.check}
-							Zustand: {healthStateLabel[result.check.state] ?? result.check.state}
-							({result.check.consecutiveFail} Fehler / {result.check.consecutiveOk} OK in Folge).
+							{t('Zustand: {state} ({fail} Fehler / {ok} OK in Folge).', {
+								state: healthStateLabel[result.check.state] ?? result.check.state,
+								fail: result.check.consecutiveFail,
+								ok: result.check.consecutiveOk
+							})}
 						{/if}
 					</Alert>
 				</div>
@@ -286,7 +291,7 @@
 			<!-- availability -->
 			<section aria-labelledby="av-h">
 				<h3 id="av-h" class="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-					Verfügbarkeit
+					{t('Verfügbarkeit')}
 				</h3>
 				<dl class="grid grid-cols-3 gap-2">
 					{#each windows as [k, lbl] (k)}
@@ -304,11 +309,13 @@
 			<!-- latency -->
 			<section aria-labelledby="lat-h">
 				<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-					<h3 id="lat-h" class="text-xs font-semibold tracking-wide text-fg-subtle uppercase">Latenz</h3>
+					<h3 id="lat-h" class="text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+						{t('Latenz')}
+					</h3>
 					<div
 						class="flex items-center gap-0.5 rounded-md bg-surface-3 p-0.5"
 						role="group"
-						aria-label="Zeitraum"
+						aria-label={t('Zeitraum')}
 					>
 						{#each RANGES as r (r.id)}
 							<button
@@ -332,18 +339,20 @@
 				{:else}
 					<TimeSeriesChart
 						points={latency.data?.points ?? []}
-						label="Latenz {c.name}"
+						label={t('Latenz {name}', { name: c.name })}
 						format={formatMs}
 						from={rangeTo - rangeMs}
 						to={chartTo}
 						emptyText={!c.lastCheckAt
-							? 'Noch keine Messwerte'
+							? t('Noch keine Messwerte')
 							: c.lastOk === false
-								? 'Keine Latenzwerte – fehlgeschlagene Prüfungen liefern keine Latenz'
-								: 'Keine Messwerte im Zeitraum'}
+								? t('Keine Latenzwerte – fehlgeschlagene Prüfungen liefern keine Latenz')
+								: t('Keine Messwerte im Zeitraum')}
 					/>
 					{#if latency.data?.resolution}
-						<p class="mt-1 text-[11px] text-fg-subtle">Auflösung: {latency.data.resolution}</p>
+						<p class="mt-1 text-[11px] text-fg-subtle">
+							{t('Auflösung: {resolution}', { resolution: latency.data.resolution })}
+						</p>
 					{/if}
 				{/if}
 			</section>
@@ -351,62 +360,64 @@
 			<!-- configuration -->
 			<section aria-labelledby="cfg-h">
 				<h3 id="cfg-h" class="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-					Konfiguration
+					{t('Konfiguration')}
 				</h3>
 				<DescList cols={2}>
-					<DescItem label="Typ" value={checkTypeLabel[c.type] ?? c.type} />
+					<DescItem label={t('Typ')} value={checkTypeLabel[c.type] ?? c.type} />
 					<DescItem
-						label="Intervall / Timeout"
+						label={t('Intervall / Timeout')}
 						value="{intervalText(c.intervalSeconds)} / {c.timeoutSeconds} s"
 					/>
 					<DescItem
-						label="Flap-Dämpfung"
-						value="Down nach {c.failThreshold}, Up nach {c.recoverThreshold} Prüfungen in Folge"
+						label={t('Flap-Dämpfung')}
+						value={t('Down nach {fail}, Up nach {ok} Prüfungen in Folge', {
+							fail: c.failThreshold,
+							ok: c.recoverThreshold
+						})}
 					/>
 					<DescItem
-						label="Beeinträchtigt ab"
-						value={c.config?.degradedMs ? `${c.config.degradedMs} ms` : 'aus'}
+						label={t('Beeinträchtigt ab')}
+						value={c.config?.degradedMs ? `${c.config.degradedMs} ms` : t('aus')}
 					/>
 					{#if c.type === 'http'}
 						<DescItem
-							label="Methode / Status"
+							label={t('Methode / Status')}
 							mono
 							value="{c.config?.method || 'GET'} · {c.config?.expectStatus || '200-399'}"
 						/>
-						<DescItem label="Body-Regex" mono value={c.config?.bodyMatch} />
+						<DescItem label={t('Body-Regex')} mono value={c.config?.bodyMatch} />
 						<DescItem
-							label="TLS / Weiterleitungen"
-							value="{c.config?.verifyTls ? 'Zertifikat prüfen' : 'Zertifikat nicht prüfen'} · {c.config
-								?.followRedirects
-								? 'folgen'
-								: 'nicht folgen'}"
+							label={t('TLS / Weiterleitungen')}
+							value={`${c.config?.verifyTls ? t('Zertifikat prüfen') : t('Zertifikat nicht prüfen')} · ${
+								c.config?.followRedirects ? t('folgen') : t('nicht folgen')
+							}`}
 						/>
 					{:else if c.type === 'tls'}
-						<DescItem label="Servername (SNI)" mono value={c.config?.serverName} />
+						<DescItem label={t('Servername (SNI)')} mono value={c.config?.serverName} />
 						<DescItem
-							label="Zertifikat"
-							value="{c.config?.verifyTls ? 'Kette prüfen' : 'Kette nicht prüfen'}{c.config?.minDays
-								? ` · mind. ${c.config.minDays} Tage gültig`
-								: ''}"
+							label={t('Zertifikat')}
+							value={`${c.config?.verifyTls ? t('Kette prüfen') : t('Kette nicht prüfen')}${
+								c.config?.minDays ? ` · ${t('mind. {n} Tage gültig', { n: c.config.minDays })}` : ''
+							}`}
 						/>
 					{:else if c.type === 'icmp'}
-						<DescItem label="Pings je Prüfung" value={c.config?.count ?? 3} />
+						<DescItem label={t('Pings je Prüfung')} value={c.config?.count ?? 3} />
 					{/if}
-					<DescItem label="Angelegt" value={formatDateTime(c.createdAt)} />
+					<DescItem label={t('Angelegt')} value={formatDateTime(c.createdAt)} />
 				</DescList>
 			</section>
 
 			<!-- outages -->
 			<section aria-labelledby="out-h">
 				<h3 id="out-h" class="mb-1 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-					Ausfallhistorie
+					{t('Ausfallhistorie')}
 				</h3>
 				{#if outages.error}
 					<ErrorState compact error={outages.error} onretry={() => outages.reload()} />
 				{:else if !outages.data}
 					<Skeleton lines={3} />
 				{:else if outages.data.length === 0}
-					<p class="py-2 text-sm text-fg-muted">Keine Ausfälle aufgezeichnet.</p>
+					<p class="py-2 text-sm text-fg-muted">{t('Keine Ausfälle aufgezeichnet.')}</p>
 				{:else}
 					<OutageList outages={outages.data} />
 				{/if}

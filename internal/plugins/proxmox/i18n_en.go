@@ -1,0 +1,92 @@
+package proxmox
+
+import "netscope/internal/i18n"
+
+// English texts of this package (German source text → English), see internal/i18n.
+func init() {
+	i18n.Register(map[string]string{
+		// plugin, settings
+		"Proxmox VE": "Proxmox VE",
+		"Importiert Nodes, VMs und LXC-Container aus der Proxmox-VE-API (Name, VMID, Status, MACs, Ressourcen) und verknüpft sie per MAC mit gescannten Geräten inklusive „läuft auf Node X“. Optional auch die Docker-Container in LXCs.": "Imports nodes, VMs and LXC containers from the Proxmox VE API (name, VMID, status, MACs, resources) and links them by MAC to scanned devices, including “runs on node X”. Optionally also the Docker containers inside LXCs.",
+		"API-URLs": "API URLs",
+		"Eine Adresse pro Zeile, mit Port. In einem Cluster genügt ein Node, alle anderen werden über ihn abgefragt; weitere Nodes desselben Clusters dienen als Ausweichadresse und werden nicht doppelt importiert. Mehrere eigenständige Hosts oder Cluster einfach untereinander eintragen.": "One address per line, with port. In a cluster one node is enough, all others are queried through it; further nodes of the same cluster serve as fallback addresses and are not imported twice. Enter several standalone hosts or clusters one below the other.",
+		"API-Tokens": "API tokens",
+		"Credentials vom Typ API-Token (Token-ID user@realm!tokenname und Secret). Leer = automatisch das passende Token je Host nach dem Geltungsbereich des Credentials (z. B. dem Gerät des Proxmox-Hosts zugewiesen). Wird ein Token abgelehnt, wird das nächste probiert. Lesende Rechte genügen, z. B. die Rolle PVEAuditor auf /.": "Credentials of type API token (token ID user@realm!tokenname and secret). Empty = automatically the matching token per host according to the credential's scope (e.g. assigned to the device of the Proxmox host). If a token is rejected, the next one is tried. Read permissions are enough, e.g. the role PVEAuditor on /.",
+		"TLS-Zertifikat prüfen": "Verify TLS certificate",
+		"Ausgeschaltet lassen, solange Proxmox das selbstsignierte Standardzertifikat verwendet.": "Leave off as long as Proxmox uses its self-signed default certificate.",
+		"Gestoppte Gäste importieren": "Import stopped guests",
+		"Vorlagen importieren":        "Import templates",
+		"VM- und Container-Vorlagen (Templates) als eigene Geräte führen.":                                    "Keep VM and container templates as devices of their own.",
+		"IP-Adressen aus dem Gast lesen":                                                                      "Read IP addresses from the guest",
+		"Bei laufenden VMs den QEMU-Gast-Agent (falls aktiviert) und bei Containern die Interfaces abfragen.": "Query the QEMU guest agent of running VMs (if enabled) and the interfaces of containers.",
+		"Fehlende Geräte anlegen":                                                                             "Create missing devices",
+		"Nodes, VMs und Container anlegen, die noch kein Scan gefunden hat (z. B. gestoppte VMs).":            "Create nodes, VMs and containers that no scan has found yet (e.g. stopped VMs).",
+		"Docker in LXC-Containern":                                                                            "Docker in LXC containers",
+		"Docker-Container in LXCs erfassen":                                                                   "Collect Docker containers in LXCs",
+		"Die Proxmox-API kann nicht in Container hineinschauen. NetScope meldet sich dafür per SSH am Node an und liest mit pct exec die Docker-Container laufender LXCs – nur lesend. Empfohlen: das Skript netscope-docker-inventory als Forced Command für den Schlüssel einrichten, dann kann er nichts anderes ausführen (siehe Doku).": "The Proxmox API cannot look inside containers. For this NetScope logs into the node over SSH and reads the Docker containers of running LXCs with pct exec – read-only. Recommended: set up the script netscope-docker-inventory as the forced command for the key, so it cannot run anything else (see the documentation).",
+		"SSH-Zugangsdaten für die Nodes": "SSH credentials for the nodes",
+		"Leer = automatisch die SSH-Zugangsdaten, deren Geltungsbereich die Node-IP abdeckt. Der Benutzer muss pct ausführen dürfen (root).": "Empty = automatically the SSH credentials whose scope covers the node IP. The user must be allowed to run pct (root).",
+		"SSH-Port":          "SSH port",
+		"SSH-Hostschlüssel": "SSH host key",
+		"Beim ersten Kontakt merken, Änderungen ablehnen": "Remember on first contact, reject changes",
+		"Nicht prüfen (unsicher)":                         "Do not verify (insecure)",
+		"Zeitlimit pro Node":                              "Timeout per node",
+		"Für alle Container eines Nodes zusammen; jedes einzelne docker-Kommando ist auf dem Node auf 20 s begrenzt.": "For all containers of a node together; every single docker command is limited to 20 s on the node.",
+
+		// API client
+		"ungültige Proxmox-URL %q (erwartet z. B. https://pve.lan:8006)": "invalid Proxmox URL %q (expected e.g. https://pve.lan:8006)",
+		"Token-ID %q hat nicht das Format user@realm!tokenname":          "token ID %q does not have the format user@realm!tokenname",
+		"Token-Secret fehlt im Credential":                               "token secret missing in the credential",
+		"%s: ungültige JSON-Antwort: %w":                                 "%s: invalid JSON response: %w",
+
+		// run log, run errors
+		"keine Proxmox-API-URL konfiguriert":                                                   "no Proxmox API URL configured",
+		"Proxmox-Endpunkt fehlgeschlagen":                                                      "Proxmox endpoint failed",
+		"kein Proxmox-Endpunkt importiert: %w":                                                 "no Proxmox endpoint imported: %w",
+		"kein API-Token passt zu %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w": "no API token matches %s (check the selection or the scope of the credentials): %w",
+		"API-Token abgelehnt, nächstes wird probiert":                                          "API token rejected, trying the next one",
+		"Token abgelehnt": "token rejected",
+		"Anmeldung an der Proxmox-API fehlgeschlagen (%s) – Token-ID und Secret prüfen":                    "login to the Proxmox API failed (%s) – check token ID and secret",
+		"%s: keine Berechtigung (%s) – das Token braucht lesende Rechte, z. B. die Rolle PVEAuditor auf /": "%s: permission denied (%s) – the token needs read permissions, e.g. the role PVEAuditor on /",
+		"Proxmox-API nicht erreichbar (%s): %w":                                                            "Proxmox API not reachable (%s): %w",
+		// what was requested (in the errors above)
+		"Cluster-Status": "cluster status",
+		"Node-Liste":     "node list",
+		"Gäste-Liste":    "guest list",
+		"Cluster-Status: keine Berechtigung (%s) – das Token braucht lesende Rechte, z. B. die Rolle PVEAuditor auf /":                                                     "cluster status: permission denied (%s) – the token needs read permissions, e.g. the role PVEAuditor on /",
+		"Node-Liste: keine Berechtigung (%s) – das Token braucht lesende Rechte, z. B. die Rolle PVEAuditor auf /":                                                         "node list: permission denied (%s) – the token needs read permissions, e.g. the role PVEAuditor on /",
+		"Gäste-Liste: keine Berechtigung (%s) – das Token braucht lesende Rechte, z. B. die Rolle PVEAuditor auf /":                                                        "guest list: permission denied (%s) – the token needs read permissions, e.g. the role PVEAuditor on /",
+		"Proxmox-API nicht erreichbar (Cluster-Status): %w":                                                                                                                "Proxmox API not reachable (cluster status): %w",
+		"Proxmox-API nicht erreichbar (Node-Liste): %w":                                                                                                                    "Proxmox API not reachable (node list): %w",
+		"Proxmox-API nicht erreichbar (Gäste-Liste): %w":                                                                                                                   "Proxmox API not reachable (guest list): %w",
+		"Cluster-Status nicht lesbar, Node-IPs sind unbekannt":                                                                                                             "Cannot read cluster status, node IPs are unknown",
+		"die Proxmox-API liefert keine Nodes – dem Token fehlen Leserechte (z. B. Rolle PVEAuditor auf /; bei Privilege Separation muss das Token selbst berechtigt sein)": "the Proxmox API returns no nodes – the token lacks read permissions (e.g. role PVEAuditor on /; with privilege separation the token itself must be authorised)",
+		"Cluster bereits über einen anderen Endpunkt importiert":                                                                                                           "Cluster already imported through another endpoint",
+		"Node meldet eine andere eigene Adresse – es gilt die aus der URL":                                                                                                 "Node reports a different address for itself – the one from the URL applies",
+		"keines der %d Proxmox-Objekte konnte gespeichert werden":                                                                                                          "none of the %d Proxmox objects could be saved",
+		"Proxmox-Import abgeschlossen":                                                                                                                                     "Proxmox import finished",
+		"Node-Status nicht lesbar":                                                                                                                                         "Cannot read node status",
+		"Keine IP-Adresse für Node bekannt, Zuordnung nur über bereits verknüpfte Geräte":                                                                                  "No IP address known for the node, matching only through devices already linked",
+		"Node konnte nicht gespeichert werden":                                                                                                                             "Could not save node",
+		"Node ist nicht im Inventar":                                                                                                                                       "Node is not in the inventory",
+		"Gast-Konfiguration nicht lesbar, Zuordnung ohne MAC":                                                                                                              "Cannot read guest configuration, matching without MAC",
+		"Gast konnte nicht gespeichert werden":                                                                                                                             "Could not save guest",
+		"Gast ist nicht im Inventar":                                                                                                                                       "Guest is not in the inventory",
+		"Gast-Agent liefert keine Adressen":                                                                                                                                "Guest agent returns no addresses",
+		"Container-Interfaces nicht lesbar":                                                                                                                                "Cannot read container interfaces",
+
+		// Docker in LXCs
+		"unerwartete Ausgabe – ist netscope-docker-inventory auf dem Node eingerichtet und der Forced Command korrekt?": "unexpected output – is netscope-docker-inventory set up on the node and the forced command correct?",
+		"pct nicht gefunden – kein Proxmox-VE-Host": "pct not found – not a Proxmox VE host",
+		"kein Docker": "no Docker",
+		"docker ps fehlgeschlagen (Exit-Code %s)":        "docker ps failed (exit code %s)",
+		"%d unlesbare Zeilen in docker ps":               "%d unreadable lines in docker ps",
+		"Docker in LXCs: IP-Adresse des Nodes unbekannt": "Docker in LXCs: IP address of the node unknown",
+		"Docker in LXCs nicht lesbar":                    "Cannot read Docker in LXCs",
+		"keine passenden SSH-Zugangsdaten: %w":           "no matching SSH credentials: %w",
+		"Inventar-Skript: %w":                            "inventory script: %w",
+		"Docker in LXCs: Ausgabe unvollständig":          "Docker in LXCs: output incomplete",
+		"Docker im Container nicht lesbar":               "Cannot read Docker in the container",
+		"Docker in LXCs gelesen":                         "Read Docker in LXCs",
+	})
+}

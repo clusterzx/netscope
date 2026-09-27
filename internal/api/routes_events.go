@@ -99,11 +99,11 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, eventList{Total: total, Items: list})
+	writeJSON(w, http.StatusOK, eventList{Total: total, Items: localizeEvents(list, requestLocale(r))})
 }
 
 func (s *Server) handleEventTypes(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, plugin.Catalog())
+	writeJSON(w, http.StatusOK, plugin.LocalizedCatalog(requestLocale(r)))
 }
 
 func (s *Server) handleEventCounts(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +165,8 @@ func (s *Server) handleEvent(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	d := eventDetail{Event: *ev, Notifications: notes}
+	loc := requestLocale(r)
+	d := eventDetail{Event: localizeEvent(*ev, loc), Notifications: localizeNotifications(notes, loc)}
 	if ev.RunID > 0 {
 		d.PrevRunID, _ = s.Inventory.PreviousRun(r.Context(), ev.RunID)
 	}

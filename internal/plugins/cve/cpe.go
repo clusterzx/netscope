@@ -200,7 +200,7 @@ var aliasGroups = [][]vendorProduct{
 	{{"polkit_project", "polkit"}, {"freedesktop", "polkit"}},
 	{{"miniupnp_project", "miniupnpd"}, {"miniupnp.free", "miniupnpd"}},
 	{{"squid-cache", "squid"}, {"squid", "squid"}},
-	{{"mit", "kerberos_5"}, {"mit", "kerberos"}},
+	{{"mit", "kerberos_5"}, {"mit", "kerberos"}}, // i18n:ignore (vendor MIT)
 	{{"openprinting", "cups"}, {"apple", "cups"}, {"easy_software_products", "cups"}, {"cups", "cups"}},
 	{{"tuxfamily", "chrony"}, {"chrony_project", "chrony"}},
 	{{"git-scm", "git"}, {"git", "git"}, {"git_project", "git"}},

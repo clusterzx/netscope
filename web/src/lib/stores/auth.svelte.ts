@@ -7,9 +7,11 @@
 //   const step = await auth.login(username, password)   // { mfa } when a second factor is needed
 //   await auth.loginTotp(challenge, code) / loginRecovery(...) / loginPasskey(challenge)
 //   await auth.logout()
+//   await auth.setLocale('en')   // language preference ('' = browser), reloads if needed
 import { goto } from '$app/navigation';
 import { api, ApiError } from '$lib/api/client';
 import type { Me } from '$lib/api/types';
+import { applyPreference, forgetPreference, type LocalePreference } from '$lib/i18n';
 import { getPasskey } from '$lib/utils/webauthn';
 import { live } from './live.svelte';
 
@@ -134,8 +136,20 @@ class Auth {
 			live.disconnect();
 			this.me = null;
 			this.checked = true;
-			await goto('/login', { replaceState: true });
+			// the login page follows the browser language, not the preference of this user
+			if (forgetPreference()) window.location.assign('/login');
+			else await goto('/login', { replaceState: true });
 		}
+	}
+
+	/**
+	 * Stores the language preference of the signed-in user ('' = browser language) and
+	 * reloads the page if the UI has to change its language.
+	 */
+	async setLocale(pref: LocalePreference) {
+		const me = await api.put('/api/v1/auth/preferences', { body: { locale: pref } });
+		this.me = me;
+		if (applyPreference(me.user?.locale)) window.location.reload();
 	}
 }
 

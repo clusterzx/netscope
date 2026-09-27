@@ -240,7 +240,7 @@ func (s *Server) handleBulk(w http.ResponseWriter, r *http.Request) {
 	// the route needs devices.edit; deleting and plugin actions need their own permission
 	need := map[string]string{"delete": auth.PermDevicesDelete, "plugin_action": auth.PermDevicesActions}[req.Action]
 	if !principal(r).Has(need) {
-		forbidden(w, need)
+		forbidden(w, r, need)
 		return
 	}
 	if req.Action == "plugin_action" {
@@ -250,7 +250,7 @@ func (s *Server) handleBulk(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.record(r, "device.bulk_action", "device", "", fmt.Sprintf("Aktion %s/%s für %d Geräte", req.Plugin, req.Name, len(req.IDs)), nil, req)
-		writeJSON(w, http.StatusOK, bulkResponse{Affected: len(req.IDs), Outcome: out})
+		writeJSON(w, http.StatusOK, bulkResponse{Affected: len(req.IDs), Outcome: localizeActionResult(out, requestLocale(r))})
 		return
 	}
 	n, err := s.Inventory.Bulk(r.Context(), req.BulkAction)
@@ -407,7 +407,7 @@ func (s *Server) handleDeviceAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.record(r, "device.action", "device", strconv.FormatInt(id, 10), fmt.Sprintf("Aktion %s/%s ausgeführt", pid, action), nil, req.Params)
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, localizeActionResult(out, requestLocale(r)))
 }
 
 func (s *Server) deviceID(w http.ResponseWriter, r *http.Request) (int64, bool) {
@@ -464,7 +464,7 @@ func (s *Server) handleDeviceInventory(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeviceHealth(w http.ResponseWriter, r *http.Request) {
 	if id, ok := s.deviceID(w, r); ok {
 		list, err := healthcheck.ListChecks(r.Context(), s.DB, id)
-		s.respond(w, r, list, err)
+		s.respond(w, r, localizeChecks(list, requestLocale(r)), err)
 	}
 }
 
@@ -475,14 +475,14 @@ func (s *Server) handleDeviceEvents(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, eventList{Total: total, Items: list})
+		writeJSON(w, http.StatusOK, eventList{Total: total, Items: localizeEvents(list, requestLocale(r))})
 	}
 }
 
 func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	if id, ok := s.deviceID(w, r); ok {
 		list, err := s.Inventory.Timeline(r.Context(), id, qInt(r, "limit", 300))
-		s.respond(w, r, list, err)
+		s.respond(w, r, localizeTimeline(list, requestLocale(r)), err)
 	}
 }
 

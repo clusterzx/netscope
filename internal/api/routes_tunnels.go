@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"netscope/internal/auth"
+	"netscope/internal/i18n"
 	"netscope/internal/inventory"
 	"netscope/internal/netutil"
 	"netscope/internal/plugin"
@@ -52,6 +53,9 @@ func (s *Server) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	if s.Tunnels != nil {
 		out.Availability, out.Tunnels = s.Tunnels.Availability(), s.Tunnels.Statuses()
 	}
+	loc := requestLocale(r)
+	out.Availability.Reason = i18n.Err(loc, out.Availability.Reason)
+	out.Tunnels = localizeTunnelStatuses(out.Tunnels, loc)
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -95,7 +99,9 @@ func (s *Server) handleInspectTunnel(w http.ResponseWriter, r *http.Request) {
 			subnets = append(subnets, p.Masked())
 		}
 	}
-	writeJSON(w, http.StatusOK, cfg.Summary(subnets))
+	sum := cfg.Summary(subnets)
+	sum.Warnings = localizeStrings(sum.Warnings, requestLocale(r))
+	writeJSON(w, http.StatusOK, sum)
 }
 
 func (s *Server) handleTestTunnel(w http.ResponseWriter, r *http.Request) {
@@ -113,16 +119,20 @@ func (s *Server) handleTestTunnel(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, errors.New("Tunnel-Verwaltung nicht gestartet"))
 		return
 	}
-	writeJSON(w, http.StatusOK, s.Tunnels.Test(r.Context(), cfg))
+	res := s.Tunnels.Test(r.Context(), cfg)
+	res.Message = i18n.Err(requestLocale(r), res.Message)
+	writeJSON(w, http.StatusOK, res)
 }
 
 // subnetViews adds the tunnel states to subnets.
-func (s *Server) subnetViews(list []inventory.Subnet) []subnetView {
+func (s *Server) subnetViews(r *http.Request, list []inventory.Subnet) []subnetView {
+	loc := requestLocale(r)
 	out := make([]subnetView, 0, len(list))
 	for _, sn := range list {
 		v := subnetView{Subnet: sn}
 		if s.Tunnels != nil && sn.Access == inventory.AccessWireGuard && sn.TunnelCredentialID != nil && sn.Enabled {
 			if st, ok := s.Tunnels.Status(*sn.TunnelCredentialID); ok {
+				st = localizeTunnelStatuses([]tunnel.Status{st}, loc)[0]
 				v.Tunnel = &st
 			}
 		}

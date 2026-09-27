@@ -14,6 +14,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -21,6 +22,7 @@
 	import { formatBytes, formatDateTime } from '$lib/utils/format';
 	import RestoreOverlay from './RestoreOverlay.svelte';
 	import StrongConfirm from './StrongConfirm.svelte';
+	import { markupParts } from './system';
 
 	const canManage = $derived(auth.can('backups.manage'));
 
@@ -35,11 +37,11 @@
 		creating = true;
 		try {
 			const b = await api.post('/api/v1/system/backups');
-			toast.success(`Backup ${b.name} erstellt (${formatBytes(b.size)})`);
+			toast.success(t('Backup {name} erstellt ({size})', { name: b.name, size: formatBytes(b.size) }));
 			list.reload();
 			return true;
 		} catch (e) {
-			toast.error(e, { title: 'Backup fehlgeschlagen' });
+			toast.error(e, { title: t('Backup fehlgeschlagen') });
 			return false;
 		} finally {
 			creating = false;
@@ -48,15 +50,19 @@
 
 	async function remove(b: BackupInfo) {
 		const ok = await confirm({
-			title: 'Backup löschen?',
-			message: `${b.name} (${formatBytes(b.size)}, ${formatDateTime(b.createdAt)}) wird endgültig gelöscht.`,
-			confirmLabel: 'Löschen',
+			title: t('Backup löschen?'),
+			message: t('{name} ({size}, {date}) wird endgültig gelöscht.', {
+				name: b.name,
+				size: formatBytes(b.size),
+				date: formatDateTime(b.createdAt)
+			}),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/system/backups/{name}', { path: { name: b.name } });
-			toast.success(`Backup ${b.name} gelöscht`);
+			toast.success(t('Backup {name} gelöscht', { name: b.name }));
 			list.reload();
 		} catch (e) {
 			toast.error(e);
@@ -78,8 +84,8 @@
 		!target ? '' : target.kind === 'backup' ? target.backup.name : target.file.name
 	);
 
-	function askRestore(t: NonNullable<typeof target>) {
-		target = t;
+	function askRestore(next: NonNullable<typeof target>) {
+		target = next;
 		backupFirst = true;
 		restoreError = null;
 		confirmOpen = true;
@@ -90,7 +96,7 @@
 		fileError = null;
 		pickedFile = f;
 		if (f && !/\.(db|sqlite3?)(\.gz)?$/i.test(f.name))
-			fileError = 'Erwartet wird ein NetScope-Backup (.db.gz oder .db).';
+			fileError = t('Erwartet wird ein NetScope-Backup (.db.gz oder .db).');
 	}
 
 	async function doRestore() {
@@ -99,7 +105,7 @@
 		restoreError = null;
 		try {
 			if (backupFirst && !(await create())) {
-				restoreError = 'Das vorherige Backup ist fehlgeschlagen – Wiederherstellung abgebrochen.';
+				restoreError = t('Das vorherige Backup ist fehlgeschlagen – Wiederherstellung abgebrochen.');
 				return;
 			}
 			if (target.kind === 'backup') {
@@ -118,10 +124,30 @@
 		}
 	}
 
+	// the path of the master key is set as code
+	const footerText = markupParts(
+		t(
+			'Backups sind gzip-komprimiert und enthalten den NVD-Spiegel nicht – der wird bei Bedarf neu geladen. Der Vault-Master-Key ({file}) ist nicht Teil des Backups – ohne ihn sind gesicherte Credentials nicht lesbar. Den Key separat sichern.'
+		)
+	);
+
+	// the restore warning: the backup name is set in bold
+	const restoreText = $derived(
+		markupParts(
+			target?.kind === 'file'
+				? t('Die Datenbank wird durch {name} ({size}) ersetzt.', { size: formatBytes(target.file.size) })
+				: target?.kind === 'backup'
+					? t('Die Datenbank wird durch {name} vom {date} ersetzt.', {
+							date: formatDateTime(target.backup.createdAt)
+						})
+					: ''
+		)
+	);
+
 	const columns: Column<BackupInfo>[] = [
 		{ key: 'name', label: 'Backup' },
-		{ key: 'createdAt', label: 'Erstellt' },
-		{ key: 'size', label: 'Größe', align: 'right', width: '7rem', hideBelow: 'sm' },
+		{ key: 'createdAt', label: t('Erstellt') },
+		{ key: 'size', label: t('Größe'), align: 'right', width: '7rem', hideBelow: 'sm' },
 		{ key: 'actions', label: '', align: 'right', width: '3rem' }
 	];
 </script>
@@ -130,21 +156,21 @@
 	<Card>
 		<EmptyState
 			icon="lock"
-			title="Keine Berechtigung"
-			description="Für Backups fehlt die Berechtigung „Backups verwalten“."
+			title={t('Keine Berechtigung')}
+			description={t('Für Backups fehlt die Berechtigung „Backups verwalten“.')}
 		/>
 	</Card>
 {:else}
 	<div class="flex flex-col gap-4">
 		<Card
 			title="Backups"
-			description="Konsistente Kopie der SQLite-Datenbank im Datenverzeichnis (backups/)"
+			description={t('Konsistente Kopie der SQLite-Datenbank im Datenverzeichnis (backups/)')}
 			icon="disk"
 			padding="none"
 		>
 			{#snippet actions()}
 				<Button size="sm" variant="primary" icon="plus" loading={creating} onclick={create}
-					>Backup erstellen</Button
+					>{t('Backup erstellen')}</Button
 				>
 			{/snippet}
 			{#if list.error && !list.data}
@@ -167,22 +193,22 @@
 							<span class="tabular text-fg-muted">{formatBytes(b.size)}</span>
 						{:else if col.key === 'actions'}
 							<Menu
-								label="Aktionen für {b.name}"
+								label={t('Aktionen für {name}', { name: b.name })}
 								items={[
 									{
 										// plain link: large backups stream straight to disk (attachment)
-										label: 'Herunterladen',
+										label: t('Herunterladen'),
 										icon: 'download',
 										href: `/api/v1/system/backups/${encodeURIComponent(b.name)}`,
 										hint: formatBytes(b.size)
 									},
 									{
-										label: 'Wiederherstellen …',
+										label: t('Wiederherstellen …'),
 										icon: 'history',
 										onclick: () => askRestore({ kind: 'backup', backup: b })
 									},
 									{ separator: true },
-									{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(b) }
+									{ label: t('Löschen'), icon: 'trash', danger: true, onclick: () => remove(b) }
 								]}
 							/>
 						{/if}
@@ -191,31 +217,32 @@
 						<EmptyState
 							compact
 							icon="disk"
-							title="Noch keine Backups"
-							description="Ein Backup sichert Inventar, Einstellungen, Regeln und verschlüsselte Credentials (ohne Master-Key)."
+							title={t('Noch keine Backups')}
+							description={t(
+								'Ein Backup sichert Inventar, Einstellungen, Regeln und verschlüsselte Credentials (ohne Master-Key).'
+							)}
 						/>
 					{/snippet}
 				</Table>
 			{/if}
 			{#snippet footer()}
 				<p class="text-xs text-fg-subtle">
-					Backups sind gzip-komprimiert und enthalten den NVD-Spiegel nicht – der wird bei Bedarf neu geladen.
-					Der Vault-Master-Key (<code class="mono">data/master.key</code>) ist nicht Teil des Backups – ohne
-					ihn sind gesicherte Credentials nicht lesbar. Den Key separat sichern.
+					{#each footerText as part, k (k)}{#if k % 2}<code class="mono">data/master.key</code
+							>{:else}{part}{/if}{/each}
 				</p>
 			{/snippet}
 		</Card>
 
 		<Card
-			title="Aus Datei wiederherstellen"
-			description="Ein heruntergeladenes Backup hochladen und einspielen"
+			title={t('Aus Datei wiederherstellen')}
+			description={t('Ein heruntergeladenes Backup hochladen und einspielen')}
 			icon="upload"
 		>
 			<div class="flex flex-col gap-3">
 				<FormField
-					label="Backup-Datei"
+					label={t('Backup-Datei')}
 					error={fileError}
-					hint="Datei (.db.gz) aus „Herunterladen“ – ältere unkomprimierte .db-Backups gehen auch"
+					hint={t('Datei (.db.gz) aus „Herunterladen“ – ältere unkomprimierte .db-Backups gehen auch')}
 				>
 					{#snippet children(id, describedby)}
 						<input
@@ -235,7 +262,7 @@
 						icon="upload"
 						disabled={!pickedFile || !!fileError}
 						onclick={() => pickedFile && askRestore({ kind: 'file', file: pickedFile })}
-						>Hochladen & wiederherstellen …</Button
+						>{t('Hochladen & wiederherstellen …')}</Button
 					>
 				</div>
 			</div>
@@ -245,24 +272,25 @@
 
 <StrongConfirm
 	bind:open={confirmOpen}
-	title="Datenbank wiederherstellen?"
-	word="WIEDERHERSTELLEN"
-	confirmLabel="Wiederherstellen"
+	title={t('Datenbank wiederherstellen?')}
+	word={t('WIEDERHERSTELLEN')}
+	confirmLabel={t('Wiederherstellen')}
 	busy={restoring}
 	onconfirm={doRestore}
 >
-	{#if restoreError}<Alert tone="danger" title="Wiederherstellung nicht möglich">{restoreError}</Alert>{/if}
-	<Alert tone="danger" title="Alle aktuellen Daten werden ersetzt">
-		Die Datenbank wird durch <strong class="mono">{targetName}</strong>
-		{#if target?.kind === 'file'}({formatBytes(target.file.size)}){:else if target?.kind === 'backup'}vom {formatDateTime(
-				target.backup.createdAt
-			)}{/if} ersetzt. Änderungen seit diesem Stand gehen verloren. Die Dienste starten neu, laufende Scans werden
-		abgebrochen und alle Sitzungen können ungültig werden.
+	{#if restoreError}<Alert tone="danger" title={t('Wiederherstellung nicht möglich')}>{restoreError}</Alert
+		>{/if}
+	<Alert tone="danger" title={t('Alle aktuellen Daten werden ersetzt')}>
+		{#each restoreText as part, k (k)}{#if k % 2}<strong class="mono">{targetName}</strong
+				>{:else}{part}{/if}{/each}
+		{t(
+			'Änderungen seit diesem Stand gehen verloren. Die Dienste starten neu, laufende Scans werden abgebrochen und alle Sitzungen können ungültig werden.'
+		)}
 	</Alert>
 	<Checkbox
 		bind:checked={backupFirst}
-		label="Vorher ein Backup des aktuellen Stands erstellen"
-		description="Empfohlen – so lässt sich die Wiederherstellung rückgängig machen."
+		label={t('Vorher ein Backup des aktuellen Stands erstellen')}
+		description={t('Empfohlen – so lässt sich die Wiederherstellung rückgängig machen.')}
 	/>
 </StrongConfirm>
 

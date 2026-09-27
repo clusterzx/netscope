@@ -13,11 +13,13 @@
 		ErrorState,
 		Skeleton
 	} from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { credentials } from '$lib/stores/catalog.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import StrongConfirm from './StrongConfirm.svelte';
+	import { markupParts } from './system';
 
 	const canView = $derived(auth.can('credentials.view'));
 	const canRotate = $derived(auth.can('system.manage'));
@@ -29,9 +31,10 @@
 	});
 
 	const fromEnv = $derived((info.data?.vaultKeySource ?? '').includes('NETSCOPE_MASTER_KEY'));
+	// the server describes the key source as "Datei <path>" (English: "File <path>")
 	const keyFile = $derived(
 		info.data && !fromEnv
-			? info.data.vaultKeySource.replace(/^Datei\s+/, '')
+			? info.data.vaultKeySource.replace(/^(?:Datei|File)\s+/, '')
 			: `${info.data?.dataDir ?? 'data'}/master.key`
 	);
 
@@ -47,7 +50,7 @@
 			const res = await api.post('/api/v1/system/vault/rotate');
 			result = { keyId: res.keyId ?? '', previousKeyId: res.previousKeyId ?? '' };
 			open = false;
-			toast.success('Master-Key rotiert – alle Credentials wurden neu verschlüsselt.');
+			toast.success(t('Master-Key rotiert – alle Credentials wurden neu verschlüsselt.'));
 			info.reload();
 		} catch (e) {
 			error = { message: errorMessage(e), conflict: e instanceof ApiError && e.status === 409 };
@@ -64,19 +67,25 @@
 	<Card><Skeleton lines={5} /></Card>
 {:else}
 	<div class="flex flex-col gap-4">
-		<Card title="Master-Key" description="Verschlüsselt alle Credentials im Vault (AES-GCM)" icon="lock">
+		<Card
+			title={t('Master-Key')}
+			description={t('Verschlüsselt alle Credentials im Vault (AES-GCM)')}
+			icon="lock"
+		>
 			<DescList cols={2}>
-				<DescItem label="Schlüssel-ID">
+				<DescItem label={t('Schlüssel-ID')}>
 					<span class="mono">{info.data.vaultKeyId}</span>
-					<CopyButton text={info.data.vaultKeyId} label="Schlüssel-ID kopieren" />
+					<CopyButton text={info.data.vaultKeyId} label={t('Schlüssel-ID kopieren')} />
 				</DescItem>
-				<DescItem label="Quelle">
+				<DescItem label={t('Quelle')}>
 					{info.data.vaultKeySource}
-					<Badge tone={fromEnv ? 'info' : 'neutral'} class="ml-1">{fromEnv ? 'Umgebung' : 'Datei'}</Badge>
+					<Badge tone={fromEnv ? 'info' : 'neutral'} class="ml-1"
+						>{fromEnv ? t('Umgebung') : t('Datei')}</Badge
+					>
 				</DescItem>
 				{#if canView}
 					<DescItem
-						label="Gespeicherte Credentials"
+						label={t('Gespeicherte Credentials')}
 						value={credentials.value ? String(credentials.value.length) : '–'}
 					/>
 				{/if}
@@ -84,45 +93,57 @@
 		</Card>
 
 		{#if result}
-			<Alert tone="ok" title="Master-Key rotiert">
-				Neue Schlüssel-ID <code class="mono">{result.keyId}</code> (vorher
-				<code class="mono">{result.previousKeyId}</code>). Die Schlüsseldatei wurde ersetzt – jetzt die neue
-				<code class="mono">{keyFile}</code> sichern; ältere Backups der Datenbank benötigen den alten Schlüssel.
+			<Alert tone="ok" title={t('Master-Key rotiert')}>
+				{@render withCode(
+					t(
+						'Neue Schlüssel-ID {keyId} (vorher {previousKeyId}). Die Schlüsseldatei wurde ersetzt – jetzt die neue {file} sichern; ältere Backups der Datenbank benötigen den alten Schlüssel.'
+					),
+					{ keyId: result.keyId, previousKeyId: result.previousKeyId, file: keyFile }
+				)}
 			</Alert>
 		{/if}
 		{#if error}
 			<Alert
 				tone={error.conflict ? 'warn' : 'danger'}
-				title={error.conflict ? 'Rotation über die Oberfläche nicht möglich' : 'Rotation fehlgeschlagen'}
+				title={error.conflict
+					? t('Rotation über die Oberfläche nicht möglich')
+					: t('Rotation fehlgeschlagen')}
 			>
 				{error.message}
 			</Alert>
 		{/if}
 
-		<Card title="Master-Key rotieren" icon="refresh">
+		<Card title={t('Master-Key rotieren')} icon="refresh">
 			<div class="flex flex-col gap-3 text-sm">
 				<p class="text-fg-muted">
-					Erzeugt einen neuen Schlüssel und verschlüsselt alle Credentials damit neu. Sinnvoll, wenn der alte
-					Schlüssel kompromittiert sein könnte oder nach Personalwechsel.
+					{t(
+						'Erzeugt einen neuen Schlüssel und verschlüsselt alle Credentials damit neu. Sinnvoll, wenn der alte Schlüssel kompromittiert sein könnte oder nach Personalwechsel.'
+					)}
 				</p>
-				<Alert tone="warn" title="Vorher sichern">
-					Vor der Rotation <code class="mono">{keyFile}</code> und ein aktuelles Datenbank-Backup sichern. Backups,
-					die vor der Rotation erstellt wurden, lassen sich nur mit dem alten Schlüssel entschlüsseln.
+				<Alert tone="warn" title={t('Vorher sichern')}>
+					{@render withCode(
+						t(
+							'Vor der Rotation {file} und ein aktuelles Datenbank-Backup sichern. Backups, die vor der Rotation erstellt wurden, lassen sich nur mit dem alten Schlüssel entschlüsseln.'
+						),
+						{ file: keyFile }
+					)}
 				</Alert>
 				{#if fromEnv}
-					<Alert tone="info" title="Schlüssel aus der Umgebung">
-						Der Master-Key kommt aus <code class="mono">NETSCOPE_MASTER_KEY</code> und kann nur dort geändert werden.
+					<Alert tone="info" title={t('Schlüssel aus der Umgebung')}>
+						{@render withCode(t('Der Master-Key kommt aus {variable} und kann nur dort geändert werden.'), {
+							variable: 'NETSCOPE_MASTER_KEY'
+						})}
 					</Alert>
 				{/if}
 				{#if canRotate}
 					<div>
 						<Button variant="danger" icon="refresh" onclick={() => (open = true)}
-							>Master-Key rotieren …</Button
+							>{t('Master-Key rotieren …')}</Button
 						>
 					</div>
 				{:else}
 					<p class="text-xs text-fg-subtle">
-						Nur lesen – dafür fehlt die Berechtigung „Systemeinstellungen ändern“.
+						{t('Nur lesen – dafür fehlt die Berechtigung „Systemeinstellungen ändern“.')}
 					</p>
 				{/if}
 			</div>
@@ -132,15 +153,30 @@
 
 <StrongConfirm
 	bind:open
-	title="Master-Key rotieren?"
-	word="ROTIEREN"
-	confirmLabel="Jetzt rotieren"
+	title={t('Master-Key rotieren?')}
+	word={t('ROTIEREN')}
+	confirmLabel={t('Jetzt rotieren')}
 	{busy}
 	onconfirm={rotate}
 >
-	<Alert tone="danger" title="Nicht rückgängig zu machen">
-		Alle {credentials.value?.length ?? ''} Credentials werden mit einem neuen Schlüssel verschlüsselt; der alte
-		Schlüssel wird ersetzt. Ohne Sicherung von <code class="mono">{keyFile}</code> sind ältere Backups danach nicht
-		mehr entschlüsselbar.
+	<Alert tone="danger" title={t('Nicht rückgängig zu machen')}>
+		{@render withCode(
+			credentials.value
+				? tn(
+						credentials.value.length,
+						'{n} Credential wird mit einem neuen Schlüssel verschlüsselt; der alte Schlüssel wird ersetzt. Ohne Sicherung von {file} sind ältere Backups danach nicht mehr entschlüsselbar.',
+						'Alle {n} Credentials werden mit einem neuen Schlüssel verschlüsselt; der alte Schlüssel wird ersetzt. Ohne Sicherung von {file} sind ältere Backups danach nicht mehr entschlüsselbar.'
+					)
+				: t(
+						'Alle Credentials werden mit einem neuen Schlüssel verschlüsselt; der alte Schlüssel wird ersetzt. Ohne Sicherung von {file} sind ältere Backups danach nicht mehr entschlüsselbar.'
+					),
+			{ file: keyFile }
+		)}
 	</Alert>
 </StrongConfirm>
+
+<!-- a translated sentence with its placeholders set as code -->
+{#snippet withCode(text: string, values: Record<string, string>)}
+	{#each markupParts(text) as part, k (k)}{#if k % 2}<code class="mono">{values[part]}</code
+			>{:else}{part}{/if}{/each}
+{/snippet}

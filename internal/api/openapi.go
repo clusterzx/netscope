@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"netscope/internal/i18n"
 )
 
 type schemaGen struct {
@@ -151,15 +153,19 @@ func (g *schemaGen) structSchema(t reflect.Type) map[string]any {
 
 var pathParamRe = regexp.MustCompile(`\{([a-zA-Z_]+)\}`)
 
-// Spec returns the generated OpenAPI 3.1 document.
-func (s *Server) Spec() map[string]any {
+// Spec returns the generated OpenAPI 3.1 document (German texts).
+func (s *Server) Spec() map[string]any { return s.SpecIn(i18n.DE) }
+
+// SpecIn returns the OpenAPI document with summaries and descriptions in a language.
+func (s *Server) SpecIn(loc i18n.Locale) map[string]any {
+	tr := func(t string) string { return i18n.T(loc, t) }
 	g := &schemaGen{components: map[string]any{}, names: map[reflect.Type]string{}}
 	paths := map[string]map[string]any{}
 	errSchema := map[string]any{"type": "object", "properties": map[string]any{"error": map[string]any{"type": "object",
 		"properties": map[string]any{"code": map[string]any{"type": "string"}, "message": map[string]any{"type": "string"},
 			"fields": map[string]any{"type": "array", "items": map[string]any{"type": "object"}}}}}}
 	for _, rt := range s.routes {
-		op := map[string]any{"summary": rt.Summary, "tags": []string{rt.Tag},
+		op := map[string]any{"summary": tr(rt.Summary), "tags": []string{tr(rt.Tag)},
 			"operationId": strings.ToLower(rt.Method) + strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(rt.Path, "/api/v1", ""), "/", "_"), "{", "")}
 		op["operationId"] = strings.ReplaceAll(op["operationId"].(string), "}", "")
 		var params []map[string]any
@@ -175,7 +181,7 @@ func (s *Server) Spec() map[string]any {
 			if typ == "" {
 				typ = "string"
 			}
-			params = append(params, map[string]any{"name": p.Name, "in": in, "required": p.Required, "description": p.Desc,
+			params = append(params, map[string]any{"name": p.Name, "in": in, "required": p.Required, "description": tr(p.Desc),
 				"schema": map[string]any{"type": typ}})
 		}
 		if len(params) > 0 {
@@ -189,24 +195,24 @@ func (s *Server) Spec() map[string]any {
 		if status == 0 {
 			status = http.StatusOK
 		}
-		resp := map[string]any{"description": "Erfolg"}
+		resp := map[string]any{"description": tr("Erfolg")}
 		switch {
 		case rt.Content != "":
 			resp["content"] = map[string]any{rt.Content: map[string]any{"schema": map[string]any{"type": "string", "format": "binary"}}}
 		case rt.Resp != nil:
 			resp["content"] = map[string]any{"application/json": map[string]any{"schema": g.schema(reflect.TypeOf(rt.Resp))}}
 		}
-		errResp := map[string]any{"description": "Fehler", "content": map[string]any{"application/json": map[string]any{"schema": errSchema}}}
+		errResp := map[string]any{"description": tr("Fehler"), "content": map[string]any{"application/json": map[string]any{"schema": errSchema}}}
 		op["responses"] = map[string]any{itoa(status): resp, "default": errResp}
 		if rt.Scope == scopePublic {
 			op["security"] = []any{}
 		} else {
-			desc := "Lesezugriff"
+			desc := tr("Lesezugriff")
 			if rt.Scope == scopeWrite || rt.Method != http.MethodGet {
-				desc = "Schreibzugriff (Token-Scope write)"
+				desc = tr("Schreibzugriff (Token-Scope write)")
 			}
 			if rt.Perm != "" {
-				desc += " · Berechtigung „" + permLabel(rt.Perm) + "“ (" + rt.Perm + ")"
+				desc += " · " + i18n.Sprintf(loc, "Berechtigung „%s“ (%s)", tr(permLabel(rt.Perm)), rt.Perm)
 			}
 			op["description"] = desc
 		}
@@ -215,16 +221,16 @@ func (s *Server) Spec() map[string]any {
 		}
 		paths[rt.Path][strings.ToLower(rt.Method)] = op
 	}
-	paths["/api/v1/stream"] = map[string]any{"get": map[string]any{"summary": "Live-Updates (Server-Sent Events)", "tags": []string{"System"},
+	paths["/api/v1/stream"] = map[string]any{"get": map[string]any{"summary": tr("Live-Updates (Server-Sent Events)"), "tags": []string{"System"},
 		"parameters": []any{map[string]any{"name": "topics", "in": "query", "schema": map[string]any{"type": "string"},
-			"description": "Kommagetrennt: run, run.log, device, event, plugin, notification, health, system, log"}},
+			"description": tr("Kommagetrennt: run, run.log, device, event, plugin, notification, health, system, log")}},
 		"responses": map[string]any{"200": map[string]any{"description": "text/event-stream"}}}}
-	paths["/metrics"] = map[string]any{"get": map[string]any{"summary": "Prometheus-Metriken", "tags": []string{"System"},
+	paths["/metrics"] = map[string]any{"get": map[string]any{"summary": tr("Prometheus-Metriken"), "tags": []string{"System"},
 		"responses": map[string]any{"200": map[string]any{"description": "text/plain; version=0.0.4"}}}}
 	return map[string]any{
 		"openapi": "3.1.0",
 		"info": map[string]any{"title": "NetScope API", "version": s.Version,
-			"description": "JSON-API von NetScope. Authentifizierung per Session-Cookie (Web-UI, zusätzlich Header X-NetScope-CSRF bei schreibenden Anfragen) oder per API-Token (Authorization: Bearer ns_…; Scope read oder write). Ein Token hat höchstens die Rechte der Rolle seines Benutzers; die nötige Berechtigung steht bei jedem Endpunkt."},
+			"description": tr("JSON-API von NetScope. Authentifizierung per Session-Cookie (Web-UI, zusätzlich Header X-NetScope-CSRF bei schreibenden Anfragen) oder per API-Token (Authorization: Bearer ns_…; Scope read oder write). Ein Token hat höchstens die Rechte der Rolle seines Benutzers; die nötige Berechtigung steht bei jedem Endpunkt.")},
 		"servers": []any{map[string]any{"url": "/"}},
 		"paths":   paths,
 		"components": map[string]any{
@@ -244,15 +250,34 @@ func itoa(n int) string {
 }
 
 func (s *Server) handleOpenAPI(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.Spec())
+	writeJSON(w, http.StatusOK, s.SpecIn(requestLocale(r)))
 }
 
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'")
-	_, _ = w.Write([]byte(docsHTML))
+	page := docsHTML
+	if requestLocale(r) == i18n.EN {
+		page = docsEnglish.Replace(page)
+	}
+	_, _ = w.Write([]byte(page))
 }
 
+// docsEnglish turns the German API docs page into English (the page is static HTML; the
+// endpoint texts come from openapi.json in the language of the browser).
+var docsEnglish = strings.NewReplacer(
+	`<html lang="de">`, `<html lang="en">`,
+	`Lade Spezifikation …`, `Loading specification …`, // i18n:ignore
+	`zur Oberfläche`, `to the web interface`, // i18n:ignore
+	`Endpunkte filtern (z. B. devices, POST, events)`, `Filter endpoints (e.g. devices, POST, events)`, // i18n:ignore
+	`'Sonstiges'`, `'Other'`, // i18n:ignore
+	`<th>Parameter</th><th>Ort</th><th>Typ</th><th>Beschreibung</th>`, `<th>Parameter</th><th>In</th><th>Type</th><th>Description</th>`, // i18n:ignore
+	`Request-Body`, `Request body`, // i18n:ignore
+	`Antwort '`, `Response '`, // i18n:ignore
+	`Keine Treffer.`, `No matches.`, // i18n:ignore
+)
+
+// docsHTML is the API docs page (i18n:ignore – English through docsEnglish).
 const docsHTML = `<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NetScope API</title>

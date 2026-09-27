@@ -7,6 +7,7 @@
 	import { request } from '$lib/api';
 	import type { HealthResponse } from '$lib/api';
 	import { Button, Spinner } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		active: boolean;
@@ -72,24 +73,30 @@
 	{#if active}
 		<div class="flex flex-col items-center gap-3 px-6 py-8 text-center" role="status" aria-live="polite">
 			<Spinner size={32} class="text-accent" />
-			<h2 id="restore-title" class="text-base font-semibold">Datenbank wird wiederhergestellt</h2>
+			<h2 id="restore-title" class="text-base font-semibold">{t('Datenbank wird wiederhergestellt')}</h2>
 			<p id="restore-desc" class="text-sm text-fg-muted">
-				Quelle: <span class="mono">{source}</span><br />
+				{t('Quelle')}: <span class="mono">{source}</span><br />
 				{#if phase === 'ready'}
-					Dienste laufen wieder – die Seite wird neu geladen …
+					{t('Dienste laufen wieder – die Seite wird neu geladen …')}
 				{:else if phase === 'down'}
-					Dienste starten neu …
+					{t('Dienste starten neu …')}
 				{:else}
-					Warte auf den Neustart der Dienste …
+					{t('Warte auf den Neustart der Dienste …')}
 				{/if}
 			</p>
 			<p class="text-xs text-fg-subtle tabular">{elapsed} s</p>
 			{#if elapsed > 120}
 				<p class="text-xs text-warn">
-					Das dauert ungewöhnlich lange{lastError ? ` (${lastError})` : ''}. Server-Log prüfen oder die Seite
-					manuell neu laden.
+					{lastError
+						? t(
+								'Das dauert ungewöhnlich lange ({error}). Server-Log prüfen oder die Seite manuell neu laden.',
+								{
+									error: lastError
+								}
+							)
+						: t('Das dauert ungewöhnlich lange. Server-Log prüfen oder die Seite manuell neu laden.')}
 				</p>
-				<Button size="sm" icon="refresh" onclick={() => window.location.reload()}>Neu laden</Button>
+				<Button size="sm" icon="refresh" onclick={() => window.location.reload()}>{t('Neu laden')}</Button>
 			{/if}
 		</div>
 	{/if}

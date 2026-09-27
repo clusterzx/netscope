@@ -13,6 +13,7 @@
 		TagInput,
 		Toggle
 	} from '$lib/components/ui';
+	import { LOCALES, t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { meta } from '$lib/stores/catalog.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -49,7 +50,7 @@
 		'http'
 	];
 	const sourceLabel: Record<string, string> = {
-		manual: 'Manuell',
+		manual: t('Manuell'),
 		dhcp: 'DHCP',
 		openwrt: 'OpenWrt',
 		opnsense: 'OPNsense',
@@ -61,19 +62,19 @@
 		meraki: 'Meraki',
 		fritzbox: 'FRITZ!Box',
 		pihole: 'Pi-hole',
-		windows_dhcp: 'Windows-DHCP',
+		windows_dhcp: t('Windows-DHCP'),
 		ssh: 'SSH',
 		snmp: 'SNMP',
 		proxmox: 'Proxmox',
-		dns: 'DNS (Reverse-Lookup)',
+		dns: t('DNS (Reverse-Lookup)'),
 		mdns: 'mDNS / Bonjour',
 		netbios: 'NetBIOS',
 		upnp: 'UPnP',
 		docker: 'Docker',
 		nmap: 'Nmap',
 		netalertx: 'NetAlertX',
-		csv: 'CSV-Import',
-		http: 'HTTP-Erkennung'
+		csv: t('CSV-Import'),
+		http: t('HTTP-Erkennung')
 	};
 
 	const canManage = $derived(auth.can('system.manage'));
@@ -102,7 +103,7 @@
 				const u = new URL(f.publicUrl.trim());
 				if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.host) throw new Error();
 			} catch {
-				e.publicUrl = 'Gültige http(s)-URL erwartet, z. B. https://netscope.lan';
+				e.publicUrl = t('Gültige http(s)-URL erwartet, z. B. https://netscope.lan');
 			}
 		}
 		const int = (v: unknown, lo: number, hi: number) =>
@@ -110,7 +111,8 @@
 		if (!int(f.offlineAfterMissed, 1, 100)) e.offlineAfterMissed = '1–100';
 		if (!int(f.maxParallelRuns, 1, 64)) e.maxParallelRuns = '1–64';
 		if (!int(f.observationRawMaxKb, 0, 16384)) e.observationRawMaxKb = '0–16384 KB';
-		if (!f.deviceTypes?.length) e.deviceTypes = 'Mindestens ein Gerätetyp';
+		if (!f.deviceTypes?.length) e.deviceTypes = t('Mindestens ein Gerätetyp');
+		if (!LOCALES.some((l) => l.value === f.language)) e.language = t('Sprache wählen');
 		return e;
 	}
 
@@ -125,10 +127,11 @@
 			const saved = await api.put('/api/v1/system/settings', { body });
 			data.set(saved);
 			meta.refresh().catch(() => {});
-			toast.success('Einstellungen gespeichert');
+			toast.success(t('Einstellungen gespeichert'));
 		} catch (e) {
 			({ errors, general } = apiErrors(e, [
 				'publicUrl',
+				'language',
 				'offlineAfterMissed',
 				'maxParallelRuns',
 				'observationRawMaxKb',
@@ -166,7 +169,7 @@
 			const res = await api.put('/api/v1/system/loglevel', { body: { level } });
 			levelLoaded = res.level.toLowerCase();
 			level = levelLoaded;
-			toast.success(`Log-Level ist jetzt „${logLevelLabel[levelLoaded] ?? res.level}“`);
+			toast.success(t('Log-Level ist jetzt „{level}“', { level: logLevelLabel[levelLoaded] ?? res.level }));
 		} catch (e) {
 			toast.error(e);
 		} finally {
@@ -191,62 +194,73 @@
 		>
 			{#if !canManage}
 				<p class="text-xs text-fg-subtle">
-					Nur lesen – dafür fehlt die Berechtigung „Systemeinstellungen ändern“.
+					{t('Nur lesen – dafür fehlt die Berechtigung „Systemeinstellungen ändern“.')}
 				</p>
 			{/if}
-			{#if general}<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>{/if}
+			{#if general}<Alert tone="danger" title={t('Speichern fehlgeschlagen')}>{general}</Alert>{/if}
 
 			<fieldset disabled={!canManage} class="contents">
-				<Card title="Allgemein" icon="globe">
+				<Card title={t('Allgemein')} icon="globe">
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 						<Input
-							label="Öffentliche URL"
+							label={t('Öffentliche URL')}
 							type="url"
 							bind:value={form.publicUrl}
 							placeholder="https://netscope.example.lan"
-							hint="Basis für Deep-Links in Benachrichtigungen und Berichten"
+							hint={t('Basis für Deep-Links in Benachrichtigungen und Berichten')}
 							error={errors.publicUrl}
 							class="md:col-span-2"
 						/>
+						<!-- the language names stay in their own language, so everyone finds theirs -->
+						<Select
+							label={t('Sprache für Benachrichtigungen und Berichte')}
+							bind:value={form.language}
+							options={LOCALES}
+							hint={t(
+								'Benachrichtigungen (E-Mail, Telegram, ntfy, Webhook …) und geplante Berichte werden in dieser Sprache verschickt. Die Oberfläche richtet sich nach der Einstellung jedes Benutzers.'
+							)}
+							error={errors.language}
+							required
+						/>
 						<Input
-							label="Offline nach verpassten Läufen"
+							label={t('Offline nach verpassten Läufen')}
 							type="number"
 							min={1}
 							max={100}
 							bind:value={form.offlineAfterMissed}
-							hint="Aufeinanderfolgende Präsenz-Läufe ohne Antwort, bis ein Gerät als offline gilt"
+							hint={t('Aufeinanderfolgende Präsenz-Läufe ohne Antwort, bis ein Gerät als offline gilt')}
 							error={errors.offlineAfterMissed}
 							required
 						/>
 						<Input
-							label="Parallele Plugin-Läufe"
+							label={t('Parallele Plugin-Läufe')}
 							type="number"
 							min={1}
 							max={64}
 							bind:value={form.maxParallelRuns}
-							hint="Obergrenze gleichzeitig laufender Scans, Importe und Prozessoren"
+							hint={t('Obergrenze gleichzeitig laufender Scans, Importe und Prozessoren')}
 							error={errors.maxParallelRuns}
 							required
 						/>
 						<Input
-							label="Rohdaten je Beobachtung (KB)"
+							label={t('Rohdaten je Beobachtung (KB)')}
 							type="number"
 							min={0}
 							max={16384}
 							bind:value={form.observationRawMaxKb}
-							hint="Gespeicherte Rohausgabe pro Beobachtung (0 = keine Rohdaten)"
+							hint={t('Gespeicherte Rohausgabe pro Beobachtung (0 = keine Rohdaten)')}
 							error={errors.observationRawMaxKb}
 							required
 						/>
 						<div class="flex flex-col gap-1.5">
 							<Toggle
 								bind:checked={form.metricsPublic}
-								label="Metriken öffentlich"
-								description="/metrics ohne Anmeldung ausliefern (für Prometheus ohne Token)"
+								label={t('Metriken öffentlich')}
+								description={t('/metrics ohne Anmeldung ausliefern (für Prometheus ohne Token)')}
 							/>
 							{#if form.metricsPublic}
 								<p class="text-xs text-warn">
-									Jeder im Netz kann dann Kennzahlen (Gerätezahlen, Plugin-Status) abrufen.
+									{t('Jeder im Netz kann dann Kennzahlen (Gerätezahlen, Plugin-Status) abrufen.')}
 								</p>
 							{/if}
 						</div>
@@ -254,19 +268,21 @@
 				</Card>
 
 				<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-					<Card title="Hostname-Priorität" icon="sort">
+					<Card title={t('Hostname-Priorität')} icon="sort">
 						<OrderedList
 							bind:value={form.hostnamePriority}
-							label="Quellen (höchste zuerst)"
-							hint="Der Hostname eines Geräts kommt aus der ersten Quelle der Liste, die einen liefert. Nicht gelistete Quellen folgen danach. Änderungen berechnen alle Gerätenamen neu."
+							label={t('Quellen (höchste zuerst)')}
+							hint={t(
+								'Der Hostname eines Geräts kommt aus der ersten Quelle der Liste, die einen liefert. Nicht gelistete Quellen folgen danach. Änderungen berechnen alle Gerätenamen neu.'
+							)}
 							suggestions={KNOWN_SOURCES}
 							itemLabel={(v) => sourceLabel[v] ?? v}
 							error={errors.hostnamePriority}
 						/>
 					</Card>
-					<Card title="Gerätetypen" icon="devices">
+					<Card title={t('Gerätetypen')} icon="devices">
 						<TagInput
-							label="Auswählbare Typen"
+							label={t('Auswählbare Typen')}
 							bind:value={form.deviceTypes}
 							suggestions={[
 								'router',
@@ -294,12 +310,14 @@
 								'other'
 							]}
 							normalize={(s) => s.trim().toLowerCase().replace(/\s+/g, '-')}
-							hint="Kleinbuchstaben mit Bindestrich, z. B. access-point. Bekannte Typen haben deutsche Anzeigenamen."
+							hint={t(
+								'Kleinbuchstaben mit Bindestrich, z. B. access-point. Bekannte Typen haben deutsche Anzeigenamen.'
+							)}
 							error={errors.deviceTypes}
 						/>
 						<p class="mt-2 flex flex-wrap gap-1 text-xs text-fg-subtle">
-							{#each form.deviceTypes as t (t)}<span class="rounded bg-surface-2 px-1.5 py-0.5"
-									>{deviceTypeName(t)}</span
+							{#each form.deviceTypes as dt (dt)}<span class="rounded bg-surface-2 px-1.5 py-0.5"
+									>{deviceTypeName(dt)}</span
 								>{/each}
 						</p>
 					</Card>
@@ -312,11 +330,11 @@
 					{dirty ? 'sticky bottom-2 shadow-md' : ''}"
 				>
 					<span class="mr-auto text-sm {dirty ? 'text-warn' : 'text-fg-subtle'}">
-						{dirty ? 'Ungespeicherte Änderungen' : 'Alle Änderungen gespeichert'}
+						{dirty ? t('Ungespeicherte Änderungen') : t('Alle Änderungen gespeichert')}
 					</span>
-					<Button onclick={reset} disabled={!dirty || saving}>Verwerfen</Button>
+					<Button onclick={reset} disabled={!dirty || saving}>{t('Verwerfen')}</Button>
 					<Button type="submit" variant="primary" icon="save" loading={saving} disabled={!dirty}
-						>Speichern</Button
+						>{t('Speichern')}</Button
 					>
 				</div>
 			{/if}
@@ -324,13 +342,13 @@
 	{/if}
 
 	<Card
-		title="Log-Level"
-		description="Wirkt sofort, bis zum nächsten Neustart (Standard aus der Konfigurationsdatei)"
+		title={t('Log-Level')}
+		description={t('Wirkt sofort, bis zum nächsten Neustart (Standard aus der Konfigurationsdatei)')}
 		icon="terminal"
 	>
 		<div class="flex flex-wrap items-end gap-2">
 			<Select
-				label="Mindest-Level"
+				label={t('Mindest-Level')}
 				bind:value={level}
 				options={LOG_LEVELS.map((l) => ({ value: l, label: logLevelLabel[l] }))}
 				class="w-48"
@@ -338,16 +356,16 @@
 			/>
 			{#if canManage}
 				<Button onclick={saveLevel} loading={levelBusy} disabled={!level || level === levelLoaded}
-					>Übernehmen</Button
+					>{t('Übernehmen')}</Button
 				>
 			{/if}
 			{#if auth.can('audit.view')}
-				<Button variant="ghost" href="?tab=logs" iconRight="arrow-right">Log-Viewer</Button>
+				<Button variant="ghost" href="?tab=logs" iconRight="arrow-right">{t('Log-Viewer')}</Button>
 			{/if}
 		</div>
 		{#if level === 'debug' && levelLoaded !== 'debug'}
 			<p class="mt-2 text-xs text-fg-subtle">
-				Debug erzeugt deutlich mehr Protokollzeilen, auch im Log-Viewer.
+				{t('Debug erzeugt deutlich mehr Protokollzeilen, auch im Log-Viewer.')}
 			</p>
 		{/if}
 	</Card>

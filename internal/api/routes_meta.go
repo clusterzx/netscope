@@ -66,7 +66,7 @@ func (s *Server) handleSubnets(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.subnetViews(list))
+	writeJSON(w, http.StatusOK, s.subnetViews(r, list))
 }
 
 func (s *Server) handleSaveSubnet(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +95,7 @@ func (s *Server) handleSaveSubnet(w http.ResponseWriter, r *http.Request) {
 		action, status = "subnet.create", http.StatusCreated
 	}
 	s.record(r, action, "subnet", strconv.FormatInt(sn.ID, 10), "Subnetz "+sn.CIDR, nil, sn)
-	writeJSON(w, status, s.subnetViews([]inventory.Subnet{sn})[0])
+	writeJSON(w, status, s.subnetViews(r, []inventory.Subnet{sn})[0])
 }
 
 func (s *Server) handleDeleteSubnet(w http.ResponseWriter, r *http.Request) {

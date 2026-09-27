@@ -23,6 +23,7 @@
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDateTime } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
 
 	type Data = { list: Credential[]; types: CredentialType[] };
 
@@ -50,7 +51,7 @@
 
 	const list = $derived(data.data?.list ?? []);
 	const types = $derived(data.data?.types ?? []);
-	const typeOf = (t: string) => types.find((x) => x.type === t);
+	const typeOf = (id: string) => types.find((x) => x.type === id);
 
 	const pluginHref = (id: string) => `/plugins/${encodeURIComponent(id)}`;
 	const useHref = (u: CredentialUse) => (u.kind === 'subnet' ? '/system?tab=subnets' : pluginHref(u.id));
@@ -84,7 +85,7 @@
 		formOpen = true;
 	}
 	function onsaved(c: Credential) {
-		toast.success(editing ? 'Credential gespeichert' : 'Credential angelegt', { title: c.name });
+		toast.success(editing ? t('Credential gespeichert') : t('Credential angelegt'), { title: c.name });
 		data.reload();
 		credentialCatalog.refresh().catch(() => {});
 	}
@@ -95,18 +96,20 @@
 	async function remove(c: Credential) {
 		const used = c.usedBy ?? [];
 		const ok = await confirm({
-			title: `Credential „${c.name}“ löschen?`,
+			title: t('Credential „{name}“ löschen?', { name: c.name }),
 			message: used.length
-				? `Achtung: Es wird noch verwendet von ${usedNames(c)}. Es muss zuerst dort entfernt werden.`
-				: 'Die verschlüsselten Zugangsdaten werden endgültig gelöscht.',
-			confirmLabel: 'Löschen',
+				? t('Achtung: Es wird noch verwendet von {names}. Es muss zuerst dort entfernt werden.', {
+						names: usedNames(c)
+					})
+				: t('Die verschlüsselten Zugangsdaten werden endgültig gelöscht.'),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		blocked = null;
 		try {
 			await api.delete('/api/v1/credentials/{id}', { path: { id: c.id } });
-			toast.success(`Credential „${c.name}“ gelöscht`);
+			toast.success(t('Credential „{name}“ gelöscht', { name: c.name }));
 			data.reload();
 			credentialCatalog.refresh().catch(() => {});
 		} catch (e) {
@@ -115,28 +118,33 @@
 				requestAnimationFrame(() =>
 					document.getElementById('cred-blocked')?.scrollIntoView({ block: 'nearest' })
 				);
-			} else toast.error(errorMessage(e), { title: 'Löschen fehlgeschlagen' });
+			} else toast.error(errorMessage(e), { title: t('Löschen fehlgeschlagen') });
 		}
 	}
 
 	const columns: Column<Credential>[] = [
 		{ key: 'name', label: 'Name' },
-		{ key: 'type', label: 'Typ', hideBelow: 'sm' },
-		{ key: 'scope', label: 'Gilt für', hideBelow: 'md' },
-		{ key: 'public', label: 'Angaben', hideBelow: 'lg' },
-		{ key: 'usedBy', label: 'Verwendet von', hideBelow: 'sm' },
-		{ key: 'lastUsed', label: 'Zuletzt verwendet', hideBelow: 'lg' },
-		{ key: 'updated', label: 'Geändert', hideBelow: 'xl' },
-		{ key: 'actions', label: 'Aktionen', align: 'right', width: '3.5rem' }
+		{ key: 'type', label: t('Typ'), hideBelow: 'sm' },
+		{ key: 'scope', label: t('Gilt für'), hideBelow: 'md' },
+		{ key: 'public', label: t('Angaben'), hideBelow: 'lg' },
+		{ key: 'usedBy', label: t('Verwendet von'), hideBelow: 'sm' },
+		{ key: 'lastUsed', label: t('Zuletzt verwendet'), hideBelow: 'lg' },
+		{ key: 'updated', label: t('Geändert'), hideBelow: 'xl' },
+		{ key: 'actions', label: t('Aktionen'), align: 'right', width: '3.5rem' }
 	];
 	const shownColumns = $derived(canManage ? columns : columns.filter((c) => c.key !== 'actions'));
+
+	// the sentence links to the vault page: split at the placeholder
+	const vaultText = t(
+		'Secrets (Passwörter, private Schlüssel, Tokens, Communities) werden mit AES-256-GCM verschlüsselt abgelegt und nach dem Speichern nie wieder angezeigt – weder hier noch über die API. Plugins verweisen nur auf das Credential. Der Master-Schlüssel wird unter {link} rotiert.'
+	).split('{link}');
 </script>
 
-<PageHeader title="Credentials" description="Zugangsdaten für Scanner, Importer und Publisher (Vault)">
+<PageHeader title="Credentials" description={t('Zugangsdaten für Scanner, Importer und Publisher (Vault)')}>
 	{#snippet actions()}
 		{#if canManage}
 			<Button variant="primary" icon="plus" onclick={openCreate} disabled={!data.data}
-				>Credential anlegen</Button
+				>{t('Credential anlegen')}</Button
 			>
 		{/if}
 	{/snippet}
@@ -145,32 +153,28 @@
 {#if !canView}
 	<EmptyState
 		icon="lock"
-		title="Keine Berechtigung"
-		description="Zum Anzeigen der Credentials fehlt die Berechtigung „Credentials einsehen“."
+		title={t('Keine Berechtigung')}
+		description={t('Zum Anzeigen der Credentials fehlt die Berechtigung „Credentials einsehen“.')}
 	/>
 {:else}
 	<div class="flex flex-col gap-4">
-		<Alert tone="info" title="Verschlüsselt gespeichert">
-			Secrets (Passwörter, private Schlüssel, Tokens, Communities) werden mit AES-256-GCM verschlüsselt
-			abgelegt und nach dem Speichern nie wieder angezeigt – weder hier noch über die API. Plugins verweisen
-			nur auf das Credential. Der Master-Schlüssel wird unter <a href="/system?tab=vault" class="link"
-				>System → Vault</a
-			>
-			rotiert.
+		<Alert tone="info" title={t('Verschlüsselt gespeichert')}>
+			{vaultText[0]}<a href="/system?tab=vault" class="link">System → Vault</a>{vaultText[1]}
 			<span class="mt-1 block">
-				<strong class="font-medium">Automatische Auswahl:</strong> Plugins ohne eigene Auswahl nehmen pro Gerät
-				die Zugangsdaten, deren „Gilt für“ passt – das spezifischste zuerst (Gerät, dann Gruppe/Tag/Filter, dann
-				Subnetz, zuletzt überall). Welche für ein Gerät gelten, zeigt die Geräteseite.
+				<strong class="font-medium">{t('Automatische Auswahl:')}</strong>
+				{t(
+					'Plugins ohne eigene Auswahl nehmen pro Gerät die Zugangsdaten, deren „Gilt für“ passt – das spezifischste zuerst (Gerät, dann Gruppe/Tag/Filter, dann Subnetz, zuletzt überall). Welche für ein Gerät gelten, zeigt die Geräteseite.'
+				)}
 			</span>
 		</Alert>
 
 		{#if blocked}
 			<div id="cred-blocked">
-				<Alert tone="danger" title="„{blocked.name}“ kann nicht gelöscht werden">
+				<Alert tone="danger" title={t('„{name}“ kann nicht gelöscht werden', { name: blocked.name })}>
 					{blocked.message}
 					{#if blocked.usedBy.length}
 						<span class="mt-1 block">
-							Zuerst dort entfernen:
+							{t('Zuerst dort entfernen:')}
 							{#each blocked.usedBy as u, i (u.id)}
 								<a class="link" href={useHref(u)}>{u.name}</a>{i < blocked.usedBy.length - 1 ? ', ' : ''}
 							{/each}
@@ -181,7 +185,7 @@
 							size="xs"
 							variant="ghost"
 							icon="x"
-							label="Hinweis schließen"
+							label={t('Hinweis schließen')}
 							onclick={() => (blocked = null)}
 						/>
 					{/snippet}
@@ -214,7 +218,7 @@
 							{#if c.description}<span class="block text-xs text-fg-muted">{c.description}</span>{/if}
 							<span class="mt-1 block text-xs text-fg-subtle sm:hidden"
 								>{typeOf(c.type)?.label ?? c.type}{(c.usedBy ?? []).length
-									? ` · verwendet von ${usedNames(c)}`
+									? ` · ${t('verwendet von {names}', { names: usedNames(c) })}`
 									: ''}</span
 							>
 						</div>
@@ -224,14 +228,18 @@
 							{typeOf(c.type)?.label ?? c.type}
 						</Badge>
 					{:else if col.key === 'scope' && c.type === 'wireguard'}
-						<span class="text-xs text-fg-subtle" title="Tunnel-Konfigurationen werden beim Subnetz ausgewählt"
-							>Tunnel für Subnetze</span
+						<span
+							class="text-xs text-fg-subtle"
+							title={t('Tunnel-Konfigurationen werden beim Subnetz ausgewählt')}
+							>{t('Tunnel für Subnetze')}</span
 						>
 					{:else if col.key === 'scope'}
 						{@const level = credentialScopeLevel(c.scope)}
 						<Badge
 							tone={levelTone[level]}
-							title="Geltungsbereich – bestimmt, für welche Ziele Plugins dieses Credential automatisch wählen"
+							title={t(
+								'Geltungsbereich – bestimmt, für welche Ziele Plugins dieses Credential automatisch wählen'
+							)}
 						>
 							<Icon name={levelIcon[level]} size={12} class="-mt-px mr-0.5 inline align-middle" />
 							<span class="inline-block max-w-56 truncate align-bottom"
@@ -253,7 +261,7 @@
 							{/if}
 							<span class="flex flex-wrap gap-1">
 								{#each c.secretsSet ?? [] as s (s)}
-									<Badge tone="ok" title="Secret ist gespeichert (wird nicht angezeigt)">
+									<Badge tone="ok" title={t('Secret ist gespeichert (wird nicht angezeigt)')}>
 										<Icon name="lock" size={11} class="-mt-px mr-0.5 inline align-middle" />
 										{fieldLabel(c.type, s)}
 									</Badge>
@@ -268,35 +276,38 @@
 								<a
 									href={useHref(u)}
 									class="rounded focus-visible:outline-2"
-									title={u.kind === 'subnet' ? 'Subnetz öffnen' : 'Plugin öffnen'}
+									title={u.kind === 'subnet' ? t('Subnetz öffnen') : t('Plugin öffnen')}
 								>
 									<Badge tone="accent">{u.name}</Badge>
 								</a>
 							{:else}
 								<span
 									class="text-xs text-fg-subtle"
-									title="Kein Plugin hat es fest ausgewählt. Plugins ohne eigene Auswahl verwenden es automatisch, wenn „Gilt für“ passt."
-									>nicht fest zugewiesen</span
+									title={t(
+										'Kein Plugin hat es fest ausgewählt. Plugins ohne eigene Auswahl verwenden es automatisch, wenn „Gilt für“ passt.'
+									)}>{t('nicht fest zugewiesen')}</span
 								>
 							{/each}
 						</span>
 					{:else if col.key === 'lastUsed'}
 						{#if c.lastUsedAt}<RelativeTime value={c.lastUsedAt} />{:else}<span class="text-fg-subtle"
-								>nie</span
+								>{t('nie')}</span
 							>{/if}
 					{:else if col.key === 'updated'}
-						<span title="Angelegt {formatDateTime(c.createdAt)}"><RelativeTime value={c.updatedAt} /></span>
+						<span title={t('Angelegt {date}', { date: formatDateTime(c.createdAt) })}
+							><RelativeTime value={c.updatedAt} /></span
+						>
 					{:else if col.key === 'actions'}
 						<Menu
-							label="Aktionen für „{c.name}“"
+							label={t('Aktionen für „{name}“', { name: c.name })}
 							items={[
-								{ label: 'Bearbeiten', icon: 'edit', onclick: () => openEdit(c) },
+								{ label: t('Bearbeiten'), icon: 'edit', onclick: () => openEdit(c) },
 								{ separator: true },
 								{
-									label: 'Löschen',
+									label: t('Löschen'),
 									icon: 'trash',
 									danger: true,
-									hint: (c.usedBy ?? []).length ? 'in Verwendung' : undefined,
+									hint: (c.usedBy ?? []).length ? t('in Verwendung') : undefined,
 									onclick: () => remove(c)
 								}
 							]}
@@ -305,13 +316,15 @@
 				{/snippet}
 				{#snippet empty()}
 					{#snippet create()}
-						<Button variant="primary" icon="plus" onclick={openCreate}>Credential anlegen</Button>
+						<Button variant="primary" icon="plus" onclick={openCreate}>{t('Credential anlegen')}</Button>
 					{/snippet}
 					<EmptyState
 						icon="key"
-						title="Noch keine Credentials"
+						title={t('Noch keine Credentials')}
 						description={canManage
-							? 'Zugangsdaten (SSH-Schlüssel, Passwort, SNMP-Community, API-Token) hier anlegen und anschließend in den Plugin-Einstellungen auswählen.'
+							? t(
+									'Zugangsdaten (SSH-Schlüssel, Passwort, SNMP-Community, API-Token) hier anlegen und anschließend in den Plugin-Einstellungen auswählen.'
+								)
 							: undefined}
 						actions={canManage ? create : undefined}
 					/>

@@ -159,7 +159,7 @@ var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
 
 // slugify turns a name into the identifier used by the filter language (site:colo).
 func slugify(name string) string {
-	s := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss", "Ä", "ae", "Ö", "oe", "Ü", "ue").Replace(name)
+	s := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss", "Ä", "ae", "Ö", "oe", "Ü", "ue").Replace(name) // i18n:ignore
 	s = slugRe.ReplaceAllString(strings.ToLower(s), "-")
 	return strings.Trim(s, "-")
 }
@@ -467,7 +467,7 @@ func (s *Service) apply(ctx context.Context, siteID int64, siteName string, it w
 		}
 		_, err := s.Events.Import(ctx, events.Imported{SiteID: siteID, Site: siteName, DeviceID: dev, At: at, Type: ev.Type,
 			Severity: ev.Severity, PluginID: ev.Plugin, Title: ev.Title, Message: ev.Message, Payload: ev.Payload, RemoteID: ev.ID})
-		if err != nil && strings.Contains(err.Error(), "unbekannter Event-Typ") {
+		if err != nil && strings.Contains(err.Error(), "unbekannter Event-Typ") { // i18n:ignore
 			s.Log.Info("Verbund: Event-Typ des Standorts unbekannt (Zentrale älter?)", "site", siteName, "type", ev.Type)
 			return nil
 		}

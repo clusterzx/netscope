@@ -57,6 +57,12 @@ type passwordRequest struct {
 	New     string `json:"new"`
 }
 
+// preferencesRequest changes the own settings of the signed-in user.
+type preferencesRequest struct {
+	// Locale is the language of the web interface: "" (browser), "de" or "en".
+	Locale string `json:"locale"`
+}
+
 type passwordConfirm struct {
 	Password string `json:"password"`
 }
@@ -129,6 +135,8 @@ func (s *Server) registerAuth() {
 		handler: s.handleLogout})
 	s.add(&route{Method: "GET", Path: "/api/v1/auth/me", Tag: "Auth", Summary: "Aktueller Benutzer mit Rolle und Berechtigungen", Scope: scopeRead,
 		Setup: true, Resp: meResponse{}, handler: s.handleMe})
+	s.add(&route{Method: "PUT", Path: "/api/v1/auth/preferences", Tag: "Auth", Summary: "Eigene Einstellungen ändern (Sprache der Oberfläche)", Scope: scopeWrite,
+		Setup: true, Body: preferencesRequest{}, Resp: meResponse{}, handler: s.handlePreferences})
 	s.add(&route{Method: "PUT", Path: "/api/v1/auth/password", Tag: "Auth", Summary: "Eigenes Passwort ändern (beendet andere Sessions)", Scope: scopeWrite,
 		Setup: true, Body: passwordRequest{}, Resp: okResponse{}, handler: s.handlePassword})
 
@@ -301,10 +309,34 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, meResponse{User: u, Principal: p})
 }
 
+func (s *Server) handlePreferences(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if !sessionOnly(w, r, p) {
+		return
+	}
+	var req preferencesRequest
+	if err := decode(r, &req); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if err := s.Auth.SetLocale(r.Context(), p.UserID, req.Locale); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	u, err := s.Auth.User(r.Context(), p.UserID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	np := *p
+	np.Locale = u.Locale
+	writeJSON(w, http.StatusOK, meResponse{User: u, Principal: &np})
+}
+
 // sessionOnly refuses changes to the own account through API tokens.
-func sessionOnly(w http.ResponseWriter, p *auth.Principal) bool {
+func sessionOnly(w http.ResponseWriter, r *http.Request, p *auth.Principal) bool {
 	if p.Kind != "session" {
-		writeError(w, http.StatusForbidden, "forbidden", "Das geht nur in der Oberfläche, nicht mit einem API-Token", nil)
+		writeError(w, r, http.StatusForbidden, "forbidden", "Das geht nur in der Oberfläche, nicht mit einem API-Token", nil)
 		return false
 	}
 	return true
@@ -312,7 +344,7 @@ func sessionOnly(w http.ResponseWriter, p *auth.Principal) bool {
 
 func (s *Server) handlePassword(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	var req passwordRequest
@@ -354,7 +386,7 @@ func (s *Server) handleMFA(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	var req totpSetupRequest
@@ -390,7 +422,7 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTOTPConfirm(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	var req totpConfirmRequest
@@ -409,7 +441,7 @@ func (s *Server) handleTOTPConfirm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTOTPDisable(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	var req passwordConfirm
@@ -427,7 +459,7 @@ func (s *Server) handleTOTPDisable(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRecoveryCodes(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	var req passwordConfirm
@@ -446,7 +478,7 @@ func (s *Server) handleRecoveryCodes(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePasskeyOptions(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	opts, err := s.Auth.BeginPasskeyRegistration(r.Context(), p.UserID, relyingParty(r))
@@ -459,7 +491,7 @@ func (s *Server) handlePasskeyOptions(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePasskeyCreate(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	var req passkeyRequest
@@ -497,7 +529,7 @@ func (s *Server) handlePasskeyRename(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePasskeyDelete(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
-	if !sessionOnly(w, p) {
+	if !sessionOnly(w, r, p) {
 		return
 	}
 	id, err := pathID(r, "id")

@@ -39,6 +39,7 @@
 </script>
 
 <script lang="ts" generics="T">
+	import { t } from '$lib/i18n';
 	import Checkbox from './Checkbox.svelte';
 	import Icon from './Icon.svelte';
 	import Skeleton from './Skeleton.svelte';
@@ -128,8 +129,8 @@
 
 	function rowClick(row: T, e: MouseEvent) {
 		if (!onrowclick) return;
-		const t = e.target as HTMLElement;
-		if (t.closest('a,button,input,label,select,textarea,[role="button"]')) return;
+		const el = e.target as HTMLElement;
+		if (el.closest('a,button,input,label,select,textarea,[role="button"]')) return;
 		if (window.getSelection()?.toString()) return;
 		onrowclick(row, e);
 	}
@@ -155,7 +156,7 @@
 							checked={allSelected}
 							indeterminate={someSelected}
 							onchange={toggleAll}
-							label="Alle sichtbaren auswählen"
+							label={t('Alle sichtbaren auswählen')}
 							hideLabel
 						/>
 					</th>
@@ -211,7 +212,12 @@
 				>
 					{#if selectable}
 						<td class="border-b border-border px-3 {dense ? 'py-1' : 'py-2'}">
-							<Checkbox checked={isSel} onchange={() => toggleRow(k)} label="Zeile auswählen" hideLabel />
+							<Checkbox
+								checked={isSel}
+								onchange={() => toggleRow(k)}
+								label={t('Zeile auswählen')}
+								hideLabel
+							/>
 						</td>
 					{/if}
 					{#each columns as c (c.key)}
@@ -243,7 +249,7 @@
 		{:else if empty}
 			{@render empty()}
 		{:else}
-			<p class="px-4 py-8 text-center text-sm text-fg-subtle">Keine Einträge</p>
+			<p class="px-4 py-8 text-center text-sm text-fg-subtle">{t('Keine Einträge')}</p>
 		{/if}
 	{/if}
 </div>

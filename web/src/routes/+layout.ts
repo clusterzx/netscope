@@ -1,7 +1,9 @@
 // Single page application: rendered in the browser, served by the Go binary.
 // The root load resolves the session once; unauthenticated users go to /login?next=…, sessions
-// that first have to change the start password or set up a second factor to /setup.
+// that first have to change the start password or set up a second factor to /setup. A signed-in
+// user whose language preference differs from the language the page started in gets a reload.
 import { redirect } from '@sveltejs/kit';
+import { applyPreference } from '$lib/i18n';
 import { auth } from '$lib/stores/auth.svelte';
 import type { LayoutLoad } from './$types';
 
@@ -15,6 +17,11 @@ export const load: LayoutLoad = async ({ url, untrack, fetch }) => {
 	if (!me) {
 		const next = untrack(() => url.pathname + url.search);
 		redirect(307, '/login?next=' + encodeURIComponent(next));
+	}
+	if (applyPreference(me.user?.locale)) {
+		window.location.reload();
+		// keep the old page from rendering while the browser reloads
+		await new Promise(() => {});
 	}
 	// a start password or a missing second factor (required by the role) comes first
 	if (auth.restricted && path !== '/setup') redirect(307, '/setup');

@@ -10,6 +10,7 @@
 	import { eventCounts } from '$lib/stores/eventCounts.svelte';
 	import { meta, wireCatalogRefresh } from '$lib/stores/catalog.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
+	import { t } from '$lib/i18n';
 
 	let { children }: { children: Snippet } = $props();
 	let mobileOpen = $state(false);
@@ -38,7 +39,7 @@
 <a
 	href="#main"
 	class="sr-only z-[70] rounded bg-accent px-3 py-2 text-accent-fg focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
-	>Zum Inhalt springen</a
+	>{t('Zum Inhalt springen')}</a
 >
 
 <div class="flex min-h-dvh">
@@ -53,7 +54,7 @@
 			<button
 				type="button"
 				class="absolute inset-0 bg-overlay"
-				aria-label="Navigation schließen"
+				aria-label={t('Navigation schließen')}
 				onclick={() => (mobileOpen = false)}
 			></button>
 			<aside class="relative h-full w-64 max-w-[85vw] border-r border-border bg-surface shadow-lg">

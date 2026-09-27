@@ -3,7 +3,8 @@
 	import Alert from '$lib/components/ui/Alert.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import { formatBytes, formatDateTime, formatNumber, formatSeconds } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
+	import { formatBytes, formatDateTime, formatNumber, formatSeconds, percentUnit } from '$lib/utils/format';
 
 	interface BlockDevice {
 		name: string;
@@ -84,8 +85,8 @@
 	const memUsed = $derived(data.memory ? data.memory.totalBytes - data.memory.availableBytes : 0);
 	const memPct = $derived(data.memory?.totalBytes ? Math.round((memUsed / data.memory.totalBytes) * 100) : 0);
 	const updateSources: Record<string, string> = {
-		'apt-history': 'APT-Historie',
-		'dpkg-status': 'dpkg-Status',
+		'apt-history': t('APT-Historie'),
+		'dpkg-status': t('dpkg-Status'),
 		rpm: 'RPM',
 		apk: 'APK'
 	};
@@ -123,7 +124,7 @@
 <div class="flex flex-col gap-5">
 	<dl class="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2 xl:grid-cols-3">
 		<div>
-			<dt class="text-xs text-fg-subtle">Betriebssystem</dt>
+			<dt class="text-xs text-fg-subtle">{t('Betriebssystem')}</dt>
 			<dd class="text-sm">{os || '–'}</dd>
 		</div>
 		<div>
@@ -138,12 +139,13 @@
 			<dt class="text-xs text-fg-subtle">Uptime</dt>
 			<dd class="text-sm">
 				{formatSeconds(data.uptimeSeconds)}
-				{#if data.bootTime}<span class="text-xs text-fg-subtle">(Boot {formatDateTime(data.bootTime)})</span
+				{#if data.bootTime}<span class="text-xs text-fg-subtle"
+						>({t('Boot {time}', { time: formatDateTime(data.bootTime) })})</span
 					>{/if}
 			</dd>
 		</div>
 		<div>
-			<dt class="text-xs text-fg-subtle">Letztes Update</dt>
+			<dt class="text-xs text-fg-subtle">{t('Letztes Update')}</dt>
 			<dd class="text-sm">
 				{formatDateTime(data.lastUpdate)}
 				{#if data.lastUpdateSource}
@@ -154,13 +156,13 @@
 			</dd>
 		</div>
 		<div>
-			<dt class="text-xs text-fg-subtle">Pakete</dt>
+			<dt class="text-xs text-fg-subtle">{t('Pakete')}</dt>
 			<dd class="text-sm">
 				{data.packageCount ? formatNumber(data.packageCount) : '–'}
 				{#if data.packageManager}<span class="text-xs text-fg-subtle">({data.packageManager})</span>{/if}
 				{#if data.packageDbModified}
 					<span class="block text-xs text-fg-subtle"
-						>Paketdatenbank geändert {formatDateTime(data.packageDbModified)}</span
+						>{t('Paketdatenbank geändert {time}', { time: formatDateTime(data.packageDbModified) })}</span
 					>
 				{/if}
 			</dd>
@@ -172,10 +174,10 @@
 					{data.cpu.model || data.cpu.hardware || data.cpu.vendor || '–'}
 					<span class="block text-xs text-fg-subtle">
 						{[
-							data.cpu.sockets ? `${data.cpu.sockets} Sockel` : '',
-							data.cpu.cores ? `${data.cpu.cores} Kerne (Host)` : '',
-							data.cpu.threads ? `${data.cpu.threads} Threads` : '',
-							data.cpu.usable ? `${data.cpu.usable} nutzbar` : ''
+							data.cpu.sockets ? t('{n} Sockel', { n: data.cpu.sockets }) : '',
+							data.cpu.cores ? t('{n} Kerne (Host)', { n: data.cpu.cores }) : '',
+							data.cpu.threads ? t('{n} Threads', { n: data.cpu.threads }) : '',
+							data.cpu.usable ? t('{n} nutzbar', { n: data.cpu.usable }) : ''
 						]
 							.filter(Boolean)
 							.join(' · ')}
@@ -185,13 +187,16 @@
 		{/if}
 		{#if data.memory}
 			<div>
-				<dt class="text-xs text-fg-subtle">Arbeitsspeicher</dt>
+				<dt class="text-xs text-fg-subtle">{t('Arbeitsspeicher')}</dt>
 				<dd class="text-sm">
-					{formatBytes(memUsed)} von {formatBytes(data.memory.totalBytes)} belegt
+					{t('{used} von {total} belegt', {
+						used: formatBytes(memUsed),
+						total: formatBytes(data.memory.totalBytes)
+					})}
 					<span
 						class="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface-3"
 						role="meter"
-						aria-label="RAM-Auslastung"
+						aria-label={t('RAM-Auslastung')}
 						aria-valuenow={memPct}
 						aria-valuemin={0}
 						aria-valuemax={100}
@@ -212,13 +217,17 @@
 			<div>
 				<dt class="text-xs text-fg-subtle">Docker</dt>
 				<dd class="text-sm">
-					{data.docker.running}/{data.docker.containers} Container laufen · {data.docker.images} Images
+					{t('{running}/{total} Container laufen · {images} Images', {
+						running: data.docker.running,
+						total: data.docker.containers,
+						images: data.docker.images
+					})}
 				</dd>
 			</div>
 		{/if}
 		{#if data.user}
 			<div>
-				<dt class="text-xs text-fg-subtle">Angemeldet als</dt>
+				<dt class="text-xs text-fg-subtle">{t('Angemeldet als')}</dt>
 				<dd class="mono text-sm">{data.user}</dd>
 			</div>
 		{/if}
@@ -226,17 +235,17 @@
 
 	{#if data.filesystems?.length}
 		<section>
-			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">Dateisysteme</h4>
+			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">{t('Dateisysteme')}</h4>
 			<div class="relative overflow-x-auto rounded-md border border-border">
 				<table class="w-full min-w-[34rem] border-separate border-spacing-0 text-xs">
 					<thead>
 						<tr class="bg-surface-2 text-left text-fg-muted">
-							<th scope="col" class={th}>Einhängepunkt</th>
-							<th scope="col" class={th}>Gerät</th>
-							<th scope="col" class={th}>Typ</th>
-							<th scope="col" class="{th} text-right">Größe</th>
-							<th scope="col" class="{th} text-right">Frei</th>
-							<th scope="col" class="{th} w-40">Belegt</th>
+							<th scope="col" class={th}>{t('Einhängepunkt')}</th>
+							<th scope="col" class={th}>{t('Gerät')}</th>
+							<th scope="col" class={th}>{t('Typ')}</th>
+							<th scope="col" class="{th} text-right">{t('Größe')}</th>
+							<th scope="col" class="{th} text-right">{t('Frei')}</th>
+							<th scope="col" class="{th} w-40">{t('Belegt')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -255,7 +264,7 @@
 												style="width:{fs.usePercent}%"
 											></span>
 										</span>
-										<span class="w-9 text-right tabular">{fs.usePercent} %</span>
+										<span class="w-9 text-right tabular">{percentUnit(fs.usePercent)}</span>
 									</span>
 								</td>
 							</tr>
@@ -268,16 +277,16 @@
 
 	{#if disks.length}
 		<section>
-			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">Datenträger</h4>
+			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">{t('Datenträger')}</h4>
 			<div class="relative overflow-x-auto rounded-md border border-border">
 				<table class="w-full min-w-[34rem] border-separate border-spacing-0 text-xs">
 					<thead>
 						<tr class="bg-surface-2 text-left text-fg-muted">
 							<th scope="col" class={th}>Name</th>
-							<th scope="col" class={th}>Modell</th>
-							<th scope="col" class={th}>Typ</th>
-							<th scope="col" class="{th} text-right">Größe</th>
-							<th scope="col" class={th}>Anschluss</th>
+							<th scope="col" class={th}>{t('Modell')}</th>
+							<th scope="col" class={th}>{t('Typ')}</th>
+							<th scope="col" class="{th} text-right">{t('Größe')}</th>
+							<th scope="col" class={th}>{t('Anschluss')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -308,7 +317,7 @@
 
 	{#if data.interfaces?.length}
 		<section>
-			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">Netzwerk-Interfaces</h4>
+			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">{t('Netzwerk-Interfaces')}</h4>
 			<div class="relative overflow-x-auto rounded-md border border-border">
 				<table class="w-full min-w-[34rem] border-separate border-spacing-0 text-xs">
 					<thead>
@@ -316,7 +325,7 @@
 							<th scope="col" class={th}>Name</th>
 							<th scope="col" class={th}>Status</th>
 							<th scope="col" class={th}>MAC</th>
-							<th scope="col" class={th}>Adressen</th>
+							<th scope="col" class={th}>{t('Adressen')}</th>
 							<th scope="col" class="{th} text-right">MTU</th>
 						</tr>
 					</thead>
@@ -325,7 +334,9 @@
 							<tr>
 								<td class="{td} mono whitespace-nowrap">
 									{it.name}
-									{#if it.master}<span class="block font-sans text-fg-subtle">an {it.master}</span>{/if}
+									{#if it.master}<span class="block font-sans text-fg-subtle"
+											>{t('an {master}', { master: it.master })}</span
+										>{/if}
 								</td>
 								<td class={td}>
 									<Badge tone={it.state === 'UP' ? 'ok' : it.state === 'DOWN' ? 'neutral' : 'info'}>
@@ -355,15 +366,17 @@
 
 	{#if listening.length}
 		<section>
-			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">Lauschende Sockets ({listening.length})</h4>
+			<h4 class="mb-1.5 text-xs font-semibold text-fg-muted">
+				{t('Lauschende Sockets ({n})', { n: listening.length })}
+			</h4>
 			<div class="relative max-h-80 overflow-auto rounded-md border border-border">
 				<table class="w-full min-w-[34rem] border-separate border-spacing-0 text-xs">
 					<thead class="sticky top-0">
 						<tr class="bg-surface-2 text-left text-fg-muted">
-							<th scope="col" class={th}>Protokoll</th>
-							<th scope="col" class={th}>Adresse</th>
+							<th scope="col" class={th}>{t('Protokoll')}</th>
+							<th scope="col" class={th}>{t('Adresse')}</th>
 							<th scope="col" class={th}>Interface</th>
-							<th scope="col" class={th}>Prozess</th>
+							<th scope="col" class={th}>{t('Prozess')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -390,14 +403,14 @@
 		<section>
 			<div class="mb-1.5 flex flex-wrap items-center gap-2">
 				<h4 class="flex-1 text-xs font-semibold text-fg-muted">
-					Laufende Dienste ({data.services.length})
+					{t('Laufende Dienste ({n})', { n: data.services.length })}
 				</h4>
 				<Input
 					size="sm"
 					icon="search"
 					bind:value={svcFilter}
-					placeholder="Dienste filtern"
-					aria-label="Dienste filtern"
+					placeholder={t('Dienste filtern')}
+					aria-label={t('Dienste filtern')}
 					class="w-full sm:w-56"
 				/>
 			</div>
@@ -410,14 +423,14 @@
 						{#if s.description}<span class="text-fg-muted">{s.description}</span>{/if}
 					</li>
 				{:else}
-					<li class="px-2.5 py-2 text-fg-subtle">Kein Dienst passt zum Filter.</li>
+					<li class="px-2.5 py-2 text-fg-subtle">{t('Kein Dienst passt zum Filter.')}</li>
 				{/each}
 			</ul>
 		</section>
 	{/if}
 
 	{#if data.errors && Object.keys(data.errors).length}
-		<Alert tone="warn" title="Teilweise nicht erfasst">
+		<Alert tone="warn" title={t('Teilweise nicht erfasst')}>
 			<ul class="text-xs">
 				{#each Object.entries(data.errors) as [k, v] (k)}
 					<li><span class="mono">{k}</span>: {v}</li>
@@ -427,7 +440,7 @@
 	{/if}
 	{#if data.unavailable?.length}
 		<p class="text-xs text-fg-subtle">
-			Auf diesem System nicht vorhanden: <span class="mono">{data.unavailable.join(', ')}</span>
+			{t('Auf diesem System nicht vorhanden:')} <span class="mono">{data.unavailable.join(', ')}</span>
 		</p>
 	{/if}
 </div>

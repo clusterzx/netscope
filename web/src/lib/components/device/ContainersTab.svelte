@@ -14,6 +14,7 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
+	import { t } from '$lib/i18n';
 	import { formatBytes, formatDateTime } from '$lib/utils/format';
 	import { containerStateLabel, containerStateTone, LazyData, sourceName } from './util';
 
@@ -82,36 +83,36 @@
 
 	const columns: Column<ContainerView>[] = [
 		{ key: 'name', label: 'Container', cell: nameCell },
-		{ key: 'state', label: 'Zustand', cell: stateCell },
+		{ key: 'state', label: t('Zustand'), cell: stateCell },
 		{ key: 'image', label: 'Image', cell: imageCell },
 		{ key: 'ports', label: 'Ports', hideBelow: 'md', cell: portsCell },
 		{
 			key: 'networks',
-			label: 'Netzwerke',
+			label: t('Netzwerke'),
 			hideBelow: 'lg',
 			value: (c) => (c.networks ?? []).join(', ') || '–'
 		},
-		{ key: 'created', label: 'Erstellt', hideBelow: 'sm', cell: createdCell }
+		{ key: 'created', label: t('Erstellt'), hideBelow: 'sm', cell: createdCell }
 	];
 
 	const imageColumns: Column<ImageView>[] = [
 		{ key: 'tags', label: 'Image', cell: tagsCell },
 		{ key: 'id', label: 'ID', hideBelow: 'sm', cell: idCell },
-		{ key: 'size', label: 'Größe', align: 'right', value: (i) => formatBytes(i.size) },
-		{ key: 'created', label: 'Erstellt', hideBelow: 'md', value: (i) => formatDateTime(i.created) },
-		{ key: 'inUse', label: 'Verwendet', align: 'right', cell: inUseCell }
+		{ key: 'size', label: t('Größe'), align: 'right', value: (i) => formatBytes(i.size) },
+		{ key: 'created', label: t('Erstellt'), hideBelow: 'md', value: (i) => formatDateTime(i.created) },
+		{ key: 'inUse', label: t('Verwendet'), align: 'right', cell: inUseCell }
 	];
 </script>
 
 {#snippet nameCell(c: ContainerView)}
 	<span class="font-medium {c.goneAt ? 'text-fg-subtle line-through' : ''}">{c.name}</span>
 	{#if c.composeService && c.composeService !== c.name}
-		<span class="block text-xs text-fg-subtle">Dienst {c.composeService}</span>
+		<span class="block text-xs text-fg-subtle">{t('Dienst {name}', { name: c.composeService })}</span>
 	{/if}
 {/snippet}
 {#snippet stateCell(c: ContainerView)}
 	{#if c.goneAt}
-		<Badge tone="neutral">entfernt</Badge>
+		<Badge tone="neutral">{t('entfernt')}</Badge>
 		<span class="block text-xs whitespace-nowrap text-fg-subtle">{formatDateTime(c.goneAt)}</span>
 	{:else}
 		<Badge tone={containerStateTone(c.state)} dot
@@ -134,20 +135,21 @@
 	<span class="whitespace-nowrap text-fg-muted">{formatDateTime(c.created)}</span>
 {/snippet}
 {#snippet tagsCell(i: ImageView)}
-	{#each i.tags?.length ? i.tags : ['<none>'] as t (t)}<span class="mono block text-xs break-all">{t}</span
+	{#each i.tags?.length ? i.tags : ['<none>'] as tag (tag)}<span class="mono block text-xs break-all"
+			>{tag}</span
 		>{/each}
 {/snippet}
 {#snippet idCell(i: ImageView)}<span class="mono text-xs text-fg-muted">{shortId(i.id)}</span>{/snippet}
 {#snippet inUseCell(i: ImageView)}
 	{#if i.inUse > 0}<Badge tone="ok">{i.inUse}×</Badge>{:else}<span class="text-xs text-fg-subtle"
-			>ungenutzt</span
+			>{t('ungenutzt')}</span
 		>{/if}
 {/snippet}
 
 <div class="flex flex-col gap-4">
 	<div class="flex flex-wrap items-center gap-3">
 		<h2 class="flex-1 text-sm font-semibold">Container</h2>
-		<Toggle bind:checked={history} label="Entfernte Container anzeigen" size="sm" />
+		<Toggle bind:checked={history} label={t('Entfernte Container anzeigen')} size="sm" />
 	</div>
 
 	{#if data.error && !data.data}
@@ -158,8 +160,10 @@
 		<div class="rounded-lg border border-border bg-surface">
 			<EmptyState
 				icon="box"
-				title="Keine Container"
-				description="Container liefern das Docker-Plugin (Docker-Socket, auch per SSH) und das SSH-Inventar."
+				title={t('Keine Container')}
+				description={t(
+					'Container liefern das Docker-Plugin (Docker-Socket, auch per SSH) und das SSH-Inventar.'
+				)}
 			/>
 		</div>
 	{:else}
@@ -169,10 +173,12 @@
 					<div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2">
 						<Icon name={g.project ? 'layers' : 'box'} size={16} class="text-fg-subtle" />
 						<h3 class="text-sm font-semibold">
-							{g.project ? g.project : 'Ohne Compose-Projekt'}
+							{g.project ? g.project : t('Ohne Compose-Projekt')}
 						</h3>
 						<span class="text-xs text-fg-subtle">
-							{g.running}/{g.current} laufen{g.project ? ' · Compose' : ''}
+							{t('{running}/{total} laufen', { running: g.running, total: g.current })}{g.project
+								? ' · Compose'
+								: ''}
 						</span>
 					</div>
 				{/snippet}
@@ -189,7 +195,10 @@
 		{/each}
 		{#if containers.length}
 			<p class="text-xs text-fg-subtle">
-				Quelle: {[...new Set(containers.map((c) => sourceName(c.source)))].join(', ')} · zuletzt gesehen
+				{t('Quelle: {sources}', {
+					sources: [...new Set(containers.map((c) => sourceName(c.source)))].join(', ')
+				})} ·
+				{t('zuletzt gesehen')}
 				<RelativeTime
 					value={containers
 						.map((c) => c.lastSeen)
@@ -202,7 +211,7 @@
 		{#if images.length}
 			<section aria-labelledby="img-h" class="flex flex-col gap-2">
 				<h2 id="img-h" class="text-sm font-semibold">Images ({images.length})</h2>
-				<Table columns={imageColumns} rows={images} key={(i) => i.id} dense caption="Container-Images" />
+				<Table columns={imageColumns} rows={images} key={(i) => i.id} dense caption={t('Container-Images')} />
 			</section>
 		{/if}
 	{/if}

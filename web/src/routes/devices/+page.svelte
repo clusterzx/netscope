@@ -19,6 +19,7 @@
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { formatNumber } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
 	import { debounce, intParam, loadPref, savePref, setParams } from '$lib/utils/url';
 
 	const PAGE_SIZES = [50, 100, 250, 500];
@@ -118,7 +119,7 @@
 	);
 </script>
 
-<PageHeader title="Geräte" description="Inventar aller entdeckten und manuell angelegten Geräte">
+<PageHeader title={t('Geräte')} description={t('Inventar aller entdeckten und manuell angelegten Geräte')}>
 	{#snippet actions()}
 		<Menu
 			text="Export"
@@ -148,7 +149,7 @@
 			]}
 		/>
 		{#if canCreate}
-			<Button variant="primary" icon="plus" onclick={() => (createOpen = true)}>Gerät anlegen</Button>
+			<Button variant="primary" icon="plus" onclick={() => (createOpen = true)}>{t('Gerät anlegen')}</Button>
 		{/if}
 	{/snippet}
 </PageHeader>
@@ -180,7 +181,7 @@
 			loading={data.loading}
 			dense
 			maxHeight="calc(100dvh - 15rem)"
-			caption="Geräteliste"
+			caption={t('Geräteliste')}
 			onrowclick={(r, e) =>
 				e.ctrlKey || e.metaKey ? window.open(`/devices/${r.id}`, '_blank') : goto(`/devices/${r.id}`)}
 			rowClass={(r) => (r.state === 'ignored' ? 'opacity-60' : '')}
@@ -190,30 +191,34 @@
 			{/snippet}
 			{#snippet empty()}
 				{#if q && queryError}
-					<EmptyState icon="filter" title="Filter ungültig" description={queryError}>
+					<EmptyState icon="filter" title={t('Filter ungültig')} description={queryError}>
 						{#snippet actions()}
-							<Button onclick={() => applyQuery('')}>Filter zurücksetzen</Button>
+							<Button onclick={() => applyQuery('')}>{t('Filter zurücksetzen')}</Button>
 						{/snippet}
 					</EmptyState>
 				{:else if q}
-					<EmptyState icon="filter" title="Keine Treffer" description="Kein Gerät passt zum Filter „{q}“.">
+					<EmptyState
+						icon="filter"
+						title={t('Keine Treffer')}
+						description={t('Kein Gerät passt zum Filter „{q}“.', { q })}
+					>
 						{#snippet actions()}
-							<Button onclick={() => applyQuery('')}>Filter zurücksetzen</Button>
+							<Button onclick={() => applyQuery('')}>{t('Filter zurücksetzen')}</Button>
 						{/snippet}
 					</EmptyState>
 				{:else}
 					<EmptyState
 						icon="devices"
-						title="Noch keine Geräte"
-						description="Sobald ein Scanner läuft, erscheinen die gefundenen Geräte hier."
+						title={t('Noch keine Geräte')}
+						description={t('Sobald ein Scanner läuft, erscheinen die gefundenen Geräte hier.')}
 					>
 						{#snippet actions()}
 							{#if auth.can('plugins.manage')}
-								<Button href="/plugins" icon="plugins">Scanner konfigurieren</Button>
+								<Button href="/plugins" icon="plugins">{t('Scanner konfigurieren')}</Button>
 							{/if}
 							{#if canCreate}
 								<Button variant="primary" icon="plus" onclick={() => (createOpen = true)}
-									>Gerät anlegen</Button
+									>{t('Gerät anlegen')}</Button
 								>
 							{/if}
 						{/snippet}
@@ -232,7 +237,7 @@
 				onchange={(o, l) => setParams({ offset: o || null, limit: l === 100 ? null : l })}
 			/>
 			{#if data.data && !queryError}
-				<span class="text-xs text-fg-subtle tabular" title="Antwortzeit der Geräteabfrage im Backend">
+				<span class="text-xs text-fg-subtle tabular" title={t('Antwortzeit der Geräteabfrage im Backend')}>
 					{formatNumber(data.data.tookMs)} ms
 				</span>
 			{/if}

@@ -205,6 +205,44 @@ Massenaktion (z. B. „Wake-on-LAN“); die Geräte stehen dann in `rc.Targets.D
 Events mit Deep-Links, bei Berichten ein Markdown-`Body`). `n.PlainText()` liefert eine
 fertige Textdarstellung. Fehler zurückgeben – der Dispatcher wiederholt.
 
+## Übersetzungen (Englisch)
+
+Texte schreibt ein Plugin auf Deutsch – Name, Beschreibung, Schema (Labels, Beschreibungen,
+Gruppen, Optionen, deutsche Platzhalter), Aktionen, Fehlermeldungen, Event-Titel, Log-Zeilen.
+Die englische Übersetzung liegt daneben in `i18n_en.go` und wird in `init()` registriert:
+
+```go
+package example
+
+import "netscope/internal/i18n"
+
+func init() {
+	i18n.Register(map[string]string{
+		"Beispiel":                          "Example",
+		"Was das Plugin tut (deutsch, ein Satz).": "What the plugin does (one sentence).",
+		"Zeitüberschreitung":                "Timeout",
+		"Host %s antwortet nicht: %w":       "host %s does not respond: %w",
+		"%s auf %s ausgelastet":             "%[2]s: %[1]s saturated",
+	})
+}
+```
+
+- Schlüssel ist der deutsche Text **genau so wie im Code**, bei `fmt`-Texten samt Verben; eine
+  Verkettung wie `"Agent auf " + host + " meldet sich nicht"` wird zu `"Agent auf %s meldet sich nicht"`.
+- Texte mit Verben sind Muster: Sie übersetzen den fertigen Text, auch wenn er schon in der
+  Datenbank steht (Event-Titel, Lauf-Fehler, Log). `%w`/`%v` (Fehler) werden mitübersetzt, `%s`,
+  `%q`, `%d` bleiben, wie sie sind (Namen, Adressen). Die englische Seite muss dieselben
+  Argumente verwenden; `%[n]s` ändert die Reihenfolge.
+- Die API übersetzt Schema, Info und Aktionen selbst (`Schema.Localize` usw.) – ein Plugin
+  kennt die Sprache des Lesers nicht. Publisher schreiben ihre eigenen Texte mit
+  `i18n.T(n.Lang, …)` bzw. `i18n.Sprintf(n.Lang, …)` in der Sprache der Benachrichtigungen.
+- `go test ./internal/i18n/` prüft die Vollständigkeit: jedes Label, jede Beschreibung und Option
+  (auch sprachneutrale wie `"SNMP": "SNMP"`) sowie jeder deutsch aussehende Text im Code braucht
+  einen Eintrag. Ein deutsches Literal, das kein Anzeigetext ist (z. B. ein Schlüsselwort, das
+  der Parser in Geräteausgaben sucht), bekommt den Kommentar `// i18n:ignore` in derselben Zeile.
+  `I18N_MISSING=fehlend.json go test ./internal/i18n/` schreibt die fehlenden Texte je Paket in
+  eine Datei.
+
 ## Tests
 
 `internal/plugin/plugintest` stellt Fakes bereit:
@@ -222,6 +260,7 @@ Parser werden mit **echten Fixtures** unter `testdata/` getestet
 ## Checkliste
 
 - [ ] ID, deutsches Label/Beschreibung, sinnvolle Defaults (Zeitplan, Timeout, Parallelität)
+- [ ] Englische Übersetzungen in `i18n_en.go`, `go test ./internal/i18n/` grün
 - [ ] Schema vollständig, Secrets als `secret`, Zugangsdaten als `credential-ref` (mehrere Ziele: `Multi`, Auswahl über `CredentialPicker`)
 - [ ] Ergebnisse pro Host sofort über den Sink, `Scanned`-Bereiche gesetzt
 - [ ] `ctx` wird respektiert, Fehler pro Host geloggt statt abgebrochen

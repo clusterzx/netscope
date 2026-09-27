@@ -137,7 +137,8 @@ func InstallScriptWindows(base string) string {
 }
 
 // installScript installs the agent as a service of its own unprivileged user. Placeholder
-// @@URL@@ is the quoted instance URL.
+// @@URL@@ is the quoted instance URL. Its output is German like install.ps1 and the agent
+// itself: it runs on the target host, not in a request (i18n:ignore).
 const installScript = `#!/bin/sh
 # NetScope-Agent installieren (von der NetScope-Instanz ausgeliefert).
 #

@@ -8,6 +8,7 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import FormField from '$lib/components/ui/FormField.svelte';
+	import { t } from '$lib/i18n';
 	import { untrack } from 'svelte';
 
 	interface Props {
@@ -70,7 +71,7 @@
 		fileError = '';
 		if (!f) return;
 		if (f.size > 256 * 1024) {
-			fileError = 'Datei zu groß (höchstens 256 KB)';
+			fileError = t('Datei zu groß (höchstens 256 KB)');
 			return;
 		}
 		text = (await f.text()).trim() + '\n';
@@ -84,13 +85,13 @@
 <FormField {label} {hint} {error} {required} {id}>
 	{#snippet labelExtra()}
 		{#if status === 'set'}
-			<Badge tone="ok" dot>gesetzt</Badge>
+			<Badge tone="ok" dot>{t('gesetzt')}</Badge>
 		{:else if status === 'cleared'}
-			<Badge tone="warn" dot>wird entfernt</Badge>
+			<Badge tone="warn" dot>{t('wird entfernt')}</Badge>
 		{:else if status === 'new'}
-			<Badge tone="accent" dot>{wasSet ? 'wird ersetzt' : 'neu'}</Badge>
+			<Badge tone="accent" dot>{wasSet ? t('wird ersetzt') : t('neu')}</Badge>
 		{:else}
-			<Badge dot>nicht gesetzt</Badge>
+			<Badge dot>{t('nicht gesetzt')}</Badge>
 		{/if}
 	{/snippet}
 	{#snippet children(fid, describedby)}
@@ -108,10 +109,10 @@
 							autocomplete="off"
 							aria-describedby={describedby}
 							aria-invalid={error ? 'true' : undefined}
-							placeholder={placeholder ?? (wasSet ? 'Neuen Wert eingeben (leer = unverändert)' : '')}
+							placeholder={placeholder ?? (wasSet ? t('Neuen Wert eingeben (leer = unverändert)') : '')}
 							class="mono py-1.5 {inputCls} {error ? 'border-danger' : 'border-border'}"></textarea>
 						<Button size="xs" variant="ghost" icon="upload" onclick={() => fileInput?.click()} {disabled}>
-							Aus Datei laden
+							{t('Aus Datei laden')}
 						</Button>
 						<input bind:this={fileInput} type="file" class="hidden" onchange={loadFile} tabindex="-1" />
 						{#if fileError}<span class="text-xs text-danger">{fileError}</span>{/if}
@@ -126,22 +127,24 @@
 						autocomplete="new-password"
 						aria-describedby={describedby}
 						aria-invalid={error ? 'true' : undefined}
-						placeholder={placeholder ?? (wasSet ? 'Neuen Wert eingeben (leer = unverändert)' : '')}
+						placeholder={placeholder ?? (wasSet ? t('Neuen Wert eingeben (leer = unverändert)') : '')}
 						class="h-8.5 {inputCls} {error ? 'border-danger' : 'border-border'}"
 					/>
 				{/if}
 				{#if wasSet}
-					<Button size="md" variant="ghost" onclick={cancel} {disabled}>Abbrechen</Button>
+					<Button size="md" variant="ghost" onclick={cancel} {disabled}>{t('Abbrechen')}</Button>
 				{/if}
 			</div>
 		{:else}
 			<div id={fid} class="flex flex-wrap items-center gap-2" aria-describedby={describedby}>
-				<span class="mono text-sm text-fg-subtle">{status === 'cleared' ? '(leer)' : '••••••••'}</span>
+				<span class="mono text-sm text-fg-subtle">{status === 'cleared' ? t('(leer)') : '••••••••'}</span>
 				{#if status === 'cleared'}
-					<Button size="sm" variant="ghost" icon="history" onclick={cancel} {disabled}>Rückgängig</Button>
+					<Button size="sm" variant="ghost" icon="history" onclick={cancel} {disabled}
+						>{t('Rückgängig')}</Button
+					>
 				{:else}
-					<Button size="sm" icon="edit" onclick={startEdit} {disabled}>Ändern</Button>
-					<Button size="sm" variant="ghost" icon="trash" onclick={clear} {disabled}>Entfernen</Button>
+					<Button size="sm" icon="edit" onclick={startEdit} {disabled}>{t('Ändern')}</Button>
+					<Button size="sm" variant="ghost" icon="trash" onclick={clear} {disabled}>{t('Entfernen')}</Button>
 				{/if}
 			</div>
 		{/if}

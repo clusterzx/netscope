@@ -36,15 +36,10 @@
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import {
-		formatDateTime,
-		formatNumber,
-		fromDateTimeLocal,
-		plural,
-		toDateTimeLocal
-	} from '$lib/utils/format';
+	import { formatDateTime, formatNumber, fromDateTimeLocal, toDateTimeLocal } from '$lib/utils/format';
 	import { eventCategoryLabel, label, severityLabel } from '$lib/utils/labels';
 	import { debounce, intParam, setParams } from '$lib/utils/url';
+	import { intlLocale, t, tn } from '$lib/i18n';
 
 	const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -173,38 +168,40 @@
 	const typeOptions = $derived.by<MultiOption[]>(() => {
 		const list = [...(eventTypes.value ?? [])].sort(
 			(a, b) =>
-				label(eventCategoryLabel, a.category).localeCompare(label(eventCategoryLabel, b.category), 'de') ||
-				a.label.localeCompare(b.label, 'de')
+				label(eventCategoryLabel, a.category).localeCompare(
+					label(eventCategoryLabel, b.category),
+					intlLocale
+				) || a.label.localeCompare(b.label, intlLocale)
 		);
-		const opts: MultiOption[] = list.map((t) => ({
-			value: t.type,
-			label: t.label,
-			description: t.type,
-			group: label(eventCategoryLabel, t.category)
+		const opts: MultiOption[] = list.map((et) => ({
+			value: et.type,
+			label: et.label,
+			description: et.type,
+			group: label(eventCategoryLabel, et.category)
 		}));
 		// patterns / unknown types from the URL (e.g. type=port.*)
-		for (const t of filter.types)
-			if (!opts.some((o) => typeof o !== 'string' && o.value === t))
-				opts.unshift({ value: t, label: t, description: 'Muster', group: 'Aus der Adresse' });
+		for (const ty of filter.types)
+			if (!opts.some((o) => typeof o !== 'string' && o.value === ty))
+				opts.unshift({ value: ty, label: ty, description: t('Muster'), group: t('Aus der Adresse') });
 		return opts;
 	});
 
 	const sevOptions = [
-		{ value: '', label: 'Alle Schweregrade' },
-		{ value: 'low', label: `ab ${severityLabel.low}` },
-		{ value: 'medium', label: `ab ${severityLabel.medium}` },
-		{ value: 'high', label: `ab ${severityLabel.high}` },
+		{ value: '', label: t('Alle Schweregrade') },
+		{ value: 'low', label: t('ab {severity}', { severity: severityLabel.low }) },
+		{ value: 'medium', label: t('ab {severity}', { severity: severityLabel.medium }) },
+		{ value: 'high', label: t('ab {severity}', { severity: severityLabel.high }) },
 		{ value: 'critical', label: severityLabel.critical }
 	];
 	const ackOptions = [
-		{ value: 'open', label: 'Offen' },
-		{ value: 'acked', label: 'Quittiert' },
-		{ value: 'all', label: 'Alle' }
+		{ value: 'open', label: t('Offen') },
+		{ value: 'acked', label: t('Quittiert') },
+		{ value: 'all', label: t('Alle') }
 	];
 	const rangeOptions = [
-		{ value: '', label: 'Beliebiger Zeitraum' },
+		{ value: '', label: t('Beliebiger Zeitraum') },
 		...RANGES.map((r) => ({ value: r.value, label: r.label })),
-		{ value: 'custom', label: 'Benutzerdefiniert …' }
+		{ value: 'custom', label: t('Benutzerdefiniert …') }
 	];
 
 	let customRange = $state(false);
@@ -214,10 +211,10 @@
 	let rangeError = $state<string | null>(null);
 	$effect(() => {
 		const f = filter.from;
-		const t = filter.to;
+		const to = filter.to;
 		untrack(() => {
 			fromLocal = toDateTimeLocal(f);
-			toLocal = toDateTimeLocal(t);
+			toLocal = toDateTimeLocal(to);
 		});
 	});
 
@@ -237,11 +234,11 @@
 		const from = fromDateTimeLocal(fromLocal);
 		const to = fromDateTimeLocal(toLocal);
 		if (!from && !to) {
-			rangeError = 'Mindestens einen Zeitpunkt angeben';
+			rangeError = t('Mindestens einen Zeitpunkt angeben');
 			return;
 		}
 		if (from && to && new Date(from) >= new Date(to)) {
-			rangeError = '„Von“ muss vor „Bis“ liegen';
+			rangeError = t('„Von“ muss vor „Bis“ liegen');
 			return;
 		}
 		setParams({ range: null, from: from || null, to: to || null, offset: null });
@@ -295,7 +292,7 @@
 	async function quickAck(ev: Event) {
 		try {
 			await api.post('/api/v1/events/ack', { body: { ids: [ev.id] } });
-			toast.success('Event quittiert');
+			toast.success(t('Event quittiert'));
 			await data.reload();
 		} catch (e) {
 			toast.error(e);
@@ -307,22 +304,31 @@
 		data.reload();
 	}
 
+	function ackTitle(ev: Event): string {
+		const date = formatDateTime(ev.ackedAt);
+		const s = ev.ackedBy
+			? t('Quittiert von {user} am {date}', { user: ev.ackedBy, date })
+			: t('Quittiert am {date}', { date });
+		return ev.ackNote ? `${s} – ${ev.ackNote}` : s;
+	}
+
 	const canAckAll = $derived(filter.acked !== 'acked' && total > 0);
 	const filterSummary = $derived.by(() => {
 		const parts: string[] = [];
-		if (filter.types.length) parts.push(`${plural(filter.types.length, 'Typ', 'Typen')}`);
+		if (filter.types.length) parts.push(tn(filter.types.length, '{n} Typ', '{n} Typen'));
 		if (filter.categories.length)
 			parts.push(filter.categories.map((c) => label(eventCategoryLabel, c)).join(', '));
-		if (filter.severity) parts.push(`Schweregrad ab ${label(severityLabel, filter.severity)}`);
-		if (filter.device) parts.push(`Gerät ${deviceName ?? '#' + filter.device}`);
-		if (filter.run) parts.push(`Lauf #${filter.run}`);
+		if (filter.severity)
+			parts.push(t('Schweregrad ab {severity}', { severity: label(severityLabel, filter.severity) }));
+		if (filter.device) parts.push(t('Gerät {name}', { name: deviceName ?? '#' + filter.device }));
+		if (filter.run) parts.push(t('Lauf #{id}', { id: filter.run }));
 		if (filter.range) parts.push(RANGES.find((r) => r.value === filter.range)?.label ?? filter.range);
 		else if (filter.from || filter.to)
 			parts.push(
-				`${filter.from ? formatDateTime(filter.from) : '…'} – ${filter.to ? formatDateTime(filter.to) : 'jetzt'}`
+				`${filter.from ? formatDateTime(filter.from) : '…'} – ${filter.to ? formatDateTime(filter.to) : t('jetzt')}`
 			);
-		if (filter.q) parts.push(`Text „${filter.q}“`);
-		return parts.length ? parts.join(' · ') : 'alle offenen Events';
+		if (filter.q) parts.push(t('Text „{text}“', { text: filter.q }));
+		return parts.length ? parts.join(' · ') : t('alle offenen Events');
 	});
 
 	// ---------------------------------------------------------------- drawer
@@ -332,33 +338,33 @@
 	}
 
 	const columns: Column<Event>[] = [
-		{ key: 'severity', label: 'Schweregrad', width: '6.5rem' },
+		{ key: 'severity', label: t('Schweregrad'), width: '6.5rem' },
 		// max-w-0 lets the column take the remaining width and truncate long titles
 		{ key: 'title', label: 'Event', class: 'max-w-0' },
-		{ key: 'device', label: 'Gerät', hideBelow: 'md', width: '14rem' },
-		{ key: 'ts', label: 'Zeit', width: '9rem', hideBelow: 'sm' },
+		{ key: 'device', label: t('Gerät'), hideBelow: 'md', width: '14rem' },
+		{ key: 'ts', label: t('Zeit'), width: '9rem', hideBelow: 'sm' },
 		{ key: 'status', label: 'Status', width: '8.5rem', hideBelow: 'lg' }
 	];
 </script>
 
 <PageHeader
 	title="Events"
-	description="Was im Netzwerk passiert ist – neue Geräte, Ports, Zertifikate, Ausfälle"
+	description={t('Was im Netzwerk passiert ist – neue Geräte, Ports, Zertifikate, Ausfälle')}
 >
 	{#snippet actions()}
 		{#if auth.can('events.ack')}
 			<Button
 				icon="check"
 				disabled={!canAckAll}
-				title={filter.acked === 'acked' ? 'Es werden nur quittierte Events angezeigt' : undefined}
+				title={filter.acked === 'acked' ? t('Es werden nur quittierte Events angezeigt') : undefined}
 				onclick={ackAll}
 			>
-				Alle passenden quittieren
+				{t('Alle passenden quittieren')}
 			</Button>
 		{/if}
 		<Button
 			icon="refresh"
-			label="Aktualisieren"
+			label={t('Aktualisieren')}
 			loading={data.loading && !!data.data}
 			onclick={() => data.reload()}
 		/>
@@ -367,7 +373,7 @@
 
 <div class="flex flex-col gap-3">
 	<!-- filters -->
-	<div class="flex flex-wrap items-start gap-2" role="search" aria-label="Events filtern">
+	<div class="flex flex-wrap items-start gap-2" role="search" aria-label={t('Events filtern')}>
 		<Input
 			type="search"
 			icon="search"
@@ -379,26 +385,26 @@
 					setParams({ q: qText.trim() || null, offset: null });
 				}
 			}}
-			placeholder="Titel, Meldung, Details …"
-			aria-label="Events durchsuchen"
+			placeholder={t('Titel, Meldung, Details …')}
+			aria-label={t('Events durchsuchen')}
 			class="w-full sm:w-auto sm:min-w-60 sm:flex-1 lg:max-w-sm"
 		/>
 		<MultiSelect
 			options={typeOptions}
 			value={filter.types}
-			placeholder="Alle Typen"
+			placeholder={t('Alle Typen')}
 			onchange={(v) => setParams({ type: v, offset: null })}
 			class="w-full sm:w-52"
 		/>
 		<Select
-			aria-label="Mindest-Schweregrad"
+			aria-label={t('Mindest-Schweregrad')}
 			options={sevOptions}
 			value={filter.severity}
 			onchange={(e) => setParams({ severity: e.currentTarget.value || null, offset: null })}
 			class="w-[calc(50%-0.25rem)] sm:w-44"
 		/>
 		<Select
-			aria-label="Quittierstatus"
+			aria-label={t('Quittierstatus')}
 			options={ackOptions}
 			value={filter.acked}
 			onchange={(e) => {
@@ -408,7 +414,7 @@
 			class="w-[calc(50%-0.25rem)] sm:w-32"
 		/>
 		<Select
-			aria-label="Zeitraum"
+			aria-label={t('Zeitraum')}
 			options={rangeOptions}
 			value={rangeValue}
 			onchange={(e) => setRange(e.currentTarget.value)}
@@ -422,12 +428,12 @@
 		/>
 		{#if filter.run}
 			<Badge tone="accent" size="md" class="h-8.5 gap-1.5 pr-1">
-				Lauf #{filter.run}
+				{t('Lauf #{id}', { id: filter.run })}
 				<Button
 					variant="ghost"
 					size="xs"
 					icon="x"
-					label="Lauf-Filter entfernen"
+					label={t('Lauf-Filter entfernen')}
 					onclick={() => setParams({ run: null, offset: null })}
 				/>
 			</Badge>
@@ -439,13 +445,13 @@
 					variant="ghost"
 					size="xs"
 					icon="x"
-					label="Kategorie-Filter entfernen"
+					label={t('Kategorie-Filter entfernen')}
 					onclick={() => setParams({ category: null, offset: null })}
 				/>
 			</Badge>
 		{/if}
 		{#if hasFilter(filter)}
-			<Button variant="ghost" icon="x" onclick={resetFilters}>Zurücksetzen</Button>
+			<Button variant="ghost" icon="x" onclick={resetFilters}>{t('Zurücksetzen')}</Button>
 		{/if}
 	</div>
 
@@ -457,15 +463,15 @@
 				applyCustom();
 			}}
 		>
-			<Input type="datetime-local" label="Von" bind:value={fromLocal} class="w-full sm:w-56" />
+			<Input type="datetime-local" label={t('Von')} bind:value={fromLocal} class="w-full sm:w-56" />
 			<Input
 				type="datetime-local"
-				label="Bis"
+				label={t('Bis')}
 				bind:value={toLocal}
-				hint="leer = jetzt"
+				hint={t('leer = jetzt')}
 				class="w-full sm:w-56"
 			/>
-			<Button type="submit" variant="primary" class="sm:mt-6">Anwenden</Button>
+			<Button type="submit" variant="primary" class="sm:mt-6">{t('Anwenden')}</Button>
 			{#if rangeError}<p class="w-full text-xs text-danger" role="alert">{rangeError}</p>{/if}
 		</form>
 	{/if}
@@ -477,7 +483,7 @@
 			class="flex items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-sm font-medium text-accent hover:bg-accent/15"
 			onclick={showNew}
 		>
-			{plural(newCount, 'neues Event', 'neue Events')} – anzeigen
+			{tn(newCount, '{n} neues Event – anzeigen', '{n} neue Events – anzeigen')}
 		</button>
 	{/if}
 
@@ -485,11 +491,13 @@
 		<div
 			class="sticky top-16 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-surface px-3 py-2 text-sm shadow-md"
 			role="region"
-			aria-label="Auswahl"
+			aria-label={t('Auswahl')}
 		>
-			<span class="font-medium text-fg">{plural(selected.length, 'Event', 'Events')} ausgewählt</span>
+			<span class="font-medium text-fg"
+				>{tn(selected.length, '{n} Event ausgewählt', '{n} Events ausgewählt')}</span
+			>
 			{#if openSelected.length !== selected.length}
-				<span class="text-fg-muted">({formatNumber(openSelected.length)} offen)</span>
+				<span class="text-fg-muted">{t('({n} offen)', { n: formatNumber(openSelected.length) })}</span>
 			{/if}
 			<span class="flex-1"></span>
 			{#if auth.can('events.ack')}
@@ -500,10 +508,10 @@
 					disabled={!openSelected.length}
 					onclick={ackSelection}
 				>
-					Quittieren …
+					{t('Quittieren …')}
 				</Button>
 			{/if}
-			<Button size="sm" variant="ghost" onclick={() => (selected = [])}>Auswahl aufheben</Button>
+			<Button size="sm" variant="ghost" onclick={() => (selected = [])}>{t('Auswahl aufheben')}</Button>
 		</div>
 	{/if}
 
@@ -547,62 +555,69 @@
 				{:else if col.key === 'device'}
 					{#if ev.deviceId}
 						<a class="link block truncate" href="/devices/{ev.deviceId}"
-							>{ev.deviceName || `Gerät #${ev.deviceId}`}</a
+							>{ev.deviceName || t('Gerät #{id}', { id: ev.deviceId })}</a
 						>
 					{:else if !ev.site}
 						<span class="text-fg-subtle">–</span>
 					{/if}
 					{#if ev.site}
-						<span class="block truncate text-xs text-fg-subtle" title="Gemeldet vom Standort {ev.site}"
-							>Standort {ev.site}</span
+						<span
+							class="block truncate text-xs text-fg-subtle"
+							title={t('Gemeldet vom Standort {site}', { site: ev.site })}
+							>{t('Standort {site}', { site: ev.site })}</span
 						>
 					{/if}
 				{:else if col.key === 'ts'}
 					<RelativeTime value={ev.ts} class="text-fg-muted" />
 				{:else if col.key === 'status'}
 					{#if ev.ackedAt}
-						<span
-							class="inline-flex items-center gap-1 text-xs text-ok"
-							title="Quittiert {ev.ackedBy ? `von ${ev.ackedBy} ` : ''}am {formatDateTime(
-								ev.ackedAt
-							)}{ev.ackNote ? ` – ${ev.ackNote}` : ''}"
-						>
-							<span class="inline-block size-1.5 rounded-full bg-ok"></span> Quittiert
+						<span class="inline-flex items-center gap-1 text-xs text-ok" title={ackTitle(ev)}>
+							<span class="inline-block size-1.5 rounded-full bg-ok"></span>
+							{t('Quittiert')}
 						</span>
 					{:else if auth.can('events.ack')}
-						<Button size="xs" variant="ghost" icon="check" onclick={() => quickAck(ev)}>Quittieren</Button>
+						<Button size="xs" variant="ghost" icon="check" onclick={() => quickAck(ev)}
+							>{t('Quittieren')}</Button
+						>
 					{:else}
-						<span class="text-xs text-warn">Offen</span>
+						<span class="text-xs text-warn">{t('Offen')}</span>
 					{/if}
 				{/if}
 			{/snippet}
 			{#snippet empty()}
 				{#if hasFilter(filter) && filter.acked !== 'open'}
-					<EmptyState icon="filter" title="Keine Events" description="Kein Event passt zu den Filtern.">
+					<EmptyState
+						icon="filter"
+						title={t('Keine Events')}
+						description={t('Kein Event passt zu den Filtern.')}
+					>
 						{#snippet actions()}
-							<Button onclick={resetFilters}>Filter zurücksetzen</Button>
+							<Button onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 						{/snippet}
 					</EmptyState>
 				{:else if hasFilter(filter)}
 					<EmptyState
 						icon="filter"
-						title="Keine offenen Events"
-						description="Kein offenes Event passt zu den Filtern."
+						title={t('Keine offenen Events')}
+						description={t('Kein offenes Event passt zu den Filtern.')}
 					>
 						{#snippet actions()}
-							<Button onclick={() => setParams({ acked: 'all', offset: null })}>Auch quittierte zeigen</Button
+							<Button onclick={() => setParams({ acked: 'all', offset: null })}
+								>{t('Auch quittierte zeigen')}</Button
 							>
-							<Button variant="ghost" onclick={resetFilters}>Filter zurücksetzen</Button>
+							<Button variant="ghost" onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 						{/snippet}
 					</EmptyState>
 				{:else}
 					<EmptyState
 						icon="check-circle"
-						title="Alles erledigt"
-						description="Es gibt keine offenen Events. Neue Events erscheinen hier live."
+						title={t('Alles erledigt')}
+						description={t('Es gibt keine offenen Events. Neue Events erscheinen hier live.')}
 					>
 						{#snippet actions()}
-							<Button onclick={() => setParams({ acked: 'all', offset: null })}>Alle Events zeigen</Button>
+							<Button onclick={() => setParams({ acked: 'all', offset: null })}
+								>{t('Alle Events zeigen')}</Button
+							>
 						{/snippet}
 					</EmptyState>
 				{/if}

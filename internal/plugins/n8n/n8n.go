@@ -108,29 +108,30 @@ func (p *Plugin) Publish(ctx context.Context, pc *plugin.PublishContext, n *plug
 		VerifyTLS:      s.Bool("verify_tls"),
 	})
 	if err != nil {
-		return fmt.Errorf("n8n: %w%s", err, hint(s.String("url"), err))
+		return fmt.Errorf("n8n: %w", withHint(s.String("url"), err))
 	}
 	logger(pc).Debug("n8n-Webhook zugestellt", "notification", n.ID, "kind", n.Kind,
 		"events", len(n.Events), "bytes", len(body))
 	return nil
 }
 
-// hint explains the typical n8n misconfigurations behind an error.
-func hint(url string, err error) string {
+// withHint explains the typical n8n misconfigurations behind an error. The hint wraps the
+// error (instead of being appended as text) so that the message stays translatable.
+func withHint(url string, err error) error {
 	var se *webhook.StatusError
 	if !errors.As(err, &se) {
-		return ""
+		return err
 	}
 	switch se.StatusCode {
 	case http.StatusNotFound:
 		if strings.Contains(url, "/webhook-test/") {
-			return " (Test-URL: funktioniert nur, solange im Editor „Listen for test event“ läuft – Production-URL verwenden)"
+			return fmt.Errorf("%w (Test-URL: funktioniert nur, solange im Editor „Listen for test event“ läuft – Production-URL verwenden)", err)
 		}
-		return " (Workflow aktiv? HTTP-Methode im Webhook-Node auf POST gestellt?)"
+		return fmt.Errorf("%w (Workflow aktiv? HTTP-Methode im Webhook-Node auf POST gestellt?)", err)
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return " (Auth-Header-Name und -Wert mit der Header-Auth-Credential im Webhook-Node vergleichen)"
+		return fmt.Errorf("%w (Auth-Header-Name und -Wert mit der Header-Auth-Credential im Webhook-Node vergleichen)", err)
 	}
-	return ""
+	return err
 }
 
 func logger(pc *plugin.PublishContext) *slog.Logger {

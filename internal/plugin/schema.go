@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"netscope/internal/cron"
+	"netscope/internal/i18n"
 )
 
 // FieldType is the type of a settings field.
@@ -223,12 +224,16 @@ func FieldErr(field, message string) error {
 	return &ValidationError{Errors: []FieldError{{Field: field, Message: message}}}
 }
 
-func (e *ValidationError) Error() string {
+func (e *ValidationError) Error() string { return e.ErrorIn(i18n.DE) }
+
+// ErrorIn returns the message with its fixed part in a language (the field messages are
+// used as they are).
+func (e *ValidationError) ErrorIn(loc i18n.Locale) string {
 	parts := make([]string, len(e.Errors))
 	for i, fe := range e.Errors {
 		parts[i] = fe.Field + ": " + fe.Message
 	}
-	return "ungültige Einstellungen: " + strings.Join(parts, "; ")
+	return i18n.Sprintf(loc, "ungültige Einstellungen: %s", strings.Join(parts, "; "))
 }
 
 // CredentialChecker verifies that a credential exists and has one of the allowed types.

@@ -4,6 +4,7 @@
 //   const errs = validateSchema(fields, values);           // client side check before submit
 //   await api.put('/api/v1/plugins/{id}/config', { path: { id }, body: { settings: schemaPayload(fields, values) } });
 import { SECRET_MASK, type SchemaField } from '$lib/api/types';
+import { t, tn } from '$lib/i18n';
 
 export type SchemaValues = Record<string, unknown>;
 
@@ -118,23 +119,25 @@ function checkFormat(format: string | undefined, s: string): string | null {
 		case 'url':
 			try {
 				const u = new URL(s);
-				if (u.protocol !== 'http:' && u.protocol !== 'https:') return 'nur http:// oder https:// erlaubt';
+				if (u.protocol !== 'http:' && u.protocol !== 'https:') return t('nur http:// oder https:// erlaubt');
 			} catch {
-				return 'gültige URL erwartet (z. B. https://host/pfad)';
+				return t('gültige URL erwartet (z. B. https://host/pfad)');
 			}
 			return null;
 		case 'email':
-			return /^[^\s@]+@[^\s@]+$/.test(s) ? null : 'E-Mail-Adresse erwartet';
+			return /^[^\s@]+@[^\s@]+$/.test(s) ? null : t('E-Mail-Adresse erwartet');
 		case 'ip':
-			return ipv4.test(s) || (s.includes(':') && /^[0-9a-fA-F:.]+$/.test(s)) ? null : 'IP-Adresse erwartet';
+			return ipv4.test(s) || (s.includes(':') && /^[0-9a-fA-F:.]+$/.test(s))
+				? null
+				: t('IP-Adresse erwartet');
 		case 'hostport':
-			return /^.+:\d{1,5}$/.test(s) ? null : 'host:port erwartet';
+			return /^.+:\d{1,5}$/.test(s) ? null : t('host:port erwartet');
 		case 'mac':
-			return /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$/.test(s) ? null : 'MAC-Adresse erwartet';
+			return /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$/.test(s) ? null : t('MAC-Adresse erwartet');
 		case 'header':
-			return /^[^\s:]+\s*:.*/.test(s) ? null : 'Format "Name: Wert" erwartet';
+			return /^[^\s:]+\s*:.*/.test(s) ? null : t('Format "Name: Wert" erwartet');
 		case 'path':
-			return s.startsWith('/') || /^[a-zA-Z]:/.test(s) ? null : 'absoluter Pfad erwartet';
+			return s.startsWith('/') || /^[a-zA-Z]:/.test(s) ? null : t('absoluter Pfad erwartet');
 	}
 	return null;
 }
@@ -160,30 +163,34 @@ export function validateSchema(fields: SchemaField[], values: SchemaValues): Rec
 		if (f.required && f.type !== 'bool' && f.type !== 'int') {
 			const empty = f.type === 'credential-ref' && !f.multi ? !v : isEmpty(v);
 			if (empty && !(isSecret(f) && v === SECRET_MASK)) {
-				errs[f.key] = 'Pflichtfeld';
+				errs[f.key] = t('Pflichtfeld');
 				continue;
 			}
 		}
 		switch (f.type) {
 			case 'int': {
 				if (v === null || v === '' || v === undefined) {
-					if (f.required) errs[f.key] = 'Pflichtfeld';
+					if (f.required) errs[f.key] = t('Pflichtfeld');
 					break;
 				}
 				const n = Number(v);
-				if (!Number.isInteger(n)) errs[f.key] = 'Ganzzahl erwartet';
-				else if (val?.min !== undefined && n < val.min) errs[f.key] = `muss mindestens ${val.min} sein`;
-				else if (val?.max !== undefined && n > val.max) errs[f.key] = `darf höchstens ${val.max} sein`;
+				if (!Number.isInteger(n)) errs[f.key] = t('Ganzzahl erwartet');
+				else if (val?.min !== undefined && n < val.min)
+					errs[f.key] = t('muss mindestens {min} sein', { min: val.min });
+				else if (val?.max !== undefined && n > val.max)
+					errs[f.key] = t('darf höchstens {max} sein', { max: val.max });
 				break;
 			}
 			case 'string':
 			case 'secret': {
 				if (typeof v !== 'string' || v === '' || v === SECRET_MASK) break;
 				const len = [...v].length;
-				if (val?.min !== undefined && len < val.min) errs[f.key] = `mindestens ${val.min} Zeichen`;
-				else if (val?.max !== undefined && len > val.max) errs[f.key] = `höchstens ${val.max} Zeichen`;
+				if (val?.min !== undefined && len < val.min)
+					errs[f.key] = tn(val.min, 'mindestens 1 Zeichen', 'mindestens {n} Zeichen');
+				else if (val?.max !== undefined && len > val.max)
+					errs[f.key] = tn(val.max, 'höchstens 1 Zeichen', 'höchstens {n} Zeichen');
 				else if (val?.pattern && !new RegExp(val.pattern).test(v))
-					errs[f.key] = 'entspricht nicht dem erwarteten Muster';
+					errs[f.key] = t('entspricht nicht dem erwarteten Muster');
 				else {
 					const fe = checkFormat(val?.format, f.multiline ? v : v.trim());
 					if (fe) errs[f.key] = fe;
@@ -192,22 +199,24 @@ export function validateSchema(fields: SchemaField[], values: SchemaValues): Rec
 			}
 			case 'duration':
 				if (typeof v === 'string' && v.trim() && !durationRe.test(v.trim()))
-					errs[f.key] = 'Dauer erwartet (z. B. 30s, 5m, 2h)';
+					errs[f.key] = t('Dauer erwartet (z. B. 30s, 5m, 2h)');
 				break;
 			case 'string-list':
 			case 'subnet-list': {
 				const list = (Array.isArray(v) ? v : []) as string[];
-				if (val?.min !== undefined && list.length < val.min) errs[f.key] = `mindestens ${val.min} Einträge`;
+				if (val?.min !== undefined && list.length < val.min)
+					errs[f.key] = tn(val.min, 'mindestens {n} Eintrag', 'mindestens {n} Einträge');
 				else if (val?.max !== undefined && list.length > val.max)
-					errs[f.key] = `höchstens ${val.max} Einträge`;
+					errs[f.key] = tn(val.max, 'höchstens {n} Eintrag', 'höchstens {n} Einträge');
 				for (const it of list) {
 					if (errs[f.key]) break;
-					if (f.type === 'subnet-list' && !isCidr(it)) errs[f.key] = `ungültiges Subnetz „${it}“`;
+					if (f.type === 'subnet-list' && !isCidr(it))
+						errs[f.key] = t('ungültiges Subnetz „{value}“', { value: it });
 					else if (val?.pattern && !new RegExp(val.pattern).test(it))
-						errs[f.key] = `„${it}“ entspricht nicht dem Muster`;
+						errs[f.key] = t('„{value}“ entspricht nicht dem Muster', { value: it });
 					else {
 						const fe = checkFormat(val?.format, it);
-						if (fe) errs[f.key] = `„${it}“: ${fe}`;
+						if (fe) errs[f.key] = t('„{value}“: {error}', { value: it, error: fe });
 					}
 				}
 				break;

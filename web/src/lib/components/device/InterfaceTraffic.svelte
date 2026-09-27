@@ -10,6 +10,7 @@
 	import { Badge, Card, EmptyState, ErrorState, Input, RelativeTime, Skeleton } from '$lib/components/ui';
 	import Table, { type Column } from '$lib/components/ui/Table.svelte';
 	import TimeSeriesChart from '$lib/components/ui/TimeSeriesChart.svelte';
+	import { intlLocale, t } from '$lib/i18n';
 	import { formatBps, formatNumber, formatPercent } from '$lib/utils/format';
 	import type { Tone } from '$lib/utils/labels';
 	import { loadPref, savePref } from '$lib/utils/url';
@@ -25,8 +26,8 @@
 
 	const RANGES = [
 		{ id: '24h', label: '24 h', ms: 24 * 3600_000 },
-		{ id: '7d', label: '7 Tage', ms: 7 * 86400_000 },
-		{ id: '30d', label: '30 Tage', ms: 30 * 86400_000 }
+		{ id: '7d', label: t('7 Tage'), ms: 7 * 86400_000 },
+		{ id: '30d', label: t('30 Tage'), ms: 30 * 86400_000 }
 	] as const;
 	type RangeId = (typeof RANGES)[number]['id'];
 	let range = $state<RangeId>(loadPref<RangeId>('device.trafficRange', '24h'));
@@ -120,7 +121,7 @@
 
 	let q = $state('');
 	let sort = $state(loadPref('device.trafficSort', 'name'));
-	const collator = new Intl.Collator('de', { numeric: true, sensitivity: 'base' });
+	const collator = new Intl.Collator(intlLocale, { numeric: true, sensitivity: 'base' });
 	const rows = $derived.by(() => {
 		const needle = q.trim().toLowerCase();
 		const list = (data.data?.rows ?? []).filter(
@@ -204,10 +205,10 @@
 		return v >= 90 ? 'bg-danger' : v >= 70 ? 'bg-warn' : 'bg-accent';
 	}
 	function statusOf(r: Row): { label: string; tone: Tone } {
-		if (r.admin === 'down') return { label: 'abgeschaltet', tone: 'neutral' };
-		if (r.oper === 'up') return { label: 'verbunden', tone: 'ok' };
-		if (r.oper === 'down' || r.oper === 'lowerLayerDown') return { label: 'kein Link', tone: 'warn' };
-		return { label: r.oper || 'unbekannt', tone: 'neutral' };
+		if (r.admin === 'down') return { label: t('abgeschaltet'), tone: 'neutral' };
+		if (r.oper === 'up') return { label: t('verbunden'), tone: 'ok' };
+		if (r.oper === 'down' || r.oper === 'lowerLayerDown') return { label: t('kein Link'), tone: 'warn' };
+		return { label: r.oper || t('unbekannt'), tone: 'neutral' };
 	}
 	const hasErrors = (p: Points) => p.some((x) => x.max > 0);
 
@@ -225,7 +226,7 @@
 		},
 		{
 			key: 'in',
-			label: 'Eingehend',
+			label: t('Eingehend'),
 			align: 'right',
 			sortable: true,
 			sortDesc: true,
@@ -233,21 +234,21 @@
 		},
 		{
 			key: 'out',
-			label: 'Ausgehend',
+			label: t('Ausgehend'),
 			align: 'right',
 			sortable: true,
 			sortDesc: true,
 			value: (r) => formatBps(r.out)
 		},
-		{ key: 'util', label: 'Auslastung', sortable: true, sortDesc: true, width: '9rem', cell: utilCell },
+		{ key: 'util', label: t('Auslastung'), sortable: true, sortDesc: true, width: '9rem', cell: utilCell },
 		{
 			key: 'errors',
-			label: 'Fehler/min',
+			label: t('Fehler/min'),
 			align: 'right',
 			hideBelow: 'md',
 			sortable: true,
 			sortDesc: true,
-			title: 'Fehler und verworfene Pakete je Minute (Summe beider Richtungen)',
+			title: t('Fehler und verworfene Pakete je Minute (Summe beider Richtungen)'),
 			cell: errorsCell
 		}
 	]);
@@ -258,7 +259,7 @@
 		type="button"
 		class="mono rounded-sm text-left text-xs font-medium hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
 		aria-pressed={r.key === selected?.key}
-		title="Verlauf anzeigen"
+		title={t('Verlauf anzeigen')}
 		onclick={() => (picked = r.key)}>{r.name}</button
 	>
 	{#if r.alias}<span class="block text-xs text-fg-subtle">{r.alias}</span>{/if}
@@ -279,7 +280,8 @@
 {/snippet}
 {#snippet errorsCell(r: Row)}
 	<span class="tabular {r.errors ? 'text-warn' : 'text-fg-subtle'}">{formatNumber(r.errors, 1)}</span>
-	{#if r.discards}<span class="block text-xs text-fg-subtle">{formatNumber(r.discards, 1)} verworfen</span
+	{#if r.discards}<span class="block text-xs text-fg-subtle"
+			>{t('{n} verworfen', { n: formatNumber(r.discards, 1) })}</span
 		>{/if}
 {/snippet}
 
@@ -292,8 +294,10 @@
 		<div class="rounded-lg border border-border bg-surface">
 			<EmptyState
 				icon="network"
-				title="Noch keine Interface-Messwerte"
-				description="Das Plugin „SNMP-Traffic“ misst die Interfaces alle 5 Minuten; Raten entstehen ab der zweiten Abfrage."
+				title={t('Noch keine Interface-Messwerte')}
+				description={t(
+					'Das Plugin „SNMP-Traffic“ misst die Interfaces alle 5 Minuten; Raten entstehen ab der zweiten Abfrage.'
+				)}
 			/>
 		</div>
 	{:else}
@@ -302,12 +306,12 @@
 				<div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
 					<h3 class="text-sm font-semibold">Interfaces</h3>
 					<span class="text-xs text-fg-subtle">
-						{data.data?.rows.length} gemessen
-						{#if data.data?.at}· Stand <RelativeTime value={data.data.at} />{/if}
+						{t('{n} gemessen', { n: data.data?.rows.length ?? 0 })}
+						{#if data.data?.at}· {t('Stand')} <RelativeTime value={data.data.at} />{/if}
 					</span>
 					<Input
 						icon="search"
-						placeholder="Interface oder Beschreibung …"
+						placeholder={t('Interface oder Beschreibung …')}
 						bind:value={q}
 						size="sm"
 						class="ml-auto w-full sm:w-64"
@@ -328,7 +332,7 @@
 				rowClass={(r) =>
 					`${r.key === selected?.key ? 'bg-accent-soft/60' : ''} ${r.in === null ? 'opacity-60' : ''}`}
 			>
-				{#snippet empty()}<EmptyState compact title="Kein Interface passt zur Suche" />{/snippet}
+				{#snippet empty()}<EmptyState compact title={t('Kein Interface passt zur Suche')} />{/snippet}
 			</Table>
 		</Card>
 
@@ -337,13 +341,13 @@
 				{#snippet header()}
 					<div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2">
 						<h3 class="text-sm font-semibold">
-							Verlauf <span class="mono">{selected.name}</span>
+							{t('Verlauf')} <span class="mono">{selected.name}</span>
 						</h3>
 						{#if selected.alias}<span class="text-xs text-fg-subtle">{selected.alias}</span>{/if}
 					</div>
 				{/snippet}
 				{#snippet actions()}
-					<div class="flex rounded-md border border-border p-0.5" role="group" aria-label="Zeitraum">
+					<div class="flex rounded-md border border-border p-0.5" role="group" aria-label={t('Zeitraum')}>
 						{#each RANGES as r (r.id)}
 							<button
 								type="button"
@@ -368,10 +372,10 @@
 							: ''}"
 					>
 						<div>
-							<h4 class="mb-1 text-xs font-medium text-fg-muted">Eingehend</h4>
+							<h4 class="mb-1 text-xs font-medium text-fg-muted">{t('Eingehend')}</h4>
 							<TimeSeriesChart
 								points={c.in}
-								label="{selected.name} eingehend"
+								label={t('{name} eingehend', { name: selected.name })}
 								format={formatBps}
 								height={150}
 								color="var(--chart-4)"
@@ -380,10 +384,10 @@
 							/>
 						</div>
 						<div>
-							<h4 class="mb-1 text-xs font-medium text-fg-muted">Ausgehend</h4>
+							<h4 class="mb-1 text-xs font-medium text-fg-muted">{t('Ausgehend')}</h4>
 							<TimeSeriesChart
 								points={c.out}
-								label="{selected.name} ausgehend"
+								label={t('{name} ausgehend', { name: selected.name })}
 								format={formatBps}
 								height={150}
 								color="var(--chart-1)"
@@ -393,25 +397,26 @@
 						</div>
 						<div>
 							<h4 class="mb-1 text-xs font-medium text-fg-muted">
-								Auslastung <span class="font-normal text-fg-subtle">(stärkere Richtung)</span>
+								{t('Auslastung')}
+								<span class="font-normal text-fg-subtle">{t('(stärkere Richtung)')}</span>
 							</h4>
 							<TimeSeriesChart
 								points={c.util}
-								label="{selected.name} Auslastung"
+								label={t('{name} Auslastung', { name: selected.name })}
 								format={(v) => formatPercent(v, 0)}
 								height={120}
 								yMax={100}
 								color="var(--chart-2)"
-								emptyText={selected.speedMbps ? undefined : 'Keine Portgeschwindigkeit bekannt'}
+								emptyText={selected.speedMbps ? undefined : t('Keine Portgeschwindigkeit bekannt')}
 								from={win.from}
 								to={win.to}
 							/>
 						</div>
 						<div>
-							<h4 class="mb-1 text-xs font-medium text-fg-muted">Fehler je Minute</h4>
+							<h4 class="mb-1 text-xs font-medium text-fg-muted">{t('Fehler je Minute')}</h4>
 							<TimeSeriesChart
 								points={c.errors}
-								label="{selected.name} Fehler je Minute"
+								label={t('{name} Fehler je Minute', { name: selected.name })}
 								format={(v) => formatNumber(v, 1)}
 								height={120}
 								color="var(--chart-3)"
@@ -421,10 +426,10 @@
 						</div>
 						{#if hasErrors(c.discards)}
 							<div>
-								<h4 class="mb-1 text-xs font-medium text-fg-muted">Verworfene Pakete je Minute</h4>
+								<h4 class="mb-1 text-xs font-medium text-fg-muted">{t('Verworfene Pakete je Minute')}</h4>
 								<TimeSeriesChart
 									points={c.discards}
-									label="{selected.name} verworfen je Minute"
+									label={t('{name} verworfen je Minute', { name: selected.name })}
 									format={(v) => formatNumber(v, 1)}
 									height={120}
 									color="var(--chart-3)"

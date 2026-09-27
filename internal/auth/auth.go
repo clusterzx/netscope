@@ -67,7 +67,9 @@ type Principal struct {
 	PasswordChange bool `json:"passwordChange,omitempty"`
 	// MFASetup: the role requires a second factor the user has not set up; the session
 	// may only set one up.
-	MFASetup  bool   `json:"mfaSetup,omitempty"`
+	MFASetup bool `json:"mfaSetup,omitempty"`
+	// Locale is the user's language preference ("" = browser); the API answers in it.
+	Locale    string `json:"locale,omitempty"`
 	SessionID string `json:"-"`
 	perms     map[string]bool
 }
@@ -218,11 +220,12 @@ type account struct {
 	admin, require2FA     bool
 	mfa                   bool   // a second factor is set up
 	source                string // local | ldap | oidc
+	locale                string // "" (browser) | de | en
 }
 
 const accountSelect = `SELECT u.id, u.username, u.display_name, u.disabled, u.must_change_password,
 	r.id, r.name, r.permissions, r.builtin = 'admin', r.require_2fa,
-	u.totp_enabled_at IS NOT NULL OR EXISTS (SELECT 1 FROM user_passkeys k WHERE k.user_id = u.id), u.auth_source
+	u.totp_enabled_at IS NOT NULL OR EXISTS (SELECT 1 FROM user_passkeys k WHERE k.user_id = u.id), u.auth_source, u.locale
 	FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?`
 
 func (s *Service) account(ctx context.Context, userID int64) (*account, error) {
@@ -231,7 +234,7 @@ func (s *Service) account(ctx context.Context, userID int64) (*account, error) {
 		perms string
 	)
 	err := s.db.R.QueryRowContext(ctx, accountSelect, userID).Scan(&a.id, &a.username, &a.displayName, &a.disabled, &a.mustChange,
-		&a.roleID, &a.roleName, &perms, &a.admin, &a.require2FA, &a.mfa, &a.source)
+		&a.roleID, &a.roleName, &perms, &a.admin, &a.require2FA, &a.mfa, &a.source, &a.locale)
 	if err != nil {
 		return nil, db.NotFound(err)
 	}
@@ -246,7 +249,7 @@ func (a *account) principal(kind, scope string) *Principal {
 		perms = AllPermissions()
 	}
 	p := &Principal{UserID: a.id, Username: a.username, DisplayName: a.displayName, Kind: kind, Scope: scope,
-		RoleID: a.roleID, RoleName: a.roleName, Admin: a.admin, Permissions: perms, perms: make(map[string]bool, len(perms))}
+		RoleID: a.roleID, RoleName: a.roleName, Admin: a.admin, Permissions: perms, Locale: a.locale, perms: make(map[string]bool, len(perms))}
 	for _, k := range perms {
 		p.perms[k] = true
 	}

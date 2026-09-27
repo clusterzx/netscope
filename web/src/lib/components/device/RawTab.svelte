@@ -11,6 +11,7 @@
 	import JsonView from '$lib/components/ui/JsonView.svelte';
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
+	import { t } from '$lib/i18n';
 	import { formatBytes, formatDateTime } from '$lib/utils/format';
 	import { LazyData, sourceName } from './util';
 
@@ -76,7 +77,7 @@
 </script>
 
 <div class="flex flex-col gap-3">
-	<h2 class="text-sm font-semibold">Rohdaten je Plugin</h2>
+	<h2 class="text-sm font-semibold">{t('Rohdaten je Plugin')}</h2>
 	{#if latest.error && !latest.data}
 		<ErrorState error={latest.error} onretry={() => latest.reload()} />
 	{:else if !latest.data}
@@ -85,8 +86,10 @@
 		<div class="rounded-lg border border-border bg-surface">
 			<EmptyState
 				icon="file"
-				title="Keine Beobachtungen"
-				description="Rohdaten werden gemäß Aufbewahrung (Cleanup-Plugin) gespeichert und danach gelöscht."
+				title={t('Keine Beobachtungen')}
+				description={t(
+					'Rohdaten werden gemäß Aufbewahrung (Cleanup-Plugin) gespeichert und danach gelöscht.'
+				)}
 			/>
 		</div>
 	{:else}
@@ -115,7 +118,7 @@
 				{#if list.length > 1 || history.loading}
 					<div class="rounded-lg border border-border bg-surface p-1">
 						<p class="px-2.5 pt-1 pb-1.5 text-[0.7rem] font-semibold tracking-wider text-fg-subtle uppercase">
-							Letzte Beobachtungen
+							{t('Letzte Beobachtungen')}
 						</p>
 						<ul class="relative flex max-h-72 flex-col overflow-auto">
 							{#each list as o (o.id)}
@@ -139,24 +142,35 @@
 				{/if}
 			</nav>
 
-			<section class="min-w-0 rounded-lg border border-border bg-surface shadow-sm" aria-label="Beobachtung">
+			<section
+				class="min-w-0 rounded-lg border border-border bg-surface shadow-sm"
+				aria-label={t('Beobachtung')}
+			>
 				{#if selected}
 					<header
 						class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2 text-sm"
 					>
 						<span class="font-semibold">{sourceName(selected.pluginId)}</span>
 						<span class="text-fg-muted">{formatDateTime(selected.ts, true)}</span>
-						{#if selected.runId}<span class="mono text-xs text-fg-subtle">Lauf #{selected.runId}</span>{/if}
-						<span class="mono min-w-0 truncate text-xs text-fg-subtle">Ziel {selected.target}</span>
+						{#if selected.runId}<span class="mono text-xs text-fg-subtle"
+								>{t('Lauf #{id}', { id: selected.runId })}</span
+							>{/if}
+						<span class="mono min-w-0 truncate text-xs text-fg-subtle"
+							>{t('Ziel {target}', { target: selected.target })}</span
+						>
 						<span class="flex-1"></span>
-						<div class="flex rounded-md border border-border p-0.5" role="group" aria-label="Darstellung">
+						<div
+							class="flex rounded-md border border-border p-0.5"
+							role="group"
+							aria-label={t('Darstellung')}
+						>
 							<button
 								type="button"
 								class="rounded px-2 py-0.5 text-xs {view === 'tree'
 									? 'bg-accent-soft font-medium text-accent'
 									: 'text-fg-muted hover:text-fg'}"
 								aria-pressed={view === 'tree'}
-								onclick={() => (view = 'tree')}>Daten (JSON)</button
+								onclick={() => (view = 'tree')}>{t('Daten (JSON)')}</button
 							>
 							<button
 								type="button"
@@ -165,21 +179,21 @@
 									: 'text-fg-muted hover:text-fg'}"
 								aria-pressed={view === 'raw'}
 								disabled={!selected.raw}
-								title={selected.raw ? undefined : 'Keine Rohausgabe gespeichert'}
+								title={selected.raw ? undefined : t('Keine Rohausgabe gespeichert')}
 								onclick={() => (view = 'raw')}
-								>Rohausgabe{selected.raw ? ` (${formatBytes(selected.raw.length)})` : ''}</button
+								>{t('Rohausgabe')}{selected.raw ? ` (${formatBytes(selected.raw.length)})` : ''}</button
 							>
 						</div>
 					</header>
 					<div class="p-3">
 						{#if view === 'raw' && selected.raw}
-							<CodeBlock code={selected.raw} maxHeight="36rem" label="Rohausgabe" />
+							<CodeBlock code={selected.raw} maxHeight="36rem" label={t('Rohausgabe')} />
 						{:else}
 							<JsonView value={selected.data} openDepth={2} maxHeight="36rem" />
 						{/if}
 					</div>
 				{:else}
-					<p class="px-4 py-6 text-sm text-fg-subtle">Keine Beobachtung ausgewählt.</p>
+					<p class="px-4 py-6 text-sm text-fg-subtle">{t('Keine Beobachtung ausgewählt.')}</p>
 				{/if}
 			</section>
 		</div>

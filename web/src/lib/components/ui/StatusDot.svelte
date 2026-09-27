@@ -4,6 +4,8 @@
 	status: online | offline | up | down | degraded | unknown | running | ok | warn | danger | idle
 -->
 <script lang="ts">
+	import { t } from '$lib/i18n';
+
 	interface Props {
 		status: string;
 		label?: string;
@@ -35,9 +37,9 @@
 		offline: 'Offline',
 		up: 'Up',
 		down: 'Down',
-		degraded: 'Beeinträchtigt',
-		unknown: 'Unbekannt',
-		running: 'Läuft'
+		degraded: t('Beeinträchtigt'),
+		unknown: t('Unbekannt'),
+		running: t('Läuft')
 	};
 	const color = $derived(colors[status] ?? 'bg-fg-subtle');
 	const doPulse = $derived(pulse ?? (status === 'running' || status === 'down'));

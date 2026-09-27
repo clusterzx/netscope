@@ -60,19 +60,19 @@ type StatusError struct {
 	Location   string // redirect target (scheme://host only) for 3xx answers
 }
 
+// Error returns whole phrases (no appended fragments) so that the catalogs can translate
+// the message.
 func (e *StatusError) Error() string {
 	if e.StatusCode >= 300 && e.StatusCode < 400 {
-		msg := "Empfänger leitet weiter (HTTP " + e.Status + ")"
 		if e.Location != "" {
-			msg += " nach " + e.Location
+			return fmt.Sprintf("Empfänger leitet weiter (HTTP %s) nach %s – bitte die endgültige URL eintragen", e.Status, e.Location)
 		}
-		return msg + " – bitte die endgültige URL eintragen"
+		return fmt.Sprintf("Empfänger leitet weiter (HTTP %s) – bitte die endgültige URL eintragen", e.Status)
 	}
-	msg := "Empfänger antwortete mit HTTP " + e.Status
 	if e.Excerpt != "" {
-		msg += ": " + e.Excerpt
+		return fmt.Sprintf("Empfänger antwortete mit HTTP %s: %s", e.Status, e.Excerpt)
 	}
-	return msg
+	return fmt.Sprintf("Empfänger antwortete mit HTTP %s", e.Status)
 }
 
 // Sign returns the signature header value "sha256=" + hex(HMAC-SHA256(secret,

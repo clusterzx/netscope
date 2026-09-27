@@ -8,6 +8,7 @@
 	import { untrack } from 'svelte';
 	import { api } from '$lib/api';
 	import type { DeviceRow } from '$lib/api';
+	import { t } from '$lib/i18n';
 	import FormField from '$lib/components/ui/FormField.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Spinner from '$lib/components/ui/Spinner.svelte';
@@ -32,7 +33,7 @@
 		hint,
 		error,
 		single = false,
-		placeholder = 'Gerät suchen (Name, IP, MAC …)',
+		placeholder = t('Gerät suchen (Name, IP, MAC …)'),
 		disabled = false,
 		id,
 		class: klass = '',
@@ -94,7 +95,7 @@
 		} catch (e) {
 			if (e instanceof DOMException && e.name === 'AbortError') return;
 			results = [];
-			searchError = 'Suche fehlgeschlagen';
+			searchError = t('Suche fehlgeschlagen');
 		} finally {
 			if (ctrl === c) loading = false;
 		}
@@ -170,7 +171,7 @@
 					<span
 						class="inline-flex max-w-full items-center gap-1 rounded py-0.5 pr-0.5 pl-1.5 text-[0.8125rem]
 							{k?.missing ? 'bg-danger-soft text-danger' : 'bg-surface-3 text-fg'}"
-						title={k?.missing ? 'Gerät existiert nicht mehr' : k?.ip}
+						title={k?.missing ? t('Gerät existiert nicht mehr') : k?.ip}
 					>
 						<Icon name="devices" size={12} class="text-fg-subtle" />
 						<span class="truncate">{k?.name ?? `#${did}`}</span>
@@ -179,7 +180,7 @@
 							<button
 								type="button"
 								class="rounded p-0.5 text-fg-subtle hover:bg-border hover:text-fg"
-								aria-label="{k?.name ?? did} entfernen"
+								aria-label={t('{name} entfernen', { name: k?.name ?? did })}
 								onclick={() => remove(did)}
 							>
 								<Icon name="x" size={12} />
@@ -200,7 +201,11 @@
 					aria-autocomplete="list"
 					aria-describedby={describedby}
 					aria-activedescendant={showList && active >= 0 ? `${uid}-opt-${active}` : undefined}
-					placeholder={(value?.length ?? 0) ? (single ? 'Anderes Gerät …' : 'Weiteres Gerät …') : placeholder}
+					placeholder={(value?.length ?? 0)
+						? single
+							? t('Anderes Gerät …')
+							: t('Weiteres Gerät …')
+						: placeholder}
 					oninput={onInput}
 					onkeydown={onKey}
 					onfocus={() => (focused = true)}
@@ -213,13 +218,15 @@
 				<ul
 					id="{uid}-list"
 					role="listbox"
-					aria-label="Gefundene Geräte"
+					aria-label={t('Gefundene Geräte')}
 					class="absolute z-40 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-surface py-1 shadow-lg"
 				>
 					{#if searchError}
 						<li class="px-3 py-1.5 text-sm text-danger" role="presentation">{searchError}</li>
 					{:else if !loading && matches.length === 0}
-						<li class="px-3 py-1.5 text-sm text-fg-subtle" role="presentation">Kein passendes Gerät</li>
+						<li class="px-3 py-1.5 text-sm text-fg-subtle" role="presentation">
+							{t('Kein passendes Gerät')}
+						</li>
 					{/if}
 					{#each matches as d, i (d.id)}
 						<li

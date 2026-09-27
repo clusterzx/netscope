@@ -143,6 +143,7 @@ func (h *Host) Init(ctx context.Context) error {
 		h.configs[id] = cfg
 	}
 	now := db.Now()
+	// i18n:ignore – SQL; the stored error text has its own catalog entry
 	if _, err := h.DB.W.ExecContext(ctx, `UPDATE runs SET status = 'cancelled', finished_at = ?, error = 'Abgebrochen: NetScope wurde neu gestartet'
 		WHERE status = 'running'`, now); err != nil {
 		return err
@@ -277,7 +278,9 @@ func (h *Host) IDs() []string {
 
 // Env returns the plugin environment.
 func (h *Host) Env() plugin.Env {
-	return plugin.Env{PublicURL: h.Settings.System().PublicURL, Location: h.Location, Version: h.Version, DataRoot: h.DataDir}
+	sys := h.Settings.System()
+	return plugin.Env{PublicURL: sys.PublicURL, Location: h.Location, Version: h.Version, DataRoot: h.DataDir,
+		Language: sys.Lang()}
 }
 
 func (h *Host) dataDir(id string) string {
@@ -485,6 +488,7 @@ func (h *Host) Publish(ctx context.Context, id string, n *plugin.Notification) e
 	defer cancel()
 	pc := &plugin.PublishContext{PluginID: id, Settings: plugin.NewSettings(cfg.Settings), Log: h.Log.With("plugin", id),
 		Creds: h.CredentialProvider(), Env: h.Env()}
+	n = LocalizeNotification(n, pc.Env.Lang())
 	start := time.Now()
 	err := safeCall(func() error { return pub.Publish(ctx, pc, n) })
 	h.metrics.notification(id, err == nil, time.Since(start))

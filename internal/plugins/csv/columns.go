@@ -53,37 +53,37 @@ var columnAliases = map[string]string{
 	"rechnername":    colHostname,
 	"type":           colType,
 	"typ":            colType,
-	"gerätetyp":      colType,
+	"gerätetyp":      colType, // i18n:ignore (column alias)
 	"geraetetyp":     colType,
 	"devicetype":     colType,
 	"vendor":         colVendor,
-	"hersteller":     colVendor,
+	"hersteller":     colVendor, // i18n:ignore (column alias)
 	"manufacturer":   colVendor,
 	"model":          colModel,
-	"modell":         colModel,
+	"modell":         colModel, // i18n:ignore (column alias)
 	"os":             colOS,
-	"betriebssystem": colOS,
+	"betriebssystem": colOS, // i18n:ignore (column alias)
 	"location":       colLocation,
-	"standort":       colLocation,
-	"aufstellort":    colLocation,
+	"standort":       colLocation, // i18n:ignore (column alias)
+	"aufstellort":    colLocation, // i18n:ignore (column alias)
 	"ort":            colLocation,
 	"raum":           colLocation,
 	"owner":          colOwner,
-	"besitzer":       colOwner,
-	"eigentümer":     colOwner,
+	"besitzer":       colOwner, // i18n:ignore (column alias)
+	"eigentümer":     colOwner, // i18n:ignore (column alias)
 	"eigentuemer":    colOwner,
 	"verantwortlich": colOwner,
 	"tags":           colTags,
 	"tag":            colTags,
-	"schlagwörter":   colTags,
+	"schlagwörter":   colTags, // i18n:ignore (column alias)
 	"schlagworte":    colTags,
 	"state":          colState,
-	"zustand":        colState,
+	"zustand":        colState, // i18n:ignore (column alias)
 	"criticality":    colCriticality,
-	"kritikalität":   colCriticality,
+	"kritikalität":   colCriticality, // i18n:ignore (column alias)
 	"kritikalitaet":  colCriticality,
 	"notes":          colNotes,
-	"notizen":        colNotes,
+	"notizen":        colNotes, // i18n:ignore (column alias)
 	"notiz":          colNotes,
 	"bemerkung":      colNotes,
 	"bemerkungen":    colNotes,
@@ -162,9 +162,9 @@ var stateValues = map[string]string{
 	"known":      "known",
 	"bekannt":    "known",
 	"unknown":    "unknown",
-	"unbekannt":  "unknown",
+	"unbekannt":  "unknown", // i18n:ignore (cell value alias)
 	"ignored":    "ignored",
-	"ignoriert":  "ignored",
+	"ignoriert":  "ignored", // i18n:ignore (cell value alias)
 	"ignore":     "ignored",
 	"ignorieren": "ignored",
 }

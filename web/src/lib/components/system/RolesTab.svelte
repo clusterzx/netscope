@@ -15,6 +15,7 @@
 		Textarea,
 		Toggle
 	} from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -52,7 +53,7 @@
 	function openEditor(r: Role | null, copyOf?: Role) {
 		const src = r ?? copyOf ?? null;
 		editing = r;
-		name = r?.name ?? (copyOf ? `${copyOf.name} (Kopie)` : '');
+		name = r?.name ?? (copyOf ? t('{name} (Kopie)', { name: copyOf.name }) : '');
 		description = src?.description ?? '';
 		require2fa = src?.require2fa ?? false;
 		// every key present: bind:checked does not accept undefined
@@ -68,7 +69,7 @@
 
 	async function save() {
 		if (!name.trim()) {
-			errors = { name: 'Name erforderlich' };
+			errors = { name: t('Name erforderlich') };
 			return;
 		}
 		saving = true;
@@ -83,7 +84,7 @@
 		try {
 			if (editing) await api.put('/api/v1/roles/{id}', { path: { id: editing.id }, body });
 			else await api.post('/api/v1/roles', { body });
-			toast.success(`Rolle „${body.name}“ gespeichert`);
+			toast.success(t('Rolle „{name}“ gespeichert', { name: body.name }));
 			open = false;
 			roles.reload();
 		} catch (e) {
@@ -95,15 +96,15 @@
 
 	async function remove(r: Role) {
 		const ok = await confirm({
-			title: `Rolle „${r.name}“ löschen?`,
-			message: 'Die Rolle wird entfernt. Das geht nur, solange kein Benutzer sie hat.',
-			confirmLabel: 'Löschen',
+			title: t('Rolle „{name}“ löschen?', { name: r.name }),
+			message: t('Die Rolle wird entfernt. Das geht nur, solange kein Benutzer sie hat.'),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/roles/{id}', { path: { id: r.id } });
-			toast.success(`Rolle „${r.name}“ gelöscht`);
+			toast.success(t('Rolle „{name}“ gelöscht', { name: r.name }));
 			roles.reload();
 		} catch (e) {
 			toast.error(e);
@@ -112,13 +113,13 @@
 </script>
 
 <Card
-	title="Rollen"
-	description="Lesen dürfen alle Benutzer; eine Rolle legt fest, was jemand ändern darf"
+	title={t('Rollen')}
+	description={t('Lesen dürfen alle Benutzer; eine Rolle legt fest, was jemand ändern darf')}
 	icon="shield"
 >
 	{#snippet actions()}
 		<Button size="sm" variant="primary" icon="plus" onclick={() => openEditor(null)} disabled={!catalog.data}
-			>Rolle anlegen</Button
+			>{t('Rolle anlegen')}</Button
 		>
 	{/snippet}
 	{#if (roles.error && !roles.data) || (catalog.error && !catalog.data)}
@@ -138,34 +139,38 @@
 					<div class="min-w-0 flex-1">
 						<div class="flex flex-wrap items-center gap-2">
 							<span class="font-medium text-fg">{r.name}</span>
-							{#if r.admin}<Badge tone="accent">alle Rechte</Badge>{/if}
-							{#if r.require2fa}<Badge tone="info">2FA Pflicht</Badge>{/if}
-							<span class="text-xs text-fg-subtle">{r.users} Benutzer</span>
+							{#if r.admin}<Badge tone="accent">{t('alle Rechte')}</Badge>{/if}
+							{#if r.require2fa}<Badge tone="info">{t('2FA Pflicht')}</Badge>{/if}
+							<span class="text-xs text-fg-subtle">{tn(r.users, '1 Benutzer', '{n} Benutzer')}</span>
 						</div>
 						{#if r.description}<p class="mt-0.5 text-sm text-fg-muted">{r.description}</p>{/if}
 						{#if !r.admin}
 							<p class="mt-1 text-xs text-fg-subtle">
-								{r.permissions.length ? r.permissions.map(label).join(' · ') : 'Nur lesen – keine Änderungen'}
+								{r.permissions.length
+									? r.permissions.map(label).join(' · ')
+									: t('Nur lesen – keine Änderungen')}
 							</p>
 						{/if}
 					</div>
 					<div class="flex gap-1">
-						<Button size="sm" variant="ghost" icon="edit" onclick={() => openEditor(r)}>Bearbeiten</Button>
+						<Button size="sm" variant="ghost" icon="edit" onclick={() => openEditor(r)}
+							>{t('Bearbeiten')}</Button
+						>
 						{#if !r.admin}
 							<Button
 								size="sm"
 								variant="ghost"
 								icon="copy"
-								label="„{r.name}“ kopieren"
+								label={t('„{name}“ kopieren', { name: r.name })}
 								onclick={() => openEditor(null, r)}
 							/>
 							<Button
 								size="sm"
 								variant="ghost"
 								icon="trash"
-								label="„{r.name}“ löschen"
+								label={t('„{name}“ löschen', { name: r.name })}
 								disabled={r.users > 0}
-								title={r.users > 0 ? 'Die Rolle ist noch Benutzern zugewiesen' : undefined}
+								title={r.users > 0 ? t('Die Rolle ist noch Benutzern zugewiesen') : undefined}
 								onclick={() => remove(r)}
 							/>
 						{/if}
@@ -178,7 +183,7 @@
 
 <Modal
 	bind:open
-	title={editing ? `Rolle „${editing.name}“` : 'Rolle anlegen'}
+	title={editing ? t('Rolle „{name}“', { name: editing.name }) : t('Rolle anlegen')}
 	size="lg"
 	as="form"
 	onsubmit={save}
@@ -189,7 +194,7 @@
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-[16rem_1fr]">
 			<Input label="Name" bind:value={name} required maxlength={64} disabled={admin} error={errors.name} />
 			<Textarea
-				label="Beschreibung"
+				label={t('Beschreibung')}
 				bind:value={description}
 				rows={2}
 				maxlength={300}
@@ -198,14 +203,16 @@
 		</div>
 		<Toggle
 			bind:checked={require2fa}
-			label="Zwei-Faktor-Anmeldung verlangen"
-			description="Benutzer mit dieser Rolle müssen beim nächsten Login TOTP oder einen Passkey einrichten"
+			label={t('Zwei-Faktor-Anmeldung verlangen')}
+			description={t(
+				'Benutzer mit dieser Rolle müssen beim nächsten Login TOTP oder einen Passkey einrichten'
+			)}
 		/>
 		{#if admin}
-			<Alert tone="info">Die Rolle Administrator hat immer alle Rechte – auch künftige.</Alert>
+			<Alert tone="info">{t('Die Rolle Administrator hat immer alle Rechte – auch künftige.')}</Alert>
 		{:else}
 			<fieldset class="flex flex-col gap-4">
-				<legend class="mb-1 text-[0.8125rem] font-medium text-fg">Rechte</legend>
+				<legend class="mb-1 text-[0.8125rem] font-medium text-fg">{t('Rechte')}</legend>
 				{#if errors.permissions}<p class="text-xs text-danger" role="alert">{errors.permissions}</p>{/if}
 				{#each groups as g (g.name)}
 					{@const all = g.perms.every((p) => perms[p.key])}
@@ -215,15 +222,16 @@
 							<button
 								type="button"
 								class="text-xs text-accent hover:underline"
-								onclick={() => setGroup(g, !all)}>{all ? 'keine' : 'alle'}</button
+								onclick={() => setGroup(g, !all)}>{all ? t('keine') : t('alle')}</button
 							>
 						</div>
 						<div class="flex flex-col gap-2 px-3 py-2">
 							{#each g.perms as p (p.key)}
 								<div class="flex items-start gap-2">
 									<Checkbox bind:checked={perms[p.key]} label={p.label} description={p.hint} />
-									{#if p.critical}<Badge tone="warn" title="Reicht an Geheimnisse oder das ganze System heran"
-											>kritisch</Badge
+									{#if p.critical}<Badge
+											tone="warn"
+											title={t('Reicht an Geheimnisse oder das ganze System heran')}>{t('kritisch')}</Badge
 										>{/if}
 								</div>
 							{/each}
@@ -234,7 +242,7 @@
 		{/if}
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={saving}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="save" loading={saving}>Speichern</Button>
+		<Button onclick={() => (open = false)} disabled={saving}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="save" loading={saving}>{t('Speichern')}</Button>
 	{/snippet}
 </Modal>

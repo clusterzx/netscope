@@ -2,22 +2,25 @@
 <script lang="ts">
 	import { live } from '$lib/stores/live.svelte';
 	import { formatRelative } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
 
 	const text = $derived(
 		live.status === 'open'
 			? 'Live'
 			: live.status === 'reconnecting'
-				? 'Getrennt'
+				? t('Getrennt')
 				: live.status === 'connecting'
-					? 'Verbinde'
-					: 'Aus'
+					? t('Verbinde')
+					: t('Aus')
 	);
 	const title = $derived(
 		live.status === 'open'
-			? `Live-Updates aktiv${live.lastMessageAt ? ` – letzte Meldung ${formatRelative(live.lastMessageAt)}` : ''}`
+			? live.lastMessageAt
+				? t('Live-Updates aktiv – letzte Meldung {time}', { time: formatRelative(live.lastMessageAt) })
+				: t('Live-Updates aktiv')
 			: live.status === 'reconnecting'
-				? 'Live-Verbindung unterbrochen – verbinde neu …'
-				: 'Live-Verbindung wird aufgebaut …'
+				? t('Live-Verbindung unterbrochen – verbinde neu …')
+				: t('Live-Verbindung wird aufgebaut …')
 	);
 	const dot = $derived(
 		live.status === 'open' ? 'bg-online' : live.status === 'reconnecting' ? 'bg-warn' : 'bg-offline'

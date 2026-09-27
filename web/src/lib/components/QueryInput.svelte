@@ -14,6 +14,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Popover from '$lib/components/ui/Popover.svelte';
+	import { t } from '$lib/i18n';
 	import { customFields, groups, meta, subnets, tags } from '$lib/stores/catalog.svelte';
 	import { deviceTypeLabel } from '$lib/utils/labels';
 
@@ -34,8 +35,8 @@
 		value = $bindable(''),
 		onsubmit,
 		error,
-		placeholder = 'Filter, z. B. tag:iot port:22 os:linux cve>=7 seen<24h',
-		label = 'Geräte-Filter',
+		placeholder = t('Filter, z. B. tag:iot port:22 os:linux cve>=7 seen<24h'),
+		label = t('Geräte-Filter'),
 		showLabel = false,
 		size = 'md',
 		live = 0,
@@ -67,7 +68,7 @@
 		const cf = (customFields.value ?? []).map((c) => ({
 			field: `cf.${c.key}`,
 			ops: ':',
-			description: `Custom Field „${c.label}“`,
+			description: t('Custom Field „{label}“', { label: c.label }),
 			example: `cf.${c.key}:`
 		}));
 		return [...list, ...cf];
@@ -78,14 +79,14 @@
 	function valuesFor(field: string): { value: string; hint?: string }[] {
 		switch (field) {
 			case 'tag':
-				return (tags.value ?? []).map((t) => ({ value: t.tag, hint: `${t.count}` }));
+				return (tags.value ?? []).map((tg) => ({ value: tg.tag, hint: `${tg.count}` }));
 			case 'group':
 				return (groups.value ?? []).map((g) => ({
 					value: quote(g.name),
-					hint: g.kind === 'query' ? 'regelbasiert' : 'manuell'
+					hint: g.kind === 'query' ? t('regelbasiert') : t('manuell')
 				}));
 			case 'type':
-				return (meta.value?.deviceTypes ?? []).map((t) => ({ value: t, hint: deviceTypeLabel[t] }));
+				return (meta.value?.deviceTypes ?? []).map((ty) => ({ value: ty, hint: deviceTypeLabel[ty] }));
 			case 'subnet':
 				return (subnets.value ?? []).map((s) => ({ value: s.cidr, hint: s.name }));
 			case 'state':
@@ -135,10 +136,10 @@
 
 	type Suggestion = { insert: string; label: string; hint?: string; final: boolean };
 	const suggestions = $derived.by((): Suggestion[] => {
-		const t = token.text;
-		if (!t) return [];
-		const neg = /^[-!]/.test(t) ? t[0] : '';
-		const body = t.slice(neg.length);
+		const tok = token.text;
+		if (!tok) return [];
+		const neg = /^[-!]/.test(tok) ? tok[0] : '';
+		const body = tok.slice(neg.length);
 		const m = /^([a-z][a-z0-9_.-]*)(>=|<=|!=|:|=|>|<)(.*)$/i.exec(body);
 		if (m) {
 			const [, field, op, partial] = m;
@@ -239,6 +240,19 @@
 		input?.focus();
 	}
 
+	// syntax shown in the help text, set into the translated sentence at {or} and {not}
+	const syntax: Record<string, string> = { or: 'a|b', not: '-' };
+	/** Splits a translated text at its placeholders so the syntax can be rendered as code. */
+	function pieces(s: string): { text: string; code?: string }[] {
+		return s
+			.split(/(\{\w+\})/)
+			.filter(Boolean)
+			.map((part) => {
+				const m = /^\{(\w+)\}$/.exec(part);
+				return m && m[1] in syntax ? { text: '', code: syntax[m[1]] } : { text: part };
+			});
+	}
+
 	function useExample(ex: string) {
 		helpOpen = false;
 		const text = (value ?? '').trim();
@@ -287,13 +301,13 @@
 		/>
 		<span class="absolute right-1 flex items-center gap-0.5" bind:this={helpBtn}>
 			{#if value}
-				<Button variant="ghost" size="xs" icon="x" label="Filter leeren" onclick={clear} />
+				<Button variant="ghost" size="xs" icon="x" label={t('Filter leeren')} onclick={clear} />
 			{/if}
 			<Button
 				variant="ghost"
 				size="xs"
 				icon="info"
-				label="Hilfe zur Filtersprache"
+				label={t('Hilfe zur Filtersprache')}
 				aria-expanded={helpOpen}
 				onclick={() => (helpOpen = !helpOpen)}
 			/>
@@ -303,7 +317,7 @@
 		<ul
 			id="{uid}-sugg"
 			role="listbox"
-			aria-label="Vorschläge"
+			aria-label={t('Vorschläge')}
 			class="absolute right-0 left-0 z-40 mt-1 max-h-72 overflow-auto rounded-md border border-border bg-surface py-1 shadow-lg"
 		>
 			{#each suggestions as s, i (s.insert)}
@@ -324,7 +338,7 @@
 				</li>
 			{/each}
 			<li class="border-t border-border px-3 pt-1 text-[0.7rem] text-fg-subtle" role="presentation">
-				↑↓ auswählen · Tab/Enter übernehmen · Esc schließen
+				{t('↑↓ auswählen · Tab/Enter übernehmen · Esc schließen')}
 			</li>
 		</ul>
 	{/if}
@@ -339,22 +353,24 @@
 	bind:open={helpOpen}
 	anchor={helpBtn}
 	placement="bottom-end"
-	label="Filtersprache"
+	label={t('Filtersprache')}
 	class="w-[min(40rem,calc(100vw-1rem))]"
 >
 	<div class="border-b border-border px-4 py-3">
-		<h2 class="text-sm font-semibold">Filtersprache</h2>
+		<h2 class="text-sm font-semibold">{t('Filtersprache')}</h2>
 		<p class="mt-0.5 text-xs text-fg-muted">
-			Begriffe werden mit UND verknüpft, <span class="mono">a|b</span> steht für ODER, ein vorangestelltes
-			<span class="mono">-</span> verneint. Werte mit Leerzeichen in Anführungszeichen. Zeitangaben: m, h, d, w.
+			{#each pieces(t('Begriffe werden mit UND verknüpft, {or} steht für ODER, ein vorangestelltes {not} verneint.')) as p, i (i)}{#if p.code !== undefined}<span
+						class="mono">{p.code}</span
+					>{:else}{p.text}{/if}{/each}
+			{t('Werte mit Leerzeichen in Anführungszeichen. Zeitangaben: m, h, d, w.')}
 		</p>
 	</div>
 	<table class="w-full text-left text-xs">
 		<thead class="sticky top-0 bg-surface-2 text-fg-muted">
 			<tr>
-				<th scope="col" class="px-4 py-1.5 font-medium">Feld</th>
-				<th scope="col" class="px-2 py-1.5 font-medium">Beschreibung</th>
-				<th scope="col" class="px-4 py-1.5 font-medium">Beispiel</th>
+				<th scope="col" class="px-4 py-1.5 font-medium">{t('Feld')}</th>
+				<th scope="col" class="px-2 py-1.5 font-medium">{t('Beschreibung')}</th>
+				<th scope="col" class="px-4 py-1.5 font-medium">{t('Beispiel')}</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -370,7 +386,7 @@
 							<button
 								type="button"
 								class="mono mr-1 mb-0.5 rounded bg-surface-3 px-1.5 py-0.5 text-fg hover:bg-accent-soft hover:text-accent"
-								title="Zum Filter hinzufügen"
+								title={t('Zum Filter hinzufügen')}
 								onclick={() => useExample(ex)}>{ex}</button
 							>
 						{/each}

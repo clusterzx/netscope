@@ -16,6 +16,7 @@
 		StatCard,
 		StatusDot
 	} from '$lib/components/ui';
+	import { intlLocale, t, tn } from '$lib/i18n';
 	import { federation, siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -59,7 +60,7 @@
 	const cveMax = $derived(d ? Math.max(1, ...Object.values(d.cves ?? {})) : 1);
 	const healthTotal = $derived(d ? Object.values(d.health ?? {}).reduce((a, b) => a + b, 0) : 0);
 
-	const kindOrder = ['scanner', 'importer', 'processor', 'publisher'];
+	const kindOrder = ['scanner', 'importer', 'processor', 'publisher']; // plugin kinds (ids), i18n-ignore
 	const pluginGroups = $derived.by(() => {
 		const list = [...(d?.plugins ?? [])];
 		return kindOrder
@@ -67,7 +68,7 @@
 				kind: k,
 				items: list
 					.filter((p) => p.kind === k)
-					.sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name, 'de'))
+					.sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name, intlLocale))
 			}))
 			.filter((g) => g.items.length);
 	});
@@ -78,14 +79,14 @@
 
 	function pluginState(p: DashboardPluginStatus): { status: string; text: string } {
 		const r = runningOf(p);
-		if (r || p.running) return { status: 'running', text: 'läuft' };
-		if (!p.enabled) return { status: 'idle', text: 'inaktiv' };
+		if (r || p.running) return { status: 'running', text: t('läuft') };
+		if (!p.enabled) return { status: 'idle', text: t('inaktiv') };
 		if (p.lastStatus === 'failed' || p.lastStatus === 'timeout')
 			return { status: 'danger', text: runStatusLabel[p.lastStatus] };
 		if (p.lastStatus === 'success') return { status: 'ok', text: 'OK' };
 		return {
 			status: 'idle',
-			text: p.lastStatus ? (runStatusLabel[p.lastStatus] ?? p.lastStatus) : 'noch nicht gelaufen'
+			text: p.lastStatus ? (runStatusLabel[p.lastStatus] ?? p.lastStatus) : t('noch nicht gelaufen')
 		};
 	}
 
@@ -98,15 +99,21 @@
 	};
 </script>
 
-<PageHeader title="Dashboard" description="Zustand des Netzwerks auf einen Blick">
+<!-- a translated text with a {time} placeholder, the time shown as live relative time -->
+{#snippet timed(text: string, value: string | null | undefined)}
+	{@const [before, after = ''] = text.split('{time}')}
+	{before}<RelativeTime {value} />{after}
+{/snippet}
+
+<PageHeader title="Dashboard" description={t('Zustand des Netzwerks auf einen Blick')}>
 	{#snippet actions()}
 		{#if d}
-			<span class="text-xs text-fg-subtle">Stand <RelativeTime value={d.generatedAt} /></span>
+			<span class="text-xs text-fg-subtle">{@render timed(t('Stand {time}'), d.generatedAt)}</span>
 		{/if}
 		<Button
 			size="sm"
 			icon="refresh"
-			label="Aktualisieren"
+			label={t('Aktualisieren')}
 			loading={data.loading && !!d}
 			onclick={() => data.reload()}
 		/>
@@ -117,16 +124,18 @@
 	<ErrorState error={data.error} onretry={() => data.reload()} />
 {:else}
 	<!-- device counters -->
-	<section aria-label="Geräte" class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+	<section aria-label={t('Geräte')} class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
 		<StatCard
-			label="Geräte"
+			label={t('Geräte')}
 			value={d?.devices.total}
 			icon="devices"
 			tone="accent"
 			href="/devices"
 			loading={!d}
 		>
-			{#if d?.devices.ignored}{formatNumber(d.devices.ignored)} ignoriert{:else}im Inventar{/if}
+			{#if d?.devices.ignored}{t('{n} ignoriert', { n: formatNumber(d.devices.ignored) })}{:else}{t(
+					'im Inventar'
+				)}{/if}
 		</StatCard>
 		<StatCard
 			label="Online"
@@ -136,10 +145,12 @@
 			href="/devices?q=is:online"
 			loading={!d}
 		>
-			{#if d && d.devices.total}{formatPercent(
-					(d.devices.online / Math.max(1, d.devices.total - d.devices.ignored)) * 100,
-					0
-				)} erreichbar{/if}
+			{#if d && d.devices.total}{t('{percent} erreichbar', {
+					percent: formatPercent(
+						(d.devices.online / Math.max(1, d.devices.total - d.devices.ignored)) * 100,
+						0
+					)
+				})}{/if}
 		</StatCard>
 		<StatCard
 			label="Offline"
@@ -149,35 +160,35 @@
 			href="/devices?q=is:offline"
 			loading={!d}
 		>
-			nicht mehr gesehen
+			{t('nicht mehr gesehen')}
 		</StatCard>
 		<StatCard
-			label="Neu (24 h)"
+			label={t('Neu (24 h)')}
 			value={d?.devices.new24h}
 			icon="plus"
 			tone="accent"
 			href="/devices?q=first<24h"
 			loading={!d}
 		>
-			erstmals entdeckt
+			{t('erstmals entdeckt')}
 		</StatCard>
 		<StatCard
-			label="Unbekannt"
+			label={t('Unbekannt')}
 			value={d?.devices.unknown}
 			icon="info"
 			tone={d?.devices.unknown ? 'unknown' : 'neutral'}
 			href="/devices?q=state:unknown"
 			loading={!d}
 		>
-			noch nicht als bekannt markiert
+			{t('noch nicht als bekannt markiert')}
 		</StatCard>
 	</section>
 
 	{#if federation.role === 'central' && d?.sites?.length && !siteFilter.value}
 		<!-- sites of a central instance -->
-		<Card title="Standorte" icon="globe" class="mt-4" padding="sm">
+		<Card title={t('Standorte')} icon="globe" class="mt-4" padding="sm">
 			{#snippet actions()}
-				<Button size="xs" variant="ghost" href="/sites" iconRight="arrow-right">Verwalten</Button>
+				<Button size="xs" variant="ghost" href="/sites" iconRight="arrow-right">{t('Verwalten')}</Button>
 			{/snippet}
 			<ul class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
 				{#each d.sites as s (s.id)}
@@ -189,18 +200,21 @@
 							type="button"
 							class="flex w-full items-start gap-2.5 rounded-md border border-border px-3 py-2 text-left hover:bg-surface-2"
 							onclick={() => (siteFilter.value = s.slug)}
-							title="Ansicht auf {s.name} einschränken"
+							title={t('Ansicht auf {name} einschränken', { name: s.name })}
 						>
 							<StatusDot status={s.connected ? 'online' : s.lastContact ? 'down' : 'idle'} class="mt-1.5" />
 							<span class="min-w-0 flex-1">
 								<span class="block truncate text-sm font-medium">{s.name}</span>
 								<span class="block text-xs text-fg-subtle">
 									{formatNumber(s.online)}/{formatNumber(s.devices)} online
-									{#if !s.connected}· {#if s.lastContact}zuletzt <RelativeTime
-												value={s.lastContact}
-											/>{:else}noch keine Meldung{/if}{/if}
-									{#if failed}· <span class="text-warn">{failed} Plugin-Fehler</span>{/if}
-									{#if s.status?.buffered}· {formatNumber(s.status.buffered)} gepuffert{/if}
+									{#if !s.connected}· {#if s.lastContact}{@render timed(
+												t('zuletzt {time}'),
+												s.lastContact
+											)}{:else}{t('noch keine Meldung')}{/if}{/if}
+									{#if failed}· <span class="text-warn"
+											>{tn(failed, '1 Plugin-Fehler', '{n} Plugin-Fehler')}</span
+										>{/if}
+									{#if s.status?.buffered}· {t('{n} gepuffert', { n: formatNumber(s.status.buffered) })}{/if}
 								</span>
 							</span>
 						</button>
@@ -212,16 +226,16 @@
 
 	<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
 		<!-- events -->
-		<Card title="Offene Events" icon="events">
+		<Card title={t('Offene Events')} icon="events">
 			{#snippet actions()}
-				<Button size="xs" variant="ghost" href="/events?acked=0" iconRight="arrow-right">Alle</Button>
+				<Button size="xs" variant="ghost" href="/events?acked=0" iconRight="arrow-right">{t('Alle')}</Button>
 			{/snippet}
 			{#if !d}
 				<Skeleton lines={5} />
 			{:else}
 				<div class="flex items-baseline gap-2">
 					<span class="text-3xl font-semibold tracking-tight">{formatNumber(openTotal)}</span>
-					<span class="text-sm text-fg-muted">nicht quittiert</span>
+					<span class="text-sm text-fg-muted">{t('nicht quittiert')}</span>
 				</div>
 				<ul class="mt-3 flex flex-col gap-1.5">
 					{#each sevOrder as s (s)}
@@ -244,11 +258,12 @@
 					{/each}
 				</ul>
 				<h3 class="mt-5 mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-					Neueste kritische & hohe
+					{t('Neueste kritische & hohe')}
 				</h3>
 				{#if (d.criticalEvents ?? []).length === 0}
 					<p class="flex items-center gap-2 text-sm text-fg-muted">
-						<Icon name="check-circle" size={16} class="text-ok" /> Keine offenen kritischen Events
+						<Icon name="check-circle" size={16} class="text-ok" />
+						{t('Keine offenen kritischen Events')}
 					</p>
 				{:else}
 					<ul class="-mx-2 flex flex-col">
@@ -276,7 +291,7 @@
 		<!-- health -->
 		<Card title="Health" icon="health">
 			{#snippet actions()}
-				<Button size="xs" variant="ghost" href="/health" iconRight="arrow-right">Statusboard</Button>
+				<Button size="xs" variant="ghost" href="/health" iconRight="arrow-right">{t('Statusboard')}</Button>
 			{/snippet}
 			{#if !d}
 				<Skeleton lines={4} />
@@ -284,8 +299,8 @@
 				<EmptyState
 					compact
 					icon="health"
-					title="Keine Health-Checks"
-					description="Checks werden in der Gerätedetailansicht oder unter Health angelegt."
+					title={t('Keine Health-Checks')}
+					description={t('Checks werden in der Gerätedetailansicht oder unter Health angelegt.')}
 				/>
 			{:else}
 				<div class="flex items-baseline gap-2">
@@ -294,10 +309,10 @@
 							? formatPercent(d.availability24h, 2)
 							: '–'}
 					</span>
-					<span class="text-sm text-fg-muted">Ø Verfügbarkeit 24 h</span>
+					<span class="text-sm text-fg-muted">{t('Ø Verfügbarkeit 24 h')}</span>
 				</div>
 				<div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-					{#each [['up', 'Up', 'ok'], ['degraded', 'Beeinträchtigt', 'warn'], ['down', 'Down', 'danger'], ['unknown', 'Unbekannt', 'neutral']] as [k, lbl, tone] (k)}
+					{#each [['up', 'Up', 'ok'], ['degraded', t('Beeinträchtigt'), 'warn'], ['down', 'Down', 'danger'], ['unknown', t('Unbekannt'), 'neutral']] as [k, lbl, tone] (k)}
 						<a href="/health" class="rounded-md border border-border px-3 py-2 hover:bg-surface-2">
 							<span class="flex items-center gap-1.5 text-xs text-fg-muted">
 								<StatusDot
@@ -322,9 +337,9 @@
 		</Card>
 
 		<!-- CVEs -->
-		<Card title="Schwachstellen" icon="shield">
+		<Card title={t('Schwachstellen')} icon="shield">
 			{#snippet actions()}
-				<Button size="xs" variant="ghost" href="/vulnerabilities" iconRight="arrow-right">Alle</Button>
+				<Button size="xs" variant="ghost" href="/vulnerabilities" iconRight="arrow-right">{t('Alle')}</Button>
 			{/snippet}
 			{#if !d}
 				<Skeleton lines={5} />
@@ -332,8 +347,8 @@
 				<EmptyState
 					compact
 					icon="shield"
-					title="Keine offenen CVEs"
-					description="Es sind keine (nicht ignorierten) Schwachstellen bekannt."
+					title={t('Keine offenen CVEs')}
+					description={t('Es sind keine (nicht ignorierten) Schwachstellen bekannt.')}
 				/>
 			{:else}
 				<ul class="flex flex-col gap-1.5">
@@ -347,7 +362,7 @@
 									style="width:{n ? Math.max(2, (n / cveMax) * 100) : 0}%"
 								></span>
 							</span>
-							<span class="text-right font-medium tabular" title="Betroffene Gerät/CVE-Paare"
+							<span class="text-right font-medium tabular" title={t('Betroffene Gerät/CVE-Paare')}
 								>{formatNumber(n)}</span
 							>
 						</li>
@@ -357,16 +372,18 @@
 					<a
 						href="/vulnerabilities?exploited=1"
 						class="mt-3 flex items-center gap-2 rounded-md border border-danger/40 px-2.5 py-2 text-sm hover:bg-danger-soft"
-						title="Schwachstellen, die laut CISA aktiv ausgenutzt werden"
+						title={t('Schwachstellen, die laut CISA aktiv ausgenutzt werden')}
 					>
 						<Icon name="zap" size={15} class="shrink-0 text-danger" />
 						<span class="font-medium text-danger tabular">{formatNumber(d.exploitedCves)}</span>
-						<span class="text-fg-muted">aktiv ausgenutzt</span>
+						<span class="text-fg-muted">{t('aktiv ausgenutzt')}</span>
 						<Icon name="arrow-right" size={14} class="ml-auto text-fg-subtle" />
 					</a>
 				{/if}
 				{#if (d.topCves ?? []).length}
-					<h3 class="mt-5 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">Top-CVEs</h3>
+					<h3 class="mt-5 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+						{t('Top-CVEs')}
+					</h3>
 					<ul class="-mx-2">
 						{#each d.topCves.slice(0, 6) as c (c.cve)}
 							<li>
@@ -380,11 +397,9 @@
 											name="zap"
 											size={14}
 											class="shrink-0 text-danger"
-											label="Laut CISA aktiv ausgenutzt"
+											label={t('Laut CISA aktiv ausgenutzt')}
 										/>{/if}
-									<span class="text-xs text-fg-subtle"
-										>{c.devices} {c.devices === 1 ? 'Gerät' : 'Geräte'}</span
-									>
+									<span class="text-xs text-fg-subtle">{tn(c.devices, '{n} Gerät', '{n} Geräte')}</span>
 								</a>
 							</li>
 						{/each}
@@ -394,17 +409,19 @@
 		</Card>
 
 		<!-- running scans -->
-		<Card title="Laufende Scans" icon="radar">
+		<Card title={t('Laufende Scans')} icon="radar">
 			{#snippet actions()}
-				{#if runs.active.length}<Badge tone="accent" dot>{runs.active.length} aktiv</Badge>{/if}
+				{#if runs.active.length}<Badge tone="accent" dot>{t('{n} aktiv', { n: runs.active.length })}</Badge
+					>{/if}
 			{/snippet}
 			{#if runs.active.length === 0}
 				<p class="flex items-center gap-2 text-sm text-fg-muted">
-					<Icon name="check" size={16} /> Zurzeit läuft kein Scan.
+					<Icon name="check" size={16} />
+					{t('Zurzeit läuft kein Scan.')}
 				</p>
 				{#if runs.recent.length}
 					<h3 class="mt-4 mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-						Zuletzt beendet
+						{t('Zuletzt beendet')}
 					</h3>
 					<ul class="flex flex-col gap-1">
 						{#each runs.recent.slice(0, 5) as r (r.id)}
@@ -445,15 +462,15 @@
 		</Card>
 
 		<!-- certificates -->
-		<Card title="Zertifikate (≤ 30 Tage)" icon="lock">
+		<Card title={t('Zertifikate (≤ 30 Tage)')} icon="lock">
 			{#if !d}
 				<Skeleton lines={4} />
 			{:else if (d.certificates ?? []).length === 0}
 				<EmptyState
 					compact
 					icon="lock"
-					title="Keine ablaufenden Zertifikate"
-					description="Kein aktives Zertifikat läuft in den nächsten 30 Tagen ab."
+					title={t('Keine ablaufenden Zertifikate')}
+					description={t('Kein aktives Zertifikat läuft in den nächsten 30 Tagen ab.')}
 				/>
 			{:else}
 				<ul class="-mx-2">
@@ -467,7 +484,7 @@
 									tone={c.daysLeft < 0 ? 'critical' : c.daysLeft <= 7 ? 'high' : 'medium'}
 									class="w-20 justify-center"
 								>
-									{c.daysLeft < 0 ? 'abgelaufen' : `${c.daysLeft} Tage`}
+									{c.daysLeft < 0 ? t('abgelaufen') : tn(c.daysLeft, '{n} Tag', '{n} Tage')}
 								</Badge>
 								<span class="min-w-0 flex-1">
 									<span class="block truncate text-sm">{c.subjectCn || c.serverName || c.ip}</span>
@@ -483,9 +500,9 @@
 		</Card>
 
 		<!-- subnets -->
-		<Card title="Subnetze" icon="network">
+		<Card title={t('Subnetze')} icon="network">
 			{#snippet actions()}
-				<Button size="xs" variant="ghost" href="/system" iconRight="arrow-right">Verwalten</Button>
+				<Button size="xs" variant="ghost" href="/system" iconRight="arrow-right">{t('Verwalten')}</Button>
 			{/snippet}
 			{#if !d}
 				<Skeleton lines={3} />
@@ -493,8 +510,8 @@
 				<EmptyState
 					compact
 					icon="network"
-					title="Keine Subnetze"
-					description="Subnetze werden unter System gepflegt."
+					title={t('Keine Subnetze')}
+					description={t('Subnetze werden unter System gepflegt.')}
 				/>
 			{:else}
 				<ul class="-mx-2">
@@ -508,9 +525,9 @@
 								<span class="min-w-0 flex-1 truncate text-sm text-fg-muted"
 									>{s.name}{s.vlan ? ` · VLAN ${s.vlan}` : ''}</span
 								>
-								{#if !s.enabled}<Badge>inaktiv</Badge>{/if}
+								{#if !s.enabled}<Badge>{t('inaktiv')}</Badge>{/if}
 								<span class="text-sm tabular">{formatNumber(s.deviceCount)}</span>
-								<span class="text-xs text-fg-subtle">Geräte</span>
+								<span class="text-xs text-fg-subtle">{s.deviceCount === 1 ? t('Gerät') : t('Geräte')}</span>
 							</a>
 						</li>
 					{/each}
@@ -523,9 +540,9 @@
 	<Card title="Plugins" icon="plugins" class="mt-4">
 		{#snippet actions()}
 			{#if d?.pluginsFailed}
-				<Badge tone="danger" dot>{d.pluginsFailed} fehlgeschlagen</Badge>
+				<Badge tone="danger" dot>{t('{n} fehlgeschlagen', { n: d.pluginsFailed })}</Badge>
 			{/if}
-			<Button size="xs" variant="ghost" href="/plugins" iconRight="arrow-right">Verwalten</Button>
+			<Button size="xs" variant="ghost" href="/plugins" iconRight="arrow-right">{t('Verwalten')}</Button>
 		{/snippet}
 		{#if !d}
 			<Skeleton lines={6} />
@@ -567,9 +584,11 @@
 											</span>
 										{:else}
 											<span class="truncate text-xs text-fg-subtle">
-												{#if p.lastRunAt}zuletzt <RelativeTime value={p.lastRunAt} />{:else}noch kein Lauf{/if}
+												{#if p.lastRunAt}{@render timed(t('zuletzt {time}'), p.lastRunAt)}{:else}{t(
+														'noch kein Lauf'
+													)}{/if}
 												{#if p.enabled && p.nextRun}
-													· nächster <RelativeTime value={p.nextRun} />{/if}
+													· {@render timed(t('nächster {time}'), p.nextRun)}{/if}
 											</span>
 										{/if}
 										{#if p.lastError && st.status === 'danger'}

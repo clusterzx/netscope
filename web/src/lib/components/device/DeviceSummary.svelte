@@ -5,6 +5,7 @@
 	import DescItem from '$lib/components/ui/DescItem.svelte';
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import { deviceTypeName } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 	import { sourceName } from './util';
 
 	interface Props {
@@ -27,55 +28,57 @@
 
 <section
 	class="rounded-lg border border-border bg-surface px-4 py-3 shadow-sm {klass}"
-	aria-label="Kerndaten"
+	aria-label={t('Kerndaten')}
 >
 	<dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-x-6 lg:grid-cols-3 2xl:grid-cols-4">
-		<DescItem label={ips.length > 1 ? `IP-Adressen (${ips.length})` : 'IP-Adresse'}>
+		<DescItem label={ips.length > 1 ? t('IP-Adressen ({n})', { n: ips.length }) : t('IP-Adresse')}>
 			{#if ips.length}
 				<span class="flex flex-wrap items-center gap-x-2">
 					{#each ips.slice(0, 4) as ip, i (ip)}
 						<span class="mono {i === 0 ? 'text-fg' : 'text-fg-muted'}">{ip}</span>
 					{/each}
 					{#if ips.length > 4}<span class="text-xs text-fg-subtle">+{ips.length - 4}</span>{/if}
-					<CopyButton text={ips[0]} label="IP kopieren" />
+					<CopyButton text={ips[0]} label={t('IP kopieren')} />
 				</span>
 			{:else}<span class="text-fg-subtle">–</span>{/if}
 		</DescItem>
-		<DescItem label={macs.length > 1 ? `MAC-Adressen (${macs.length})` : 'MAC-Adresse'}>
+		<DescItem label={macs.length > 1 ? t('MAC-Adressen ({n})', { n: macs.length }) : t('MAC-Adresse')}>
 			{#if macs.length}
 				<span class="flex flex-wrap items-center gap-x-2">
 					{#each macs.slice(0, 3) as mac, i (mac)}
 						<span class="mono {i === 0 ? 'text-fg' : 'text-fg-muted'}">{mac}</span>
 						{#if randomized.has(mac)}
-							<span class="text-xs text-warn" title="Zufällige (private) MAC-Adresse">zufällig</span>
+							<span class="text-xs text-warn" title={t('Zufällige (private) MAC-Adresse')}
+								>{t('zufällig')}</span
+							>
 						{/if}
 					{/each}
 					{#if macs.length > 3}<span class="text-xs text-fg-subtle">+{macs.length - 3}</span>{/if}
-					<CopyButton text={macs[0]} label="MAC kopieren" />
+					<CopyButton text={macs[0]} label={t('MAC kopieren')} />
 				</span>
 			{:else}<span class="text-fg-subtle">–</span>{/if}
 		</DescItem>
 		<DescItem label="Hostname" value={d.hostname} hint={d.hostname ? hint('hostname') : undefined} />
-		<DescItem label="Hersteller" value={d.vendor} hint={d.vendor ? hint('vendor') : undefined} />
-		<DescItem label="Modell" value={d.model} hint={d.model ? hint('model') : undefined} />
+		<DescItem label={t('Hersteller')} value={d.vendor} hint={d.vendor ? hint('vendor') : undefined} />
+		<DescItem label={t('Modell')} value={d.model} hint={d.model ? hint('model') : undefined} />
 		<DescItem
-			label="Typ"
+			label={t('Typ')}
 			value={d.type ? deviceTypeName(d.type) : ''}
 			hint={d.type ? hint('type') : undefined}
 		/>
-		<DescItem label="Betriebssystem" value={d.os} hint={d.os ? hint('os') : undefined} />
-		<DescItem label="Aufstellort" value={d.location} />
-		<DescItem label="Besitzer" value={d.owner} />
-		<DescItem label="Eltern-Gerät">
+		<DescItem label={t('Betriebssystem')} value={d.os} hint={d.os ? hint('os') : undefined} />
+		<DescItem label={t('Aufstellort')} value={d.location} />
+		<DescItem label={t('Besitzer')} value={d.owner} />
+		<DescItem label={t('Eltern-Gerät')}>
 			{#if d.parentId}
 				<a href="/devices/{d.parentId}" class="link">{d.parentName || `#${d.parentId}`}</a>
 			{:else}<span class="text-fg-subtle">–</span>{/if}
 		</DescItem>
-		<DescItem label="Erstsichtung">
+		<DescItem label={t('Erstsichtung')}>
 			<RelativeTime value={d.firstSeen} absolute />
 			{#if d.createdSource}<span class="ml-1 text-xs text-fg-subtle">({sourceName(d.createdSource)})</span
 				>{/if}
 		</DescItem>
-		<DescItem label="Zuletzt gesehen"><RelativeTime value={d.lastSeen} /></DescItem>
+		<DescItem label={t('Zuletzt gesehen')}><RelativeTime value={d.lastSeen} /></DescItem>
 	</dl>
 </section>

@@ -20,6 +20,7 @@ import {
 } from 'd3-force';
 import type { GraphEdge, GraphNode } from '$lib/api';
 import { icons, type IconName } from '$lib/components/ui/icons';
+import { t } from '$lib/i18n';
 import { radialLayout } from './radial';
 
 /** force: free d3-force layout (nodes can be pinned); radial: children on rings around their parent */
@@ -269,7 +270,7 @@ export class TopologyEngine {
 	constructor(canvas: HTMLCanvasElement, palette: Palette, cb: EngineCallbacks) {
 		this.#canvas = canvas;
 		const ctx = canvas.getContext('2d');
-		if (!ctx) throw new Error('Canvas 2D nicht verfügbar');
+		if (!ctx) throw new Error(t('Canvas 2D nicht verfügbar'));
 		this.#ctx = ctx;
 		this.#palette = palette;
 		this.#cb = cb;

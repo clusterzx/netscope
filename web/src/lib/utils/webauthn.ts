@@ -6,6 +6,7 @@
 //     const credential = await createPasskey(await api.post('/api/v1/auth/passkeys/options'));
 //     await api.post('/api/v1/auth/passkeys', { body: { name, credential } });
 //   }
+import { t } from '$lib/i18n';
 
 /** Browsers offer passkeys only in a secure context (HTTPS or localhost). */
 export function passkeysSupported(): boolean {
@@ -47,15 +48,15 @@ function descriptors(list: unknown): PublicKeyCredentialDescriptor[] | undefined
 
 function publicKey(options: unknown): Json {
 	const pk = (options as { publicKey?: Json } | null)?.publicKey;
-	if (!pk) throw new Error('Ungültige Passkey-Optionen vom Server');
+	if (!pk) throw new Error(t('Ungültige Passkey-Optionen vom Server'));
 	return pk;
 }
 
 function cancelled(e: unknown): Error {
 	if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError'))
-		return new Error('Vorgang abgebrochen oder Zeit abgelaufen');
+		return new Error(t('Vorgang abgebrochen oder Zeit abgelaufen'));
 	if (e instanceof DOMException && e.name === 'InvalidStateError')
-		return new Error('Dieser Passkey ist bereits registriert');
+		return new Error(t('Dieser Passkey ist bereits registriert'));
 	return e instanceof Error ? e : new Error(String(e));
 }
 

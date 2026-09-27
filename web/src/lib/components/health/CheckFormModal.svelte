@@ -9,6 +9,7 @@
 	import type { HealthCheck } from '$lib/api';
 	import { Alert, Button, Checkbox, Icon, Input, Modal, Select, Toggle } from '$lib/components/ui';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 	import DevicePicker from './DevicePicker.svelte';
 	import {
 		CHECK_TYPES,
@@ -82,11 +83,11 @@
 		});
 	});
 
-	function setType(t: CheckType) {
+	function setType(ty: CheckType) {
 		const prevDefault = defaultPort(form.type);
-		form.type = t;
-		if (form.port === null || form.port === prevDefault) form.port = defaultPort(t);
-		if (t === 'icmp' && !form.count) form.count = 3;
+		form.type = ty;
+		if (form.port === null || form.port === prevDefault) form.port = defaultPort(ty);
+		if (ty === 'icmp' && !form.count) form.count = 3;
 		delete errors.type;
 		delete errors.port;
 	}
@@ -119,7 +120,7 @@
 			const saved = check
 				? await api.put('/api/v1/health-checks/{id}', { path: { id: check.id }, body })
 				: await api.post('/api/v1/health-checks', { body });
-			toast.success(check ? 'Health-Check gespeichert' : 'Health-Check angelegt');
+			toast.success(check ? t('Health-Check gespeichert') : t('Health-Check angelegt'));
 			open = false;
 			onsaved?.(saved);
 		} catch (e) {
@@ -137,8 +138,8 @@
 
 <Modal
 	bind:open
-	title={check ? 'Health-Check bearbeiten' : 'Health-Check anlegen'}
-	description={check ? check.name : 'Prüft einen Dienst regelmäßig und meldet Zustandswechsel als Event.'}
+	title={check ? t('Health-Check bearbeiten') : t('Health-Check anlegen')}
+	description={check ? check.name : t('Prüft einen Dienst regelmäßig und meldet Zustandswechsel als Event.')}
 	size="lg"
 	as="form"
 	onsubmit={save}
@@ -147,7 +148,7 @@
 >
 	<div class="flex flex-col gap-4">
 		{#if general}
-			<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>
+			<Alert tone="danger" title={t('Speichern fehlgeschlagen')}>{general}</Alert>
 		{/if}
 
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -155,7 +156,7 @@
 				bind:value={form.deviceId}
 				bind:name={form.deviceName}
 				error={errors.deviceId}
-				hint="Optional – ohne Ziel wird die primäre IP des Geräts geprüft."
+				hint={t('Optional – ohne Ziel wird die primäre IP des Geräts geprüft.')}
 				onselect={onDevice}
 			/>
 			<Input
@@ -172,25 +173,27 @@
 		</div>
 
 		<fieldset>
-			<legend class="mb-1.5 text-[0.8125rem] font-medium text-fg">Typ</legend>
-			<div class="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Typ">
-				{#each CHECK_TYPES as t (t)}
+			<legend class="mb-1.5 text-[0.8125rem] font-medium text-fg">{t('Typ')}</legend>
+			<div class="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t('Typ')}>
+				{#each CHECK_TYPES as ty (ty)}
 					<label
 						class="flex cursor-pointer flex-col gap-0.5 rounded-md border px-3 py-2 text-sm transition-colors has-focus-visible:ring-2 has-focus-visible:ring-focus
-							{form.type === t
+							{form.type === ty
 							? 'border-accent bg-accent-soft'
 							: 'border-border hover:border-border-strong hover:bg-surface-2'}"
 					>
 						<input
 							type="radio"
 							name="{uid}-type"
-							value={t}
-							checked={form.type === t}
-							onchange={() => setType(t)}
+							value={ty}
+							checked={form.type === ty}
+							onchange={() => setType(ty)}
 							class="sr-only"
 						/>
-						<span class="font-medium {form.type === t ? 'text-accent' : 'text-fg'}">{checkTypeLabel[t]}</span>
-						<span class="text-xs leading-snug text-fg-subtle">{checkTypeDescription[t]}</span>
+						<span class="font-medium {form.type === ty ? 'text-accent' : 'text-fg'}"
+							>{checkTypeLabel[ty]}</span
+						>
+						<span class="text-xs leading-snug text-fg-subtle">{checkTypeDescription[ty]}</span>
 					</label>
 				{/each}
 			</div>
@@ -204,7 +207,7 @@
 				bind:value={form.url}
 				mono
 				placeholder="https://nas.lan:5001/"
-				hint="Optional – ersetzt Ziel und Port (Schema, Host, Port und Pfad)."
+				hint={t('Optional – ersetzt Ziel und Port (Schema, Host, Port und Pfad).')}
 				error={errors.url}
 				oninput={() => delete errors.url}
 			/>
@@ -212,10 +215,10 @@
 
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_9rem]">
 			<Input
-				label="Ziel (Host/IP)"
+				label={t('Ziel (Host/IP)')}
 				bind:value={form.target}
 				mono
-				placeholder={form.deviceId ? 'primäre IP des Geräts' : '192.168.1.10 oder nas.lan'}
+				placeholder={form.deviceId ? t('primäre IP des Geräts') : t('192.168.1.10 oder nas.lan')}
 				disabled={form.type === 'http' && !!form.url.trim()}
 				error={errors.target}
 				oninput={() => delete errors.target}
@@ -237,18 +240,23 @@
 
 		{#if form.type === 'http'}
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-				<Select label="Methode" bind:value={form.method} options={['GET', 'HEAD']} error={errors.method} />
+				<Select
+					label={t('Methode')}
+					bind:value={form.method}
+					options={['GET', 'HEAD']}
+					error={errors.method}
+				/>
 				<Input
-					label="Erwarteter Status"
+					label={t('Erwarteter Status')}
 					bind:value={form.expectStatus}
 					mono
 					placeholder="200-399"
-					hint="Bereiche/Liste, z. B. 200-299,301"
+					hint={t('Bereiche/Liste, z. B. 200-299,301')}
 					error={errors.expectStatus}
 					oninput={() => delete errors.expectStatus}
 				/>
 				<Input
-					label="Body-Regex"
+					label={t('Body-Regex')}
 					bind:value={form.bodyMatch}
 					mono
 					placeholder="optional"
@@ -259,43 +267,43 @@
 			<div class="flex flex-wrap gap-x-6 gap-y-2">
 				<Checkbox
 					bind:checked={form.verifyTls}
-					label="Zertifikat prüfen"
-					description="Kette und Hostname bei https:// validieren"
+					label={t('Zertifikat prüfen')}
+					description={t('Kette und Hostname bei https:// validieren')}
 				/>
-				<Checkbox bind:checked={form.followRedirects} label="Weiterleitungen folgen" />
+				<Checkbox bind:checked={form.followRedirects} label={t('Weiterleitungen folgen')} />
 			</div>
 		{:else if form.type === 'tls'}
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input
-					label="Servername (SNI)"
+					label={t('Servername (SNI)')}
 					bind:value={form.serverName}
 					mono
-					placeholder="optional, z. B. nas.example.org"
+					placeholder={t('optional, z. B. nas.example.org')}
 				/>
 				<Input
-					label="Mindestlaufzeit Zertifikat (Tage)"
+					label={t('Mindestlaufzeit Zertifikat (Tage)')}
 					type="number"
 					bind:value={form.minDays}
 					min={0}
 					max={3650}
-					hint="Beeinträchtigt, wenn das Zertifikat früher abläuft (0 = aus)"
+					hint={t('Beeinträchtigt, wenn das Zertifikat früher abläuft (0 = aus)')}
 					error={errors.minDays}
 				/>
 			</div>
 			<Checkbox
 				bind:checked={form.verifyTls}
-				label="Zertifikatskette prüfen"
-				description="Selbstsignierte Zertifikate gelten dann als Fehler"
+				label={t('Zertifikatskette prüfen')}
+				description={t('Selbstsignierte Zertifikate gelten dann als Fehler')}
 			/>
 		{:else if form.type === 'icmp'}
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input
-					label="Anzahl Pings"
+					label={t('Anzahl Pings')}
 					type="number"
 					bind:value={form.count}
 					min={1}
 					max={20}
-					hint="1–20 Pakete je Prüfung"
+					hint={t('1–20 Pakete je Prüfung')}
 					error={errors.count}
 				/>
 			</div>
@@ -303,16 +311,20 @@
 
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input
-				label="Beeinträchtigt ab (ms)"
+				label={t('Beeinträchtigt ab (ms)')}
 				type="number"
 				bind:value={form.degradedMs}
 				min={0}
-				placeholder="aus"
-				hint="Latenz, ab der der Check als beeinträchtigt gilt"
+				placeholder={t('aus')}
+				hint={t('Latenz, ab der der Check als beeinträchtigt gilt')}
 				error={errors.degradedMs}
 			/>
 			<div class="flex items-end pb-1.5">
-				<Toggle bind:checked={form.enabled} label="Aktiv" description="Check wird im Intervall ausgeführt" />
+				<Toggle
+					bind:checked={form.enabled}
+					label={t('Aktiv')}
+					description={t('Check wird im Intervall ausgeführt')}
+				/>
 			</div>
 		</div>
 
@@ -325,10 +337,14 @@
 				onclick={() => (advanced = !advanced)}
 			>
 				<span>
-					Intervall & Schwellwerte
+					{t('Intervall & Schwellwerte')}
 					<span class="ml-1 font-normal text-fg-subtle">
-						{form.intervalSeconds ?? '–'} s · Timeout {form.timeoutSeconds ?? '–'} s · {form.failThreshold ??
-							'–'}× Fehler / {form.recoverThreshold ?? '–'}× OK
+						{t('{interval} s · Timeout {timeout} s · {fail}× Fehler / {ok}× OK', {
+							interval: form.intervalSeconds ?? '–',
+							timeout: form.timeoutSeconds ?? '–',
+							fail: form.failThreshold ?? '–',
+							ok: form.recoverThreshold ?? '–'
+						})}
 					</span>
 				</span>
 				<Icon
@@ -343,17 +359,17 @@
 				class="grid grid-cols-1 gap-4 border-t border-border p-3 sm:grid-cols-2"
 			>
 				<Input
-					label="Intervall (Sekunden)"
+					label={t('Intervall (Sekunden)')}
 					type="number"
 					bind:value={form.intervalSeconds}
 					min={30}
 					max={86400}
 					required
-					hint="30 s bis 24 h"
+					hint={t('30 s bis 24 h')}
 					error={errors.intervalSeconds}
 				/>
 				<Input
-					label="Timeout (Sekunden)"
+					label={t('Timeout (Sekunden)')}
 					type="number"
 					bind:value={form.timeoutSeconds}
 					min={1}
@@ -363,23 +379,23 @@
 					error={errors.timeoutSeconds}
 				/>
 				<Input
-					label="Down nach Fehlschlägen"
+					label={t('Down nach Fehlschlägen')}
 					type="number"
 					bind:value={form.failThreshold}
 					min={1}
 					max={20}
 					required
-					hint="Aufeinanderfolgende Fehler bis „Down“ (Flap-Dämpfung)"
+					hint={t('Aufeinanderfolgende Fehler bis „Down“ (Flap-Dämpfung)')}
 					error={errors.failThreshold}
 				/>
 				<Input
-					label="Up nach Erfolgen"
+					label={t('Up nach Erfolgen')}
 					type="number"
 					bind:value={form.recoverThreshold}
 					min={1}
 					max={20}
 					required
-					hint="Aufeinanderfolgende Erfolge bis „Up“"
+					hint={t('Aufeinanderfolgende Erfolge bis „Up“')}
 					error={errors.recoverThreshold}
 				/>
 			</div>
@@ -387,9 +403,9 @@
 	</div>
 
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={saving}>Abbrechen</Button>
+		<Button onclick={() => (open = false)} disabled={saving}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="primary" loading={saving} icon="save">
-			{check ? 'Speichern' : 'Anlegen'}
+			{check ? t('Speichern') : t('Anlegen')}
 		</Button>
 	{/snippet}
 </Modal>

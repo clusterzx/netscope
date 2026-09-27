@@ -7,10 +7,11 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && node scripts/i18n-check.mjs",
 		"lint": "prettier --check . && npm run check",
 		"format": "prettier --write .",
-		"gen:api": "node scripts/gen-api.mjs"
+		"gen:api": "node scripts/gen-api.mjs",
+		"check:i18n": "node scripts/i18n-check.mjs --list-untranslated"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"netscope/internal/db"
+	"netscope/internal/i18n"
 	"netscope/internal/inventory"
 	"netscope/internal/plugin"
 )
@@ -367,46 +368,74 @@ func BuildChangeReport(ctx context.Context, d *db.DB, from, to time.Time) (*Chan
 	return r, nil
 }
 
-func sevLabel(s string) string { return plugin.Severity(s).Label() }
+func sevLabel(s string, lang i18n.Locale) string { return plugin.Severity(s).LabelIn(lang) }
 
-func eventLabel(t string) string {
-	if spec, ok := plugin.LookupEvent(t); ok {
-		return spec.Label
+func eventLabel(t string, lang i18n.Locale) string { return plugin.EventLabel(t, lang) }
+
+// DateLayout returns the Go time layout for a German date layout ("02.01.2006 15:04",
+// "02.01.2006", "02.01. 15:04", "02.01.", "02.01.06 15:04") in the language: German
+// dates stay as they are, English ones read "2 Jan 2006 15:04".
+func DateLayout(lang i18n.Locale, de string) string {
+	if lang != i18n.EN {
+		return de
 	}
-	return t
+	switch de {
+	case "02.01.2006 15:04":
+		return "2 Jan 2006 15:04"
+	case "02.01.2006":
+		return "2 Jan 2006"
+	case "02.01. 15:04":
+		return "2 Jan 15:04"
+	case "02.01.":
+		return "2 Jan"
+	case "02.01.06 15:04":
+		return "2 Jan 06 15:04"
+	}
+	return de
 }
 
-// Markdown renders the report as Markdown (German).
-func (r *ChangeReport) Markdown(loc *time.Location, baseURL string) string {
+// ongoing marks the duration of an outage that has not ended yet.
+func ongoing(dur string, lang i18n.Locale) string { return i18n.Sprintf(lang, "%s (andauernd)", dur) }
+
+// Markdown renders the report as Markdown in the language.
+func (r *ChangeReport) Markdown(lang i18n.Locale, loc *time.Location, baseURL string) string {
 	if loc == nil {
 		loc = time.Local
 	}
+	layout := DateLayout(lang, "02.01.2006 15:04")
 	df := func(s string) string {
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {
 			return s
 		}
-		return t.In(loc).Format("02.01.2006 15:04")
+		return t.In(loc).Format(layout)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "**Zeitraum:** %s – %s\n\n", r.From.In(loc).Format("02.01.2006 15:04"), r.To.In(loc).Format("02.01.2006 15:04"))
-	fmt.Fprintf(&b, "**Geräte:** %d gesamt, %d online, %d neu, %d unbekannt\n", r.Devices["total"], r.Devices["online"], r.Devices["new"], r.Devices["unknown"])
-	fmt.Fprintf(&b, "**Offene Events:** %d kritisch, %d hoch\n", r.OpenCritical, r.OpenHigh)
-	fmt.Fprintf(&b, "**Schwachstellen (aktiv):** %d kritisch, %d hoch, %d mittel, %d niedrig\n\n",
+	// line writes a translated line, item a list item, heading a section heading.
+	line := func(format string, args ...any) { b.WriteString(i18n.Sprintf(lang, format, args...) + "\n") }
+	item := func(format string, args ...any) { b.WriteString("- " + i18n.Sprintf(lang, format, args...) + "\n") }
+	heading := func(title string) { b.WriteString("## " + i18n.T(lang, title) + "\n") }
+
+	line("**Zeitraum:** %s – %s", r.From.In(loc).Format(layout), r.To.In(loc).Format(layout))
+	b.WriteString("\n")
+	line("**Geräte:** %d gesamt, %d online, %d neu, %d unbekannt", r.Devices["total"], r.Devices["online"], r.Devices["new"], r.Devices["unknown"])
+	line("**Offene Events:** %d kritisch, %d hoch", r.OpenCritical, r.OpenHigh)
+	line("**Schwachstellen (aktiv):** %d kritisch, %d hoch, %d mittel, %d niedrig",
 		r.CVEBySeverity["critical"], r.CVEBySeverity["high"], r.CVEBySeverity["medium"], r.CVEBySeverity["low"])
+	b.WriteString("\n")
 	if len(r.NewDevices) > 0 {
-		b.WriteString("## Neue Geräte\n")
+		heading("Neue Geräte")
 		for _, d := range r.NewDevices {
-			fmt.Fprintf(&b, "- %s (%s)", d.Name, d.IP)
 			if d.Vendor != "" {
-				fmt.Fprintf(&b, " – %s", d.Vendor)
+				item("%s (%s) – %s, seit %s", d.Name, d.IP, d.Vendor, df(d.At))
+			} else {
+				item("%s (%s), seit %s", d.Name, d.IP, df(d.At))
 			}
-			fmt.Fprintf(&b, ", seit %s\n", df(d.At))
 		}
 		b.WriteString("\n")
 	}
 	if len(r.EventCounts) > 0 {
-		b.WriteString("## Ereignisse\n")
+		heading("Ereignisse")
 		type kv struct {
 			k string
 			v int
@@ -417,52 +446,56 @@ func (r *ChangeReport) Markdown(loc *time.Location, baseURL string) string {
 		}
 		sort.Slice(list, func(i, j int) bool { return list[i].v > list[j].v })
 		for _, e := range list {
-			fmt.Fprintf(&b, "- %s: %d\n", eventLabel(e.k), e.v)
+			fmt.Fprintf(&b, "- %s: %d\n", eventLabel(e.k, lang), e.v)
 		}
 		b.WriteString("\n")
 	}
 	if len(r.Important) > 0 {
-		b.WriteString("## Wichtige Ereignisse (hoch/kritisch)\n")
+		heading("Wichtige Ereignisse (hoch/kritisch)")
 		for i, e := range r.Important {
 			if i >= 25 {
-				fmt.Fprintf(&b, "- … und %d weitere\n", len(r.Important)-25)
+				item("… und %d weitere", len(r.Important)-25)
 				break
 			}
 			ack := ""
 			if e.Acked {
 				ack = " ✓"
 			}
-			fmt.Fprintf(&b, "- [%s] %s – %s%s\n", sevLabel(e.Severity), df(e.TS), e.Title, ack)
+			fmt.Fprintf(&b, "- [%s] %s – %s%s\n", sevLabel(e.Severity, lang), df(e.TS), i18n.T(lang, e.Title), ack)
 		}
 		b.WriteString("\n")
 	}
 	if len(r.NewCVEs) > 0 {
-		b.WriteString("## Neue Schwachstellen\n")
+		heading("Neue Schwachstellen")
 		for _, c := range r.NewCVEs {
-			fmt.Fprintf(&b, "- %s (CVSS %.1f) auf %s – %s\n", c.CVE, c.CVSS, c.Device, c.Detail)
+			item("%s (CVSS %.1f) auf %s – %s", c.CVE, c.CVSS, c.Device, c.Detail)
 		}
 		b.WriteString("\n")
 	}
 	if len(r.ExpiringCerts) > 0 {
-		b.WriteString("## Zertifikate mit baldigem Ablauf\n")
+		heading("Zertifikate mit baldigem Ablauf")
 		for _, c := range r.ExpiringCerts {
-			fmt.Fprintf(&b, "- %s (%s, %s): %d Tage\n", c.Subject, c.Endpoint, c.Device, c.DaysLeft)
+			item("%s (%s, %s): %d Tage", c.Subject, c.Endpoint, c.Device, c.DaysLeft)
 		}
 		b.WriteString("\n")
 	}
 	if len(r.Outages) > 0 {
-		b.WriteString("## Ausfälle\n")
+		heading("Ausfälle")
 		for _, o := range r.Outages {
 			state := "Ausfall"
 			if o.State == "degraded" {
 				state = "Beeinträchtigt"
 			}
-			fmt.Fprintf(&b, "- %s: %s ab %s, Dauer %s\n", o.Check, state, df(o.Started), o.Duration)
+			dur := o.Duration
+			if base, ok := strings.CutSuffix(dur, " (andauernd)"); ok {
+				dur = ongoing(base, lang)
+			}
+			item("%s: %s ab %s, Dauer %s", o.Check, i18n.T(lang, state), df(o.Started), dur)
 		}
 		b.WriteString("\n")
 	}
 	if len(r.FailedRuns) > 0 {
-		b.WriteString("## Fehlgeschlagene Plugin-Läufe\n")
+		heading("Fehlgeschlagene Plugin-Läufe")
 		ids := make([]string, 0, len(r.FailedRuns))
 		for id := range r.FailedRuns {
 			ids = append(ids, id)
@@ -480,18 +513,22 @@ func (r *ChangeReport) Markdown(loc *time.Location, baseURL string) string {
 }
 
 // NotificationExtra renders what mail publishers send with a report notification: the
-// HTML version and the PDF as attachment (JSON plugin.NotificationExtra). root is the
-// public URL of the UI ("" = no links).
-func (r *ChangeReport) NotificationExtra(loc *time.Location, root string) (string, error) {
+// HTML version and the PDF as attachment (JSON plugin.NotificationExtra), in the
+// language. root is the public URL of the UI ("" = no links).
+func (r *ChangeReport) NotificationExtra(lang i18n.Locale, loc *time.Location, root string) (string, error) {
 	if loc == nil {
 		loc = time.Local
 	}
 	var buf bytes.Buffer
-	if err := r.PDF(&buf, loc); err != nil {
+	if err := r.PDF(&buf, lang, loc); err != nil {
 		return "", err
 	}
-	x := plugin.NotificationExtra{HTML: r.EmailHTML(loc, root), Attachments: []plugin.Attachment{{
-		Name:        "netscope-bericht_" + r.From.In(loc).Format("2006-01-02") + "_" + r.To.In(loc).Format("2006-01-02") + ".pdf",
+	name := "netscope-bericht_"
+	if lang == i18n.EN {
+		name = "netscope-report_"
+	}
+	x := plugin.NotificationExtra{HTML: r.EmailHTML(lang, loc, root), Attachments: []plugin.Attachment{{
+		Name:        name + r.From.In(loc).Format("2006-01-02") + "_" + r.To.In(loc).Format("2006-01-02") + ".pdf",
 		ContentType: "application/pdf",
 		Data:        buf.Bytes(),
 	}}}
@@ -499,17 +536,17 @@ func (r *ChangeReport) NotificationExtra(loc *time.Location, root string) (strin
 	return string(b), err
 }
 
-// ToBytes renders a report in the given format.
-func (r *ChangeReport) ToBytes(format string, loc *time.Location, baseURL string) ([]byte, string, error) {
+// ToBytes renders a report in the given format and language.
+func (r *ChangeReport) ToBytes(format string, lang i18n.Locale, loc *time.Location, baseURL string) ([]byte, string, error) {
 	switch format {
 	case "json":
 		b, err := json.MarshalIndent(r, "", "  ")
 		return b, "application/json", err
 	case "md", "markdown":
-		return []byte("# NetScope Änderungsbericht\n\n" + r.Markdown(loc, baseURL) + "\n"), "text/markdown; charset=utf-8", nil
+		return []byte("# " + i18n.T(lang, "NetScope Änderungsbericht") + "\n\n" + r.Markdown(lang, loc, baseURL) + "\n"), "text/markdown; charset=utf-8", nil
 	case "pdf":
 		var buf bytes.Buffer
-		err := r.PDF(&buf, loc)
+		err := r.PDF(&buf, lang, loc)
 		return buf.Bytes(), "application/pdf", err
 	}
 	return nil, "", fmt.Errorf("unbekanntes Format %q", format)

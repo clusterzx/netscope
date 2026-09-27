@@ -66,6 +66,9 @@
   NVD, Health-Checks mit Verfügbarkeit, Topologie-Graph, Berichte.
 - **Benachrichtigungen:** Regel-Engine (Bedingungen, Bündelung, Ruhezeiten, Drosselung,
   Eskalation) mit Telegram, Webhook, ntfy, E-Mail und n8n.
+- **Sprachen:** Oberfläche auf Deutsch und Englisch, je Benutzer umschaltbar (Standard:
+  Browsersprache) – samt Plugin-Einstellungen, Events, Fehlermeldungen, Berichten und
+  Benachrichtigungen.
 - **Technik:** ein Go-Binary ohne CGO, SQLite (WAL), eingebettete SvelteKit-Oberfläche
   (Dark Mode), JSON-API mit OpenAPI, Live-Updates per SSE, Prometheus-Metriken.
 
@@ -606,6 +609,33 @@ kein NetScope-Passwort, lassen sich aber in NetScope deaktivieren. Ein lokales K
 gleichem Namen hat immer Vorrang und wird nie von einer externen Anmeldung übernommen; das gilt
 auch zwischen OIDC und LDAP. Mindestens ein aktiver lokaler Administrator bleibt immer bestehen
 – er ist der Notzugang, wenn Verzeichnis oder Identity Provider ausfallen.
+
+## Sprache: Deutsch und Englisch
+
+Die Oberfläche gibt es auf Deutsch und Englisch. Jeder Benutzer wählt seine Sprache unter
+**System → Konto → Sprache** (Deutsch, English oder „Wie im Browser“, Administratoren auch in
+der Benutzerverwaltung); ohne Auswahl gilt die Sprache des Browsers, und ist die weder Deutsch
+noch Englisch, Deutsch. Die Anmeldeseite folgt immer dem Browser. Auch alles, was der Server
+liefert, kommt in dieser Sprache: Plugin-Einstellungen, Event-Katalog und Event-Titel (auch
+bereits gespeicherte), Fehlermeldungen, Laufprotokolle, Audit-Log und die API-Dokumentation.
+Datum und Zahlen folgen der Sprache (Englisch in der Variante des Browsers, sonst britisch:
+27/09/2026 14:05).
+
+Benachrichtigungen (E-Mail, Telegram, ntfy, Webhook, n8n) und geplante Berichte gehen in einer
+Sprache für die ganze Instanz: **System → Einstellungen → Sprache für Benachrichtigungen und
+Berichte** (Standard Deutsch). Berichte, die man in der Oberfläche herunterlädt, kommen in der
+Sprache des Benutzers. API-Clients erhalten Texte nach der Einstellung des Token-Benutzers bzw.
+`Accept-Language`; die CLI im Container antwortet mit `LANG=en_US.UTF-8` auf Englisch.
+
+Nicht übersetzt werden Daten: Gerätenamen, Namen von Rollen (auch der vorgegebenen
+„Bearbeiter“ und „Betrachter“), Werte in Event-Payloads (z. B. `direction: eingehend`, auf
+die Regeln filtern) und Texte, die NetScope nicht selbst schreibt. Der Agent und seine
+Installationsskripte bleiben deutsch.
+
+**Übersetzungen ergänzen:** Texte stehen im Code auf Deutsch; die englischen stehen daneben –
+in der Oberfläche in `web/src/lib/i18n/en/*.json` ([docs/FRONTEND.md](docs/FRONTEND.md),
+Abschnitt 9), im Server in `i18n_en.go` je Paket ([docs/PLUGINS.md](docs/PLUGINS.md)).
+`npm run check` und `go test ./internal/i18n/` schlagen fehl, sobald eine Übersetzung fehlt.
 
 ## API
 

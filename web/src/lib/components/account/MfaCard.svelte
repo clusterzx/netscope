@@ -14,6 +14,7 @@
 		RelativeTime,
 		Skeleton
 	} from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -50,7 +51,7 @@
 	let totpOpen = $state(false);
 	async function totpDone(list: string[]) {
 		totpOpen = false;
-		toast.success('TOTP ist eingerichtet');
+		toast.success(t('TOTP ist eingerichtet'));
 		await changed();
 		showCodes(list);
 	}
@@ -67,7 +68,7 @@
 	}
 	async function runPasswordAction() {
 		if (!pw) {
-			pwError = 'Passwort eingeben';
+			pwError = t('Passwort eingeben');
 			return;
 		}
 		pwBusy = true;
@@ -75,7 +76,7 @@
 		try {
 			if (pwAction === 'disable') {
 				await api.post('/api/v1/auth/2fa/totp/disable', { body: { password: pw } });
-				toast.success('TOTP abgeschaltet');
+				toast.success(t('TOTP abgeschaltet'));
 				pwAction = null;
 				await changed();
 			} else {
@@ -102,7 +103,7 @@
 			const res = await api.post('/api/v1/auth/passkeys', {
 				body: { name: pkName.trim() || defaultName(), credential }
 			});
-			toast.success(`Passkey „${res.passkey?.name}“ registriert`);
+			toast.success(t('Passkey „{name}“ registriert', { name: res.passkey?.name ?? '' }));
 			pkName = '';
 			await changed();
 			showCodes(res.recoveryCodes);
@@ -124,7 +125,7 @@
 						? 'Android'
 						: /Linux/.test(ua)
 							? 'Linux'
-							: 'Gerät';
+							: t('Gerät');
 		return `Passkey (${os})`;
 	}
 
@@ -147,15 +148,15 @@
 
 	async function removePasskey(p: Passkey) {
 		const ok = await confirm({
-			title: 'Passkey entfernen?',
-			message: `„${p.name}“ kann danach nicht mehr zur Anmeldung genutzt werden.`,
-			confirmLabel: 'Entfernen',
+			title: t('Passkey entfernen?'),
+			message: t('„{name}“ kann danach nicht mehr zur Anmeldung genutzt werden.', { name: p.name }),
+			confirmLabel: t('Entfernen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/auth/passkeys/{id}', { path: { id: p.id } });
-			toast.success('Passkey entfernt');
+			toast.success(t('Passkey entfernt'));
 			await changed();
 		} catch (e) {
 			toast.error(e);
@@ -163,7 +164,11 @@
 	}
 </script>
 
-<Card title="Zwei-Faktor-Anmeldung" description="Schützt das Konto zusätzlich zum Passwort" icon="shield">
+<Card
+	title={t('Zwei-Faktor-Anmeldung')}
+	description={t('Schützt das Konto zusätzlich zum Passwort')}
+	icon="shield"
+>
 	{#if data.error && !st}
 		<ErrorState error={data.error} onretry={() => data.reload()} />
 	{:else if !st}
@@ -172,28 +177,31 @@
 		<div class="flex flex-col gap-5 text-sm">
 			{#if st.required}
 				<Alert tone="info">
-					Deine Rolle „{auth.me?.principal?.roleName}“ verlangt einen zweiten Faktor – der letzte lässt sich
-					nicht abschalten.
+					{t('Deine Rolle „{role}“ verlangt einen zweiten Faktor – der letzte lässt sich nicht abschalten.', {
+						role: auth.me?.principal?.roleName ?? ''
+					})}
 				</Alert>
 			{/if}
 
 			<section class="flex flex-col gap-2">
 				<div class="flex flex-wrap items-center gap-2">
-					<h3 class="font-medium text-fg">Authenticator-App (TOTP)</h3>
-					{#if st.totp}<Badge tone="ok">aktiv</Badge>{:else}<Badge tone="neutral">aus</Badge>{/if}
+					<h3 class="font-medium text-fg">{t('Authenticator-App (TOTP)')}</h3>
+					{#if st.totp}<Badge tone="ok">{t('aktiv')}</Badge>{:else}<Badge tone="neutral">{t('aus')}</Badge
+						>{/if}
 				</div>
 				<p class="text-fg-muted">
-					6-stelliger Code aus einer App wie Aegis, Google oder Microsoft Authenticator.
+					{t('6-stelliger Code aus einer App wie Aegis, Google oder Microsoft Authenticator.')}
 				</p>
 				<div class="flex flex-wrap gap-2">
 					<Button
 						size="sm"
 						variant={st.totp ? 'secondary' : 'primary'}
 						icon="phone"
-						onclick={() => (totpOpen = true)}>{st.totp ? 'Neu einrichten' : 'Einrichten'}</Button
+						onclick={() => (totpOpen = true)}>{st.totp ? t('Neu einrichten') : t('Einrichten')}</Button
 					>
 					{#if st.totp}
-						<Button size="sm" variant="ghost" onclick={() => askPassword('disable')}>Abschalten</Button>
+						<Button size="sm" variant="ghost" onclick={() => askPassword('disable')}>{t('Abschalten')}</Button
+						>
 					{/if}
 				</div>
 			</section>
@@ -204,8 +212,12 @@
 					<Badge tone={passkeys.length ? 'ok' : 'neutral'}>{passkeys.length}</Badge>
 				</div>
 				<p class="text-fg-muted">
-					Fingerabdruck, Gesichtserkennung, Geräte-PIN oder Sicherheitsschlüssel. Ein Passkey gilt nur für die
-					Adresse, unter der er eingerichtet wurde{st.rpId ? ` (hier: ${st.rpId})` : ''}.
+					{t('Fingerabdruck, Gesichtserkennung, Geräte-PIN oder Sicherheitsschlüssel.')}
+					{st.rpId
+						? t('Ein Passkey gilt nur für die Adresse, unter der er eingerichtet wurde (hier: {host}).', {
+								host: st.rpId
+							})
+						: t('Ein Passkey gilt nur für die Adresse, unter der er eingerichtet wurde.')}
 				</p>
 				{#if passkeys.length}
 					<ul class="divide-y divide-border rounded-md border border-border">
@@ -215,16 +227,17 @@
 									<span class="font-medium">{p.name}</span>
 									<span class="mono ml-1 text-xs text-fg-subtle">{p.rpId}</span>
 									<span class="block text-xs text-fg-subtle">
-										angelegt {formatDate(p.createdAt)} · {#if p.lastUsedAt}zuletzt <RelativeTime
-												value={p.lastUsedAt}
-											/>{:else}noch nicht benutzt{/if}
+										{t('angelegt {date}', { date: formatDate(p.createdAt) })} ·
+										{#if p.lastUsedAt}{t('zuletzt')} <RelativeTime value={p.lastUsedAt} />{:else}{t(
+												'noch nicht benutzt'
+											)}{/if}
 									</span>
 								</div>
 								<Button
 									size="xs"
 									variant="ghost"
 									icon="edit"
-									label="„{p.name}“ umbenennen"
+									label={t('„{name}“ umbenennen', { name: p.name })}
 									onclick={() => {
 										renaming = p;
 										newName = p.name;
@@ -234,7 +247,7 @@
 									size="xs"
 									variant="ghost"
 									icon="trash"
-									label="„{p.name}“ entfernen"
+									label={t('„{name}“ entfernen', { name: p.name })}
 									onclick={() => removePasskey(p)}
 								/>
 							</li>
@@ -252,29 +265,32 @@
 						<Input
 							label="Name (optional)"
 							bind:value={pkName}
-							placeholder="z. B. Laptop, YubiKey"
+							placeholder={t('z. B. Laptop, YubiKey')}
 							class="w-56"
 						/>
-						<Button type="submit" size="sm" icon="plus" loading={pkBusy}>Passkey hinzufügen</Button>
+						<Button type="submit" size="sm" icon="plus" loading={pkBusy}>{t('Passkey hinzufügen')}</Button>
 					</form>
 				{:else}
 					<p class="text-xs text-fg-subtle">
-						Passkeys funktionieren nur über HTTPS mit einem Hostnamen (z. B. https://netscope.example.lan
-						hinter einem Reverse-Proxy), nicht über eine IP-Adresse wie hier.
+						{t(
+							'Passkeys funktionieren nur über HTTPS mit einem Hostnamen (z. B. https://netscope.example.lan hinter einem Reverse-Proxy), nicht über eine IP-Adresse wie hier.'
+						)}
 					</p>
 				{/if}
 			</section>
 
 			{#if factors > 0}
 				<section class="flex flex-col gap-2">
-					<h3 class="font-medium text-fg">Wiederherstellungscodes</h3>
+					<h3 class="font-medium text-fg">{t('Wiederherstellungscodes')}</h3>
 					<p class="text-fg-muted">
-						{st.recoveryCodes} von 10 unbenutzt – für den Fall, dass kein zweiter Faktor zur Hand ist.
-						{#if st.recoveryCodes <= 3}<span class="text-warn">Bald neue erzeugen.</span>{/if}
+						{t('{n} von 10 unbenutzt – für den Fall, dass kein zweiter Faktor zur Hand ist.', {
+							n: st.recoveryCodes
+						})}
+						{#if st.recoveryCodes <= 3}<span class="text-warn">{t('Bald neue erzeugen.')}</span>{/if}
 					</p>
 					<div>
 						<Button size="sm" variant="ghost" icon="refresh" onclick={() => askPassword('codes')}
-							>Neue Codes erzeugen</Button
+							>{t('Neue Codes erzeugen')}</Button
 						>
 					</div>
 				</section>
@@ -283,26 +299,26 @@
 	{/if}
 </Card>
 
-<Modal bind:open={totpOpen} title="Authenticator-App einrichten" size="md">
+<Modal bind:open={totpOpen} title={t('Authenticator-App einrichten')} size="md">
 	{#if totpOpen}
 		<TotpSetup replacing={!!st?.totp} ondone={totpDone} oncancel={() => (totpOpen = false)} />
 	{/if}
 </Modal>
 
-<Modal bind:open={codesOpen} title="Wiederherstellungscodes" size="md">
+<Modal bind:open={codesOpen} title={t('Wiederherstellungscodes')} size="md">
 	<RecoveryCodes {codes} />
 	{#snippet footer()}
-		<Button variant="primary" onclick={() => (codesOpen = false)}>Gespeichert</Button>
+		<Button variant="primary" onclick={() => (codesOpen = false)}>{t('Gespeichert')}</Button>
 	{/snippet}
 </Modal>
 
 <Modal
 	open={pwAction !== null}
 	onclose={() => (pwAction = null)}
-	title={pwAction === 'disable' ? 'TOTP abschalten' : 'Neue Wiederherstellungscodes'}
+	title={pwAction === 'disable' ? t('TOTP abschalten') : t('Neue Wiederherstellungscodes')}
 	description={pwAction === 'disable'
-		? 'Die Anmeldung braucht danach keinen Code aus der App mehr.'
-		: 'Die bisherigen Codes werden ungültig.'}
+		? t('Die Anmeldung braucht danach keinen Code aus der App mehr.')
+		: t('Die bisherigen Codes werden ungültig.')}
 	size="sm"
 	as="form"
 	onsubmit={runPasswordAction}
@@ -310,12 +326,12 @@
 >
 	<div class="flex flex-col gap-3">
 		{#if pwError}<Alert tone="danger">{pwError}</Alert>{/if}
-		<Input label="Passwort" type="password" autocomplete="current-password" bind:value={pw} required />
+		<Input label={t('Passwort')} type="password" autocomplete="current-password" bind:value={pw} required />
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (pwAction = null)} disabled={pwBusy}>Abbrechen</Button>
+		<Button onclick={() => (pwAction = null)} disabled={pwBusy}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant={pwAction === 'disable' ? 'danger' : 'primary'} loading={pwBusy}
-			>{pwAction === 'disable' ? 'Abschalten' : 'Erzeugen'}</Button
+			>{pwAction === 'disable' ? t('Abschalten') : t('Erzeugen')}</Button
 		>
 	{/snippet}
 </Modal>
@@ -323,7 +339,7 @@
 <Modal
 	open={renaming !== null}
 	onclose={() => (renaming = null)}
-	title="Passkey umbenennen"
+	title={t('Passkey umbenennen')}
 	size="sm"
 	as="form"
 	onsubmit={rename}
@@ -331,7 +347,7 @@
 >
 	<Input label="Name" bind:value={newName} maxlength={64} required />
 	{#snippet footer()}
-		<Button onclick={() => (renaming = null)} disabled={renameBusy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" loading={renameBusy}>Speichern</Button>
+		<Button onclick={() => (renaming = null)} disabled={renameBusy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" loading={renameBusy}>{t('Speichern')}</Button>
 	{/snippet}
 </Modal>

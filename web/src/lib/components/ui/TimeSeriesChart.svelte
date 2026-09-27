@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
 	import type { SeriesPoint } from '$lib/api/types';
+	import { t, tn } from '$lib/i18n';
 	import { niceTicks, splitGaps, timeTickLabel, timeTicks } from '$lib/utils/chart';
 	import { formatDateTime, formatNumber } from '$lib/utils/format';
 
@@ -39,7 +40,7 @@
 		color = 'var(--chart-1)',
 		from,
 		to,
-		emptyText = 'Keine Messwerte im Zeitraum',
+		emptyText = t('Keine Messwerte im Zeitraum'),
 		class: klass = ''
 	}: Props = $props();
 
@@ -148,7 +149,12 @@
 			{width}
 			{height}
 			role="img"
-			aria-label="{label}: {pts.length} Messwerte von {formatDateTime(x0)} bis {formatDateTime(x1)}"
+			aria-label={tn(
+				pts.length,
+				'{label}: {n} Messwert von {from} bis {to}',
+				'{label}: {n} Messwerte von {from} bis {to}',
+				{ label, from: formatDateTime(x0), to: formatDateTime(x1) }
+			)}
 			tabindex="0"
 			class="block touch-pan-y focus-visible:outline-2 focus-visible:outline-focus"
 			onpointermove={onMove}
@@ -178,9 +184,9 @@
 				</text>
 			{/each}
 			<!-- x axis -->
-			{#each xTicks as t (t)}
-				<text x={sx(t)} y={height - 6} text-anchor="middle" class="fill-fg-subtle text-[10px] tabular">
-					{timeTickLabel(t, x1 - x0)}
+			{#each xTicks as tick (tick)}
+				<text x={sx(tick)} y={height - 6} text-anchor="middle" class="fill-fg-subtle text-[10px] tabular">
+					{timeTickLabel(tick, x1 - x0)}
 				</text>
 			{/each}
 			<!-- data -->
@@ -225,7 +231,7 @@
 				<div class="mt-0.5 flex items-center gap-1.5">
 					<span class="inline-block h-0.5 w-3 rounded" style="background:{color}"></span>
 					<span class="font-semibold text-fg tabular">{format(hp.avg)}</span>
-					<span class="text-fg-muted">Ø</span>
+					<span class="text-fg-muted">{t('Ø')}</span>
 				</div>
 				{#if hasBand}
 					<div class="text-fg-muted tabular">{format(hp.min)} – {format(hp.max)}</div>
@@ -235,7 +241,9 @@
 		<div class="mt-1 flex items-center justify-between gap-2 text-[11px] text-fg-subtle">
 			<div class="flex items-center gap-3">
 				<span class="flex items-center gap-1"
-					><span class="inline-block h-0.5 w-3 rounded" style="background:{color}"></span>Durchschnitt</span
+					><span class="inline-block h-0.5 w-3 rounded" style="background:{color}"></span>{t(
+						'Durchschnitt'
+					)}</span
 				>
 				{#if hasBand}
 					<span class="flex items-center gap-1"
@@ -249,7 +257,8 @@
 				class="hover:text-fg"
 				aria-expanded={showTable}
 				aria-controls="{uid}-table"
-				onclick={() => (showTable = !showTable)}>{showTable ? 'Tabelle ausblenden' : 'Als Tabelle'}</button
+				onclick={() => (showTable = !showTable)}
+				>{showTable ? t('Tabelle ausblenden') : t('Als Tabelle')}</button
 			>
 		</div>
 		{#if showTable}
@@ -258,9 +267,9 @@
 					<caption class="sr-only">{label}</caption>
 					<thead class="sticky top-0 bg-surface-2 text-fg-muted">
 						<tr>
-							<th scope="col" class="px-2 py-1 text-left font-medium">Zeit</th>
+							<th scope="col" class="px-2 py-1 text-left font-medium">{t('Zeit')}</th>
 							<th scope="col" class="px-2 py-1 text-right font-medium">Min</th>
-							<th scope="col" class="px-2 py-1 text-right font-medium">Ø</th>
+							<th scope="col" class="px-2 py-1 text-right font-medium">{t('Ø')}</th>
 							<th scope="col" class="px-2 py-1 text-right font-medium">Max</th>
 						</tr>
 					</thead>

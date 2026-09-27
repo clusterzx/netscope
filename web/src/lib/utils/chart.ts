@@ -1,4 +1,5 @@
 // Scale/tick helpers for the hand-written SVG charts.
+import { formatDayMonth, formatTime } from './format';
 
 /** "Nice" linear ticks covering [min, max]. */
 export function niceTicks(min: number, max: number, count = 4): number[] {
@@ -57,15 +58,12 @@ export function timeTicks(from: number, to: number, width: number, px = 90): num
 	return out;
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/** Tick label: HH:mm for short ranges, dd.MM. for long ranges, both at midnight for mid ranges. */
+/** Tick label: HH:mm for short ranges, day and month for long ranges, both at midnight for mid ranges. */
 export function timeTickLabel(t: number, span: number): string {
 	const d = new Date(t);
-	if (span > 3 * DAY) return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.`;
-	if (d.getHours() === 0 && d.getMinutes() === 0 && span > 12 * HOUR)
-		return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.`;
-	return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	if (span > 3 * DAY) return formatDayMonth(d);
+	if (d.getHours() === 0 && d.getMinutes() === 0 && span > 12 * HOUR) return formatDayMonth(d);
+	return formatTime(d);
 }
 
 /** Splits points into runs where consecutive samples are closer than `gapFactor` × median interval. */

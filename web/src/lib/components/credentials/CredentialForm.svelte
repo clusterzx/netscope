@@ -18,6 +18,7 @@
 	import { groups } from '$lib/stores/catalog.svelte';
 	import { SchemaForm, schemaInitial, schemaPayload, validateSchema } from '$lib/components/schema';
 	import { Alert, Button, Icon, Input, Modal, Textarea } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		open: boolean;
@@ -46,7 +47,7 @@
 		Object.fromEntries(Object.entries(errors).filter(([k]) => k.startsWith('scope')))
 	);
 
-	const type = $derived(types.find((t) => t.type === typeId));
+	const type = $derived(types.find((x) => x.type === typeId));
 	const fields = $derived(type?.schema?.fields ?? []);
 	const schemaErrors = $derived(
 		Object.fromEntries(Object.entries(errors).filter(([k]) => k !== 'name' && !k.startsWith('scope')))
@@ -73,8 +74,8 @@
 			step = 'form';
 			name = credential.name;
 			description = credential.description ?? '';
-			const t = types.find((x) => x.type === credential.type);
-			values = schemaInitial(t?.schema?.fields ?? [], credential.public ?? {}, credential.secretsSet ?? []);
+			const ct = types.find((x) => x.type === credential.type);
+			values = schemaInitial(ct?.schema?.fields ?? [], credential.public ?? {}, credential.secretsSet ?? []);
 		} else {
 			typeId = '';
 			step = 'type';
@@ -84,9 +85,9 @@
 		}
 	}
 
-	function chooseType(t: CredentialType) {
-		typeId = t.type;
-		values = schemaInitial(t.schema?.fields ?? [], {});
+	function chooseType(ct: CredentialType) {
+		typeId = ct.type;
+		values = schemaInitial(ct.schema?.fields ?? [], {});
 		errors = {};
 		step = 'form';
 		requestAnimationFrame(() => document.getElementById('cred-name')?.focus());
@@ -99,7 +100,7 @@
 		}
 		formError = '';
 		const e = validateSchema(fields, values);
-		if (!name.trim()) e.name = 'Pflichtfeld';
+		if (!name.trim()) e.name = t('Pflichtfeld');
 		errors = e;
 		if (Object.keys(e).length) return;
 		busy = true;
@@ -123,7 +124,7 @@
 		} catch (err) {
 			errors = fieldErrors(err);
 			if (Object.keys(errors).some((k) => k.startsWith('scope'))) showScope = true;
-			if (err instanceof ApiError && /Name/.test(err.message) && !err.fields.length)
+			if (err instanceof ApiError && /name/i.test(err.message) && !err.fields.length)
 				errors = { name: err.message };
 			// messages that belong to a field are shown there only
 			formError = Object.keys(errors).length ? '' : errorMessage(err);
@@ -135,8 +136,10 @@
 
 <Modal
 	bind:open
-	title={credential ? `Credential „${credential.name}“ bearbeiten` : 'Credential anlegen'}
-	description={type ? `${type.label} – ${type.description}` : 'Art der Zugangsdaten wählen'}
+	title={credential
+		? t('Credential „{name}“ bearbeiten', { name: credential.name })
+		: t('Credential anlegen')}
+	description={type ? `${type.label} – ${type.description}` : t('Art der Zugangsdaten wählen')}
 	size="lg"
 	as="form"
 	onsubmit={submit}
@@ -144,26 +147,26 @@
 >
 	{#if step === 'type'}
 		<fieldset>
-			<legend class="sr-only">Typ</legend>
+			<legend class="sr-only">{t('Typ')}</legend>
 			<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-				{#each types as t (t.type)}
+				{#each types as ct (ct.type)}
 					<label
 						class="flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors
-							{typeId === t.type
+							{typeId === ct.type
 							? 'border-accent bg-accent-soft'
 							: 'border-border hover:border-border-strong hover:bg-surface-2'}"
 					>
 						<input
 							type="radio"
 							name="cred-type"
-							value={t.type}
+							value={ct.type}
 							bind:group={typeId}
 							class="mt-1 accent-(--accent)"
-							ondblclick={() => chooseType(t)}
+							ondblclick={() => chooseType(ct)}
 						/>
 						<span class="min-w-0">
-							<span class="block text-sm font-medium">{t.label}</span>
-							<span class="block text-xs text-fg-muted">{t.description}</span>
+							<span class="block text-sm font-medium">{ct.label}</span>
+							<span class="block text-xs text-fg-muted">{ct.description}</span>
 						</span>
 					</label>
 				{/each}
@@ -175,17 +178,18 @@
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input id="cred-name" label="Name" required bind:value={name} error={errors.name} maxlength={200} />
 				<div class="flex flex-col gap-1">
-					<span class="text-[0.8125rem] font-medium text-fg">Typ</span>
+					<span class="text-[0.8125rem] font-medium text-fg">{t('Typ')}</span>
 					<span class="flex h-8.5 items-center gap-2 text-sm">
 						<Icon name="key" size={14} class="text-fg-subtle" />
 						{type?.label ?? typeId}
 						{#if !credential}
-							<button type="button" class="link text-xs" onclick={() => (step = 'type')}>ändern</button>
+							<button type="button" class="link text-xs" onclick={() => (step = 'type')}>{t('ändern')}</button
+							>
 						{/if}
 					</span>
 				</div>
 			</div>
-			<Textarea id="cred-desc" label="Beschreibung" bind:value={description} rows={2} />
+			<Textarea id="cred-desc" label={t('Beschreibung')} bind:value={description} rows={2} />
 			<div class="border-t border-border pt-4">
 				<SchemaForm {fields} bind:values errors={schemaErrors} idPrefix="cred-{typeId}" compact />
 			</div>
@@ -193,7 +197,7 @@
 				<section class="border-t border-border pt-4" aria-labelledby="cred-scope-title">
 					<div class="flex flex-wrap items-start justify-between gap-2">
 						<div class="min-w-0">
-							<h3 id="cred-scope-title" class="text-[0.8125rem] font-medium text-fg">Gilt für</h3>
+							<h3 id="cred-scope-title" class="text-[0.8125rem] font-medium text-fg">{t('Gilt für')}</h3>
 							<p class="text-sm break-words text-fg-muted">{scopeText}</p>
 						</div>
 						<Button
@@ -201,12 +205,13 @@
 							icon={showScope ? 'chevron-up' : 'edit'}
 							aria-expanded={showScope}
 							aria-controls="cred-scope"
-							onclick={() => (showScope = !showScope)}>{showScope ? 'Einklappen' : 'Anpassen'}</Button
+							onclick={() => (showScope = !showScope)}>{showScope ? t('Einklappen') : t('Anpassen')}</Button
 						>
 					</div>
 					<p class="mt-1 text-xs text-fg-subtle">
-						Plugins ohne eigene Auswahl nehmen pro Gerät automatisch die passenden Zugangsdaten – zuerst die
-						dem Gerät zugewiesenen, dann Gruppe, Tag oder Filter, dann Subnetz, zuletzt „überall“.
+						{t(
+							'Plugins ohne eigene Auswahl nehmen pro Gerät automatisch die passenden Zugangsdaten – zuerst die dem Gerät zugewiesenen, dann Gruppe, Tag oder Filter, dann Subnetz, zuletzt „überall“.'
+						)}
 					</p>
 					{#if showScope}
 						<div id="cred-scope" class="mt-4">
@@ -217,18 +222,19 @@
 			{/if}
 			<p class="flex items-start gap-1.5 text-xs text-fg-subtle">
 				<Icon name="lock" size={13} class="mt-px shrink-0" />
-				Secrets werden verschlüsselt gespeichert und danach nie wieder angezeigt.
-				{credential ? 'Leer lassen bzw. „gesetzt“ belassen, um den gespeicherten Wert zu behalten.' : ''}
+				{t('Secrets werden verschlüsselt gespeichert und danach nie wieder angezeigt.')}
+				{credential ? t('Leer lassen bzw. „gesetzt“ belassen, um den gespeicherten Wert zu behalten.') : ''}
 			</p>
 		</div>
 	{/if}
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
 		{#if step === 'type'}
-			<Button type="submit" variant="primary" iconRight="arrow-right" disabled={!typeId}>Weiter</Button>
+			<Button type="submit" variant="primary" iconRight="arrow-right" disabled={!typeId}>{t('Weiter')}</Button
+			>
 		{:else}
 			<Button type="submit" variant="primary" icon="save" loading={busy}
-				>{credential ? 'Speichern' : 'Anlegen'}</Button
+				>{credential ? t('Speichern') : t('Anlegen')}</Button
 			>
 		{/if}
 	{/snippet}

@@ -23,6 +23,7 @@
 	import { eventTypes, groups } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
+	import { t } from '$lib/i18n';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { setParams } from '$lib/utils/url';
@@ -63,10 +64,10 @@
 		try {
 			const saved = await api.put('/api/v1/rules/{id}', { path: { id: r.id }, body: { ...r, enabled: v } });
 			Object.assign(r, saved);
-			toast.success(`Regel ${v ? 'aktiviert' : 'deaktiviert'}`, { title: r.name });
+			toast.success(v ? t('Regel aktiviert') : t('Regel deaktiviert'), { title: r.name });
 		} catch (e) {
 			r.enabled = prev;
-			toast.error(errorMessage(e), { title: `${r.name}: Umschalten fehlgeschlagen` });
+			toast.error(errorMessage(e), { title: t('{name}: Umschalten fehlgeschlagen', { name: r.name }) });
 		} finally {
 			busy[r.id] = false;
 		}
@@ -82,9 +83,9 @@
 		try {
 			const saved = await api.put('/api/v1/rules/order', { body: { ids: list.map((r) => r.id) } });
 			data.set(saved ?? []);
-			toast.success('Reihenfolge gespeichert');
+			toast.success(t('Reihenfolge gespeichert'));
 		} catch (e) {
-			toast.error(errorMessage(e), { title: 'Reihenfolge konnte nicht gespeichert werden' });
+			toast.error(errorMessage(e), { title: t('Reihenfolge konnte nicht gespeichert werden') });
 			data.reload();
 		} finally {
 			reordering = false;
@@ -123,20 +124,20 @@
 	// ---------------------------------------------------------------- delete
 	async function remove(r: Rule) {
 		const ok = await confirm({
-			title: `Regel „${r.name}“ löschen?`,
+			title: t('Regel „{name}“ löschen?', { name: r.name }),
 			message: r.builtin
-				? 'Das ist eine mitgelieferte Standardregel. Sie wird nicht automatisch wiederhergestellt.'
-				: 'Bereits verschickte Benachrichtigungen bleiben im Verlauf erhalten.',
-			confirmLabel: 'Löschen',
+				? t('Das ist eine mitgelieferte Standardregel. Sie wird nicht automatisch wiederhergestellt.')
+				: t('Bereits verschickte Benachrichtigungen bleiben im Verlauf erhalten.'),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/rules/{id}', { path: { id: r.id } });
-			toast.success(`Regel „${r.name}“ gelöscht`);
+			toast.success(t('Regel „{name}“ gelöscht', { name: r.name }));
 			data.reload();
 		} catch (e) {
-			toast.error(errorMessage(e), { title: 'Löschen fehlgeschlagen' });
+			toast.error(errorMessage(e), { title: t('Löschen fehlgeschlagen') });
 		}
 	}
 
@@ -148,26 +149,33 @@
 	}
 </script>
 
-<PageHeader title="Regeln" description="Welche Events wann über welchen Publisher gemeldet werden">
+<PageHeader title={t('Regeln')} description={t('Welche Events wann über welchen Publisher gemeldet werden')}>
 	{#snippet actions()}
 		{#if tab === 'rules' && canManage}
-			<Button variant="primary" icon="plus" href="/rules/new">Neue Regel</Button>
+			<Button variant="primary" icon="plus" href="/rules/new">{t('Neue Regel')}</Button>
 		{/if}
 	{/snippet}
 </PageHeader>
 
 <Tabs
 	items={[
-		{ id: 'rules', label: 'Regeln', icon: 'rules', count: data.data ? rules.length : null },
-		{ id: 'notifications', label: 'Benachrichtigungen', icon: 'bell' }
+		{ id: 'rules', label: t('Regeln'), icon: 'rules', count: data.data ? rules.length : null },
+		{ id: 'notifications', label: t('Benachrichtigungen'), icon: 'bell' }
 	]}
 	bind:active={activeTab}
-	onchange={(t) =>
+	onchange={(id) =>
 		setParams(
-			{ tab: t === 'rules' ? null : t, status: null, publisher: null, rule: null, offset: null, limit: null },
+			{
+				tab: id === 'rules' ? null : id,
+				status: null,
+				publisher: null,
+				rule: null,
+				offset: null,
+				limit: null
+			},
 			{ push: true }
 		)}
-	label="Regel-Bereiche"
+	label={t('Regel-Bereiche')}
 	class="mb-4"
 />
 
@@ -178,12 +186,13 @@
 {:else}
 	<div role="tabpanel" id="panel-rules" aria-labelledby="tab-rules" class="flex flex-col gap-3">
 		{#if publishers.value && !anyPublisher}
-			<Alert tone="warn" title="Kein Publisher aktiv">
-				Regeln werden ausgewertet, aber Benachrichtigungen erst verschickt, wenn ein Publisher eingerichtet
-				und aktiviert ist.
+			<Alert tone="warn" title={t('Kein Publisher aktiv')}>
+				{t(
+					'Regeln werden ausgewertet, aber Benachrichtigungen erst verschickt, wenn ein Publisher eingerichtet und aktiviert ist.'
+				)}
 				{#snippet actions()}
 					{#if auth.can('plugins.manage')}
-						<Button size="xs" href="/plugins#kind-publisher">Publisher einrichten</Button>
+						<Button size="xs" href="/plugins#kind-publisher">{t('Publisher einrichten')}</Button>
 					{/if}
 				{/snippet}
 			</Alert>
@@ -195,21 +204,26 @@
 			<div class="rounded-lg border border-border bg-surface p-4"><Skeleton rows={4} /></div>
 		{:else if rules.length === 0}
 			{#snippet create()}
-				<Button variant="primary" icon="plus" href="/rules/new">Neue Regel</Button>
+				<Button variant="primary" icon="plus" href="/rules/new">{t('Neue Regel')}</Button>
 			{/snippet}
 			<EmptyState
 				icon="rules"
-				title="Keine Regeln"
-				description="Ohne Regeln werden Events zwar erfasst, aber niemand benachrichtigt."
+				title={t('Keine Regeln')}
+				description={t('Ohne Regeln werden Events zwar erfasst, aber niemand benachrichtigt.')}
 				actions={canManage ? create : undefined}
 			/>
 		{:else}
 			<p class="text-sm text-fg-muted">
-				Regeln werden von oben nach unten ausgewertet; eine Regel mit „Stopp“ beendet die Auswertung, wenn sie
-				greift.{#if canManage}
-					Reihenfolge per Ziehen oder mit den Pfeil-Schaltflächen ändern.{/if}
+				{t(
+					'Regeln werden von oben nach unten ausgewertet; eine Regel mit „Stopp“ beendet die Auswertung, wenn sie greift.'
+				)}
+				{#if canManage}{t('Reihenfolge per Ziehen oder mit den Pfeil-Schaltflächen ändern.')}{/if}
 			</p>
-			<ol class="flex flex-col gap-2" aria-label="Regeln in Auswertungsreihenfolge" aria-busy={reordering}>
+			<ol
+				class="flex flex-col gap-2"
+				aria-label={t('Regeln in Auswertungsreihenfolge')}
+				aria-busy={reordering}
+			>
 				{#each rules as r, i (r.id)}
 					{@const off = disabledPublishers(r)}
 					<li
@@ -237,7 +251,7 @@
 								<span
 									draggable="true"
 									role="presentation"
-									title="Ziehen zum Verschieben"
+									title={t('Ziehen zum Verschieben')}
 									class="hidden cursor-grab text-fg-subtle hover:text-fg active:cursor-grabbing sm:block"
 									ondragstart={(e) => {
 										dragId = r.id;
@@ -256,7 +270,7 @@
 									size="xs"
 									variant="ghost"
 									icon="chevron-up"
-									label="„{r.name}“ nach oben"
+									label={t('„{name}“ nach oben', { name: r.name })}
 									disabled={i === 0 || reordering}
 									onclick={() => move(i, -1)}
 								/>
@@ -268,7 +282,7 @@
 									size="xs"
 									variant="ghost"
 									icon="chevron-down"
-									label="„{r.name}“ nach unten"
+									label={t('„{name}“ nach unten', { name: r.name })}
 									disabled={i === rules.length - 1 || reordering}
 									onclick={() => move(i, 1)}
 								/>
@@ -280,27 +294,31 @@
 								<a href="/rules/{r.id}" class="font-medium text-fg hover:text-accent hover:underline"
 									>{r.name}</a
 								>
-								{#if r.builtin}<Badge tone="accent" title="Mitgelieferte Standardregel">Standard</Badge>{/if}
+								{#if r.builtin}<Badge tone="accent" title={t('Mitgelieferte Standardregel')}
+										>{t('Standard')}</Badge
+									>{/if}
 								{#if r.stop}<Badge
 										tone="warn"
-										title="Greift diese Regel, werden nachfolgende Regeln nicht ausgewertet">Stopp</Badge
+										title={t('Greift diese Regel, werden nachfolgende Regeln nicht ausgewertet')}
+										>{t('Stopp')}</Badge
 									>{/if}
-								{#if !r.enabled}<Badge>inaktiv</Badge>{/if}
+								{#if !r.enabled}<Badge>{t('inaktiv')}</Badge>{/if}
 							</div>
 							{#if r.description}<p class="text-sm text-fg-muted">{r.description}</p>{/if}
 							<dl class="grid grid-cols-[3.5rem_1fr] gap-x-2 gap-y-0.5 text-sm">
-								<dt class="text-fg-subtle">Wenn</dt>
+								<dt class="text-fg-subtle">{t('Wenn')}</dt>
 								<dd class="min-w-0">
 									{conditionSummary(r.conditions, catalog, groupName, siteName).join(' · ')}
 								</dd>
-								<dt class="text-fg-subtle">Dann</dt>
+								<dt class="text-fg-subtle">{t('Dann')}</dt>
 								<dd class="min-w-0">
 									{#each r.actions ?? [] as a, ai (ai)}
 										<span class="block">{actionSummary(a, pubs)}</span>
 									{/each}
 									{#if off.length}
 										<span class="mt-0.5 flex items-center gap-1 text-xs text-warn">
-											<Icon name="alert" size={13} /> Publisher inaktiv: {off.join(', ')} – wird übersprungen
+											<Icon name="alert" size={13} />
+											{t('Publisher inaktiv: {names} – wird übersprungen', { names: off.join(', ') })}
 										</span>
 									{/if}
 								</dd>
@@ -315,29 +333,29 @@
 									checked={r.enabled}
 									onchange={(v) => setEnabled(r, v)}
 									disabled={busy[r.id]}
-									label="„{r.name}“ aktiv"
+									label={t('„{name}“ aktiv', { name: r.name })}
 									hideLabel
 									size="sm"
 								/>
 							{/if}
 							<Menu
-								label="Aktionen für „{r.name}“"
+								label={t('Aktionen für „{name}“', { name: r.name })}
 								items={canManage
 									? [
-											{ label: 'Bearbeiten', icon: 'edit', href: `/rules/${r.id}` },
-											{ label: 'Duplizieren', icon: 'copy', href: `/rules/new?from=${r.id}` },
+											{ label: t('Bearbeiten'), icon: 'edit', href: `/rules/${r.id}` },
+											{ label: t('Duplizieren'), icon: 'copy', href: `/rules/new?from=${r.id}` },
 											{
-												label: 'Benachrichtigungen',
+												label: t('Benachrichtigungen'),
 												icon: 'bell',
 												href: `/rules?tab=notifications&rule=${r.id}`
 											},
 											{ separator: true },
-											{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(r) }
+											{ label: t('Löschen'), icon: 'trash', danger: true, onclick: () => remove(r) }
 										]
 									: [
-											{ label: 'Anzeigen', icon: 'eye', href: `/rules/${r.id}` },
+											{ label: t('Anzeigen'), icon: 'eye', href: `/rules/${r.id}` },
 											{
-												label: 'Benachrichtigungen',
+												label: t('Benachrichtigungen'),
 												icon: 'bell',
 												href: `/rules?tab=notifications&rule=${r.id}`
 											}

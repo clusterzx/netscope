@@ -27,7 +27,7 @@ func (s *Server) registerUsers() {
 		Perm: auth.PermUsersManage, Resp: []auth.User{}, handler: s.handleUsers})
 	s.add(&route{Method: "POST", Path: "/api/v1/users", Tag: "Benutzer", Summary: "Benutzer anlegen (ohne Passwort wird eins erzeugt; Änderung beim ersten Login)",
 		Scope: scopeWrite, Perm: auth.PermUsersManage, Body: auth.UserInput{}, Resp: userCreated{}, Status: http.StatusCreated, handler: s.handleCreateUser})
-	s.add(&route{Method: "GET", Path: "/api/v1/users/{id}", Tag: "Benutzer", Summary: "Benutzer", Scope: scopeRead, Perm: auth.PermUsersManage,
+	s.add(&route{Method: "GET", Path: "/api/v1/users/{id}", Tag: "Benutzer", Summary: "Ein Benutzer", Scope: scopeRead, Perm: auth.PermUsersManage,
 		Params: idParam, Resp: auth.User{}, handler: s.handleUser})
 	s.add(&route{Method: "PUT", Path: "/api/v1/users/{id}", Tag: "Benutzer", Summary: "Benutzer ändern (Name, Rolle, deaktiviert)", Scope: scopeWrite,
 		Perm: auth.PermUsersManage, Params: idParam, Body: auth.UserInput{}, Resp: auth.User{}, handler: s.handleUpdateUser})
@@ -49,7 +49,7 @@ func (s *Server) registerUsers() {
 }
 
 func (s *Server) handlePermissions(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, auth.Permissions)
+	writeJSON(w, http.StatusOK, localizePermissions(requestLocale(r)))
 }
 
 func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {

@@ -8,6 +8,7 @@
 	import { api, errorMessage, fieldErrors } from '$lib/api';
 	import type { Credential, TunnelStatus, TunnelSummary, TunnelTestResult } from '$lib/api';
 	import { Alert, Button, CopyButton, Input, RelativeTime, Select, Textarea } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { formatBytes } from '$lib/utils/format';
 	import TunnelState from './TunnelState.svelte';
@@ -101,28 +102,32 @@
 		fileError = '';
 		if (!f) return;
 		if (f.size > 64 * 1024) {
-			fileError = 'Datei zu groß – eine WireGuard-Konfiguration hat nur wenige Zeilen.';
+			fileError = t('Datei zu groß – eine WireGuard-Konfiguration hat nur wenige Zeilen.');
 			return;
 		}
 		config = (await f.text()).trim() + '\n';
 		if (!name.trim()) name = f.name.replace(/\.conf$/i, '');
 	}
 
-	const tunnelOptions = $derived(tunnels.map((t) => ({ value: String(t.id), label: t.name })));
+	const tunnelOptions = $derived(tunnels.map((c) => ({ value: String(c.id), label: c.name })));
 	/** a new configuration is stored as credential */
 	const canCreate = $derived(auth.can('credentials.manage'));
 </script>
 
 <div class="flex flex-col gap-4 rounded-lg border border-border bg-surface-2 p-4">
 	{#if tunnels.length && canCreate}
-		<div class="flex flex-wrap gap-x-5 gap-y-2 text-sm" role="radiogroup" aria-label="Tunnel-Konfiguration">
+		<div
+			class="flex flex-wrap gap-x-5 gap-y-2 text-sm"
+			role="radiogroup"
+			aria-label={t('Tunnel-Konfiguration')}
+		>
 			<label class="flex cursor-pointer items-center gap-2">
 				<input type="radio" value="existing" bind:group={mode} class="accent-(--accent)" />
-				Vorhandenen Tunnel verwenden
+				{t('Vorhandenen Tunnel verwenden')}
 			</label>
 			<label class="flex cursor-pointer items-center gap-2">
 				<input type="radio" value="new" bind:group={mode} class="accent-(--accent)" />
-				Neue Konfiguration
+				{t('Neue Konfiguration')}
 			</label>
 		</div>
 	{/if}
@@ -133,25 +138,27 @@
 			required
 			value={credentialId ? String(credentialId) : ''}
 			options={tunnelOptions}
-			placeholder="Tunnel wählen …"
+			placeholder={t('Tunnel wählen …')}
 			onchange={(e) => (credentialId = Number((e.currentTarget as HTMLSelectElement).value) || null)}
 			error={errors.tunnelCredentialId ?? (inspectError || null)}
 			hint={canCreate
-				? 'Mehrere Subnetze können denselben Tunnel nutzen, z. B. das LAN und das IPMI-Netz eines Rechenzentrums.'
-				: 'Neue Tunnel-Konfigurationen anlegen erfordert die Berechtigung „Credentials verwalten“.'}
+				? t(
+						'Mehrere Subnetze können denselben Tunnel nutzen, z. B. das LAN und das IPMI-Netz eines Rechenzentrums.'
+					)
+				: t('Neue Tunnel-Konfigurationen anlegen erfordert die Berechtigung „Credentials verwalten“.')}
 		/>
 	{:else}
 		<Input
-			label="Name des Tunnels"
+			label={t('Name des Tunnels')}
 			bind:value={name}
 			required
 			maxlength={200}
-			placeholder="z. B. Rechenzentrum"
+			placeholder={t('z. B. Rechenzentrum')}
 			error={errors.name}
 		/>
 		<div class="flex flex-col items-start gap-1">
 			<Textarea
-				label="WireGuard-Konfiguration"
+				label={t('WireGuard-Konfiguration')}
 				bind:value={config}
 				mono
 				rows={9}
@@ -160,11 +167,13 @@
 				autocomplete="off"
 				class="w-full"
 				placeholder={'[Interface]\nPrivateKey = …\nAddress = 10.10.10.3/32\n\n[Peer]\nPublicKey = …\nEndpoint = vpn.example.org:51820\nAllowedIPs = 192.168.1.0/24'}
-				hint="Inhalt der .conf-Datei, z. B. aus dem Peer-Generator der OPNsense. Einen eigenen Zugang nur für NetScope anlegen – die Konfiguration eines anderen Geräts nicht wiederverwenden. Der private Schlüssel wird verschlüsselt gespeichert."
+				hint={t(
+					'Inhalt der .conf-Datei, z. B. aus dem Peer-Generator der OPNsense. Einen eigenen Zugang nur für NetScope anlegen – die Konfiguration eines anderen Geräts nicht wiederverwenden. Der private Schlüssel wird verschlüsselt gespeichert.'
+				)}
 				error={errors.config ?? (inspectError || null)}
 			/>
 			<Button size="xs" variant="ghost" icon="upload" onclick={() => fileInput?.click()}
-				>Aus Datei laden</Button
+				>{t('Aus Datei laden')}</Button
 			>
 			<input
 				bind:this={fileInput}
@@ -181,34 +190,36 @@
 	{#if summary}
 		<dl class="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-2">
 			<div class="min-w-0">
-				<dt class="text-xs text-fg-subtle">Gegenstelle</dt>
+				<dt class="text-xs text-fg-subtle">{t('Gegenstelle')}</dt>
 				<dd class="mono break-all">{summary.endpoint}</dd>
 			</div>
 			<div class="min-w-0">
-				<dt class="text-xs text-fg-subtle">Tunnel-Adresse von NetScope</dt>
+				<dt class="text-xs text-fg-subtle">{t('Tunnel-Adresse von NetScope')}</dt>
 				<dd class="mono break-all">{summary.addresses.join(', ')}</dd>
 			</div>
 			<div class="min-w-0 sm:col-span-2">
 				<dt class="text-xs text-fg-subtle">
-					Öffentlicher Schlüssel von NetScope (muss auf dem Server als Peer eingetragen sein)
+					{t('Öffentlicher Schlüssel von NetScope (muss auf dem Server als Peer eingetragen sein)')}
 				</dt>
 				<dd class="flex items-center gap-1">
 					<span class="mono min-w-0 break-all">{summary.publicKey}</span>
-					<CopyButton text={summary.publicKey} size="xs" label="Schlüssel kopieren" />
+					<CopyButton text={summary.publicKey} size="xs" label={t('Schlüssel kopieren')} />
 				</dd>
 			</div>
 			<div class="min-w-0 sm:col-span-2">
-				<dt class="text-xs text-fg-subtle">Durch den Tunnel geleitet</dt>
+				<dt class="text-xs text-fg-subtle">{t('Durch den Tunnel geleitet')}</dt>
 				<dd>
 					<span class="mono">{cidr.trim() || '—'}</span>
 					<span class="text-xs text-fg-subtle">
-						– nur die Subnetze, die diesen Tunnel nutzen; der übrige Verkehr des Servers bleibt unverändert</span
+						{t(
+							'– nur die Subnetze, die diesen Tunnel nutzen; der übrige Verkehr des Servers bleibt unverändert'
+						)}</span
 					>
 				</dd>
 			</div>
 		</dl>
 		{#if summary.warnings.length}
-			<Alert tone="warn" title="Hinweise zur Konfiguration">
+			<Alert tone="warn" title={t('Hinweise zur Konfiguration')}>
 				<ul class="list-disc space-y-0.5 pl-4">
 					{#each summary.warnings as w (w)}<li>{w}</li>{/each}
 				</ul>
@@ -219,11 +230,14 @@
 	<div class="flex flex-col gap-2">
 		<div>
 			<Button size="sm" icon="zap" onclick={test} loading={testing} disabled={!summary || testing}
-				>Verbindung testen</Button
+				>{t('Verbindung testen')}</Button
 			>
 		</div>
 		{#if result}
-			<Alert tone={result.ok ? 'ok' : 'danger'} title={result.ok ? 'Verbindung klappt' : 'Keine Verbindung'}>
+			<Alert
+				tone={result.ok ? 'ok' : 'danger'}
+				title={result.ok ? t('Verbindung klappt') : t('Keine Verbindung')}
+			>
 				{result.message}
 			</Alert>
 		{/if}
@@ -237,9 +251,13 @@
 			</div>
 			{#if liveStatus.error}<p class="text-xs text-danger">{liveStatus.error}</p>{/if}
 			<p class="text-xs text-fg-muted">
-				Letzter Handshake:
-				{#if liveStatus.lastHandshake}<RelativeTime value={liveStatus.lastHandshake} />{:else}noch keiner{/if}
-				· empfangen {formatBytes(liveStatus.rxBytes)} · gesendet {formatBytes(liveStatus.txBytes)}
+				{t('Letzter Handshake:')}
+				{#if liveStatus.lastHandshake}<RelativeTime value={liveStatus.lastHandshake} />{:else}{t(
+						'noch keiner'
+					)}{/if}
+				· {t('empfangen {bytes}', { bytes: formatBytes(liveStatus.rxBytes) })} · {t('gesendet {bytes}', {
+					bytes: formatBytes(liveStatus.txBytes)
+				})}
 			</p>
 		</div>
 	{/if}

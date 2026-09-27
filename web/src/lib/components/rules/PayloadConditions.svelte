@@ -5,6 +5,7 @@
 <script lang="ts">
 	import type { EventSpec } from '$lib/api';
 	import { Button, Input, Select } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { OPS, fieldMessage, opLabel } from './rule';
 
 	type Cond = { field: string; op: string; value: string };
@@ -23,15 +24,15 @@
 	/** unique payload fields of the selected types (key → type + description) */
 	const fields = $derived.by(() => {
 		const map = new Map<string, { type: string; description: string }>();
-		for (const t of types)
-			for (const f of t.payload ?? [])
+		for (const spec of types)
+			for (const f of spec.payload ?? [])
 				if (!map.has(f.key)) map.set(f.key, { type: f.type, description: f.description });
 		return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
 	});
 
 	const opOptions = OPS.map((o) => ({
 		value: o,
-		label: o === 'contains' ? 'enthält' : `${o}  (${opLabel[o]})`
+		label: o === 'contains' ? opLabel[o] : `${o}  (${opLabel[o]})`
 	}));
 
 	function add() {
@@ -54,7 +55,9 @@
 		{/each}
 	</datalist>
 	{#if !value?.length}
-		<p class="text-sm text-fg-subtle">Keine Payload-Bedingungen – alle Events der gewählten Typen passen.</p>
+		<p class="text-sm text-fg-subtle">
+			{t('Keine Payload-Bedingungen – alle Events der gewählten Typen passen.')}
+		</p>
 	{/if}
 	{#each value as c, i (i)}
 		<div
@@ -62,14 +65,14 @@
 		>
 			<Input
 				id="{uid}-f{i}"
-				label="Feld"
+				label={t('Feld')}
 				bind:value={c.field}
 				list="{uid}-fields"
-				placeholder="z. B. cvss"
+				placeholder={t('z. B. cvss')}
 				mono
 				size="sm"
 				error={fieldMessage(errors[`conditions.payload.${i}.field`])}
-				hint={typeOf(c.field) ? `Typ: ${typeOf(c.field)}` : undefined}
+				hint={typeOf(c.field) ? t('Typ: {type}', { type: typeOf(c.field) }) : undefined}
 				class="w-full sm:w-auto sm:flex-[1.2]"
 			/>
 			<Select
@@ -83,29 +86,31 @@
 			/>
 			<Input
 				id="{uid}-v{i}"
-				label="Wert"
+				label={t('Wert')}
 				bind:value={c.value}
 				size="sm"
-				placeholder={typeOf(c.field) === 'number' ? 'Zahl' : 'Text'}
+				placeholder={typeOf(c.field) === 'number' ? t('Zahl') : 'Text'}
 				class="min-w-24 flex-1"
 			/>
 			<Button
 				size="sm"
 				variant="ghost"
 				icon="trash"
-				label="Bedingung {i + 1} entfernen"
+				label={t('Bedingung {n} entfernen', { n: i + 1 })}
 				onclick={() => remove(i)}
 				class="mt-5.5 shrink-0"
 			/>
 		</div>
 	{/each}
 	<div>
-		<Button size="sm" icon="plus" onclick={add}>Payload-Bedingung</Button>
+		<Button size="sm" icon="plus" onclick={add}>{t('Payload-Bedingung')}</Button>
 	</div>
 	{#if fields.length}
 		<p class="text-xs text-fg-subtle">
-			Verfügbare Felder: {fields.map(([k]) => k).join(', ')}. Zahlen werden numerisch verglichen, Text ohne
-			Groß-/Kleinschreibung.
+			{t(
+				'Verfügbare Felder: {fields}. Zahlen werden numerisch verglichen, Text ohne Groß-/Kleinschreibung.',
+				{ fields: fields.map(([k]) => k).join(', ') }
+			)}
 		</p>
 	{/if}
 </div>

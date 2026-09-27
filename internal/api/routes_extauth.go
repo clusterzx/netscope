@@ -193,6 +193,7 @@ func (s *Server) handleTestOIDC(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	res.Steps = localizeSteps(res.Steps, requestLocale(r))
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -207,5 +208,6 @@ func (s *Server) handleTestLDAP(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	res.Steps = localizeSteps(res.Steps, requestLocale(r))
 	writeJSON(w, http.StatusOK, res)
 }

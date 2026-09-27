@@ -8,6 +8,7 @@
 -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { t } from '$lib/i18n';
 	import Button from './Button.svelte';
 
 	interface Props {
@@ -105,7 +106,14 @@
 					<h2 id="{uid}-title" class="text-base font-semibold">{title}</h2>
 					{#if description}<p id="{uid}-desc" class="mt-0.5 text-sm text-fg-muted">{description}</p>{/if}
 				</div>
-				<Button variant="ghost" size="sm" icon="x" label="Schließen" onclick={requestClose} disabled={busy} />
+				<Button
+					variant="ghost"
+					size="sm"
+					icon="x"
+					label={t('Schließen')}
+					onclick={requestClose}
+					disabled={busy}
+				/>
 			</header>
 			<div class="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-modal-body>
 				{@render children()}

@@ -486,9 +486,9 @@ geprüft.
 | `events[]` | Liste | gebündelte Events (Reihenfolge wie in der Regel-Engine) |
 | `events[].id` | Zahl | Event-ID |
 | `events[].type` | Text | Typ aus dem Event-Katalog, z. B. `port.opened`, `cve.new` (`GET /api/v1/events/types`) |
-| `events[].label` | Text | deutscher Name des Typs |
+| `events[].label` | Text | Name des Typs in der Sprache der Benachrichtigungen (Systemeinstellung) |
 | `events[].category` | Text | `device`, `port`, `cert`, `container`, `software`, `vulnerability`, `health`, `system` |
-| `events[].severity` / `severityRank` / `severityLabel` | Text / Zahl / Text | Schweregrad, als Zahl 0–4 und deutsch |
+| `events[].severity` / `severityRank` / `severityLabel` | Text / Zahl / Text | Schweregrad, als Zahl 0–4 und als Text in der Sprache der Benachrichtigungen |
 | `events[].title` / `message` | Text | Titel und Detailtext |
 | `events[].at` | Zeit | Zeitpunkt des Events |
 | `events[].acknowledged` | Bool | inzwischen quittiert |

@@ -9,6 +9,7 @@
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import RelativeTime from '$lib/components/ui/RelativeTime.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		open: boolean;
@@ -40,11 +41,11 @@
 	async function submit() {
 		error = '';
 		if (!selected.length) {
-			error = 'Mindestens eine MAC-Adresse auswählen';
+			error = t('Mindestens eine MAC-Adresse auswählen');
 			return;
 		}
 		if (selected.length >= macs.length) {
-			error = 'Mindestens eine MAC-Adresse muss beim Gerät bleiben';
+			error = t('Mindestens eine MAC-Adresse muss beim Gerät bleiben');
 			return;
 		}
 		busy = true;
@@ -55,9 +56,13 @@
 			});
 			open = false;
 			onsplit(res.id);
-			toast.success(`${selected.length === 1 ? 'MAC-Adresse' : 'MAC-Adressen'} in neues Gerät abgespalten`, {
+			const msg =
+				selected.length === 1
+					? t('MAC-Adresse in neues Gerät abgespalten')
+					: t('MAC-Adressen in neues Gerät abgespalten');
+			toast.success(msg, {
 				timeout: 10000,
-				action: { label: 'Neues Gerät öffnen', onClick: () => goto(`/devices/${res.id}`) }
+				action: { label: t('Neues Gerät öffnen'), onClick: () => goto(`/devices/${res.id}`) }
 			});
 		} catch (e) {
 			error = errorMessage(e);
@@ -69,8 +74,10 @@
 
 <Modal
 	bind:open
-	title="MAC-Adressen abspalten"
-	description="Die gewählten MACs samt ihrer IPs, Ports, Zertifikate und Web-Dienste werden zu einem neuen Gerät – z. B. wenn zwei Geräte fälschlich zusammengefasst wurden."
+	title={t('MAC-Adressen abspalten')}
+	description={t(
+		'Die gewählten MACs samt ihrer IPs, Ports, Zertifikate und Web-Dienste werden zu einem neuen Gerät – z. B. wenn zwei Geräte fälschlich zusammengefasst wurden.'
+	)}
 	as="form"
 	onsubmit={submit}
 	{busy}
@@ -78,7 +85,7 @@
 	<div class="flex flex-col gap-3">
 		{#if error}<Alert tone="danger">{error}</Alert>{/if}
 		<fieldset class="flex flex-col gap-1.5">
-			<legend class="mb-1 text-[0.8125rem] font-medium">MAC-Adressen für das neue Gerät</legend>
+			<legend class="mb-1 text-[0.8125rem] font-medium">{t('MAC-Adressen für das neue Gerät')}</legend>
 			{#each macs as m (m.mac)}
 				<label
 					class="flex cursor-pointer items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-2 has-checked:border-accent has-checked:bg-accent-soft"
@@ -91,9 +98,9 @@
 					/>
 					<span class="min-w-0 flex-1">
 						<span class="mono">{m.mac}</span>
-						{#if m.randomized}<Badge tone="warn">zufällig</Badge>{/if}
+						{#if m.randomized}<Badge tone="warn">{t('zufällig')}</Badge>{/if}
 						<span class="block truncate text-xs text-fg-subtle">
-							{m.vendor || 'Hersteller unbekannt'}
+							{m.vendor || t('Hersteller unbekannt')}
 							{#if ipsOf(m.mac).length}
 								&middot; <span class="mono">{ipsOf(m.mac).join(', ')}</span>
 							{/if}
@@ -104,12 +111,13 @@
 			{/each}
 		</fieldset>
 		<p class="text-xs text-fg-subtle">
-			Manuelle Angaben, Tags und Notizen bleiben beim bisherigen Gerät. Rückgängig machen lässt sich die
-			Aufteilung per „Zusammenführen“ in der Geräteliste.
+			{t(
+				'Manuelle Angaben, Tags und Notizen bleiben beim bisherigen Gerät. Rückgängig machen lässt sich die Aufteilung per „Zusammenführen“ in der Geräteliste.'
+			)}
 		</p>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="split" loading={busy}>Abspalten</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="split" loading={busy}>{t('Abspalten')}</Button>
 	{/snippet}
 </Modal>

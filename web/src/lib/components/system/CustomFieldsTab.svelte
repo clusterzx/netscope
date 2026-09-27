@@ -16,6 +16,7 @@
 		Table
 	} from '$lib/components/ui';
 	import type { Column } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { customFields as cfCatalog } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
@@ -86,11 +87,12 @@
 
 	function validate(): Record<string, string> {
 		const e: Record<string, string> = {};
-		if (!form.label.trim()) e.label = 'Bezeichnung erforderlich';
+		if (!form.label.trim()) e.label = t('Bezeichnung erforderlich');
 		if (!editing && !KEY_RE.test(form.key))
-			e.key = 'Kleinbuchstaben, Ziffern und _, beginnt mit Buchstabe (max. 40)';
-		if (!editing && (list.data ?? []).some((c) => c.key === form.key)) e.key = 'Schlüssel bereits vergeben';
-		if (form.sortOrder !== null && !Number.isInteger(form.sortOrder)) e.sortOrder = 'Ganze Zahl';
+			e.key = t('Kleinbuchstaben, Ziffern und _, beginnt mit Buchstabe (max. 40)');
+		if (!editing && (list.data ?? []).some((c) => c.key === form.key))
+			e.key = t('Schlüssel bereits vergeben');
+		if (form.sortOrder !== null && !Number.isInteger(form.sortOrder)) e.sortOrder = t('Ganze Zahl');
 		return e;
 	}
 
@@ -110,7 +112,11 @@
 			const saved = editing
 				? await api.put('/api/v1/custom-fields/{id}', { path: { id: editing.id }, body })
 				: await api.post('/api/v1/custom-fields', { body });
-			toast.success(editing ? `Feld „${saved.label}“ gespeichert` : `Feld „${saved.label}“ angelegt`);
+			toast.success(
+				editing
+					? t('Feld „{label}“ gespeichert', { label: saved.label })
+					: t('Feld „{label}“ angelegt', { label: saved.label })
+			);
 			open = false;
 			list.reload();
 			cfCatalog.refresh().catch(() => {});
@@ -123,15 +129,18 @@
 
 	async function remove(c: CustomField) {
 		const ok = await confirm({
-			title: `Custom Field „${c.label}“ löschen?`,
-			message: `Die Definition und alle Werte von cf.${c.key} bei allen Geräten werden gelöscht. Filter und Ansichten mit cf.${c.key} funktionieren danach nicht mehr.`,
-			confirmLabel: 'Löschen',
+			title: t('Custom Field „{label}“ löschen?', { label: c.label }),
+			message: t(
+				'Die Definition und alle Werte von cf.{key} bei allen Geräten werden gelöscht. Filter und Ansichten mit cf.{key} funktionieren danach nicht mehr.',
+				{ key: c.key }
+			),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await api.delete('/api/v1/custom-fields/{id}', { path: { id: c.id } });
-			toast.success(`Custom Field „${c.label}“ gelöscht`);
+			toast.success(t('Custom Field „{label}“ gelöscht', { label: c.label }));
 			list.reload();
 			cfCatalog.refresh().catch(() => {});
 		} catch (e) {
@@ -141,23 +150,25 @@
 
 	const columns: Column<CustomField>[] = [
 		{ key: 'sortOrder', label: '#', width: '3.5rem', align: 'right' },
-		{ key: 'label', label: 'Feld' },
-		{ key: 'type', label: 'Typ', width: '7rem' },
-		{ key: 'description', label: 'Beschreibung', hideBelow: 'md' },
+		{ key: 'label', label: t('Feld') },
+		{ key: 'type', label: t('Typ'), width: '7rem' },
+		{ key: 'description', label: t('Beschreibung'), hideBelow: 'md' },
 		{ key: 'actions', label: '', align: 'right', width: '3rem' }
 	];
 	const shownColumns = $derived(canManage ? columns : columns.filter((c) => c.key !== 'actions'));
 </script>
 
 <Card
-	title="Custom Fields"
-	description="Eigene Attribute für alle Geräte – filterbar als cf.schlüssel, z. B. cf.standort:keller"
+	title={t('Custom Fields')}
+	description={t('Eigene Attribute für alle Geräte – filterbar als cf.schlüssel, z. B. cf.standort:keller')}
 	icon="tag"
 	padding="none"
 >
 	{#snippet actions()}
 		{#if canManage}
-			<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}>Feld anlegen</Button>
+			<Button size="sm" variant="primary" icon="plus" onclick={() => openForm(null)}
+				>{t('Feld anlegen')}</Button
+			>
 		{/if}
 	{/snippet}
 	{#if list.error && !list.data}
@@ -169,7 +180,7 @@
 			key={(c) => c.id}
 			loading={list.loading && !list.data}
 			class="rounded-none border-0"
-			caption="Custom Fields"
+			caption={t('Custom Fields')}
 		>
 			{#snippet cell(c, col)}
 				{#if col.key === 'sortOrder'}
@@ -185,11 +196,11 @@
 					>
 				{:else if col.key === 'actions'}
 					<Menu
-						label="Aktionen für {c.label}"
+						label={t('Aktionen für {name}', { name: c.label })}
 						items={[
-							{ label: 'Bearbeiten', icon: 'edit', onclick: () => openForm(c) },
+							{ label: t('Bearbeiten'), icon: 'edit', onclick: () => openForm(c) },
 							{ separator: true },
-							{ label: 'Löschen', icon: 'trash', danger: true, onclick: () => remove(c) }
+							{ label: t('Löschen'), icon: 'trash', danger: true, onclick: () => remove(c) }
 						]}
 					/>
 				{/if}
@@ -198,8 +209,8 @@
 				<EmptyState
 					compact
 					icon="tag"
-					title="Keine Custom Fields"
-					description="Z. B. Standort, Inventarnummer, Garantie bis (Datum) oder Handbuch (URL)."
+					title={t('Keine Custom Fields')}
+					description={t('Z. B. Standort, Inventarnummer, Garantie bis (Datum) oder Handbuch (URL).')}
 				/>
 			{/snippet}
 		</Table>
@@ -208,34 +219,34 @@
 
 <Modal
 	bind:open
-	title={editing ? `Feld „${editing.label}“ bearbeiten` : 'Custom Field anlegen'}
+	title={editing ? t('Feld „{label}“ bearbeiten', { label: editing.label }) : t('Custom Field anlegen')}
 	size="md"
 	as="form"
 	onsubmit={save}
 	busy={saving}
 >
 	<div class="flex flex-col gap-4">
-		{#if general}<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>{/if}
+		{#if general}<Alert tone="danger" title={t('Speichern fehlgeschlagen')}>{general}</Alert>{/if}
 		<Input
-			label="Bezeichnung"
+			label={t('Bezeichnung')}
 			bind:value={form.label}
 			required
 			maxlength={80}
-			placeholder="z. B. Inventarnummer"
+			placeholder={t('z. B. Inventarnummer')}
 			error={errors.label}
 			oninput={onLabel}
 		/>
 		<Input
-			label="Schlüssel"
+			label={t('Schlüssel')}
 			bind:value={form.key}
 			mono
 			required={!editing}
 			disabled={!!editing}
 			maxlength={40}
-			placeholder="inventarnummer"
+			placeholder={t('inventarnummer')}
 			hint={editing
-				? 'Der Schlüssel kann nach dem Anlegen nicht mehr geändert werden.'
-				: `Im Filter als cf.${form.key || 'schlüssel'}`}
+				? t('Der Schlüssel kann nach dem Anlegen nicht mehr geändert werden.')
+				: t('Im Filter als cf.{key}', { key: form.key || t('schlüssel') })}
 			error={errors.key}
 			oninput={() => {
 				keyTouched = true;
@@ -244,36 +255,36 @@
 		/>
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Select
-				label="Typ"
+				label={t('Typ')}
 				bind:value={form.type}
-				options={TYPES.map((t) => ({ value: t, label: customFieldTypeLabel[t] ?? t }))}
+				options={TYPES.map((ty) => ({ value: ty, label: customFieldTypeLabel[ty] ?? ty }))}
 				error={errors.type}
 			/>
 			<Input
-				label="Reihenfolge"
+				label={t('Reihenfolge')}
 				type="number"
 				step={1}
 				bind:value={form.sortOrder}
-				hint="Kleinere Werte zuerst"
+				hint={t('Kleinere Werte zuerst')}
 				error={errors.sortOrder}
 			/>
 		</div>
 		{#if editing && form.type !== editing.type}
 			<Alert tone="warn"
-				>Vorhandene Werte werden nicht umgewandelt und passen eventuell nicht zum neuen Typ.</Alert
+				>{t('Vorhandene Werte werden nicht umgewandelt und passen eventuell nicht zum neuen Typ.')}</Alert
 			>
 		{/if}
 		<Input
-			label="Beschreibung"
+			label={t('Beschreibung')}
 			bind:value={form.description}
 			maxlength={300}
-			placeholder="optional, erscheint als Hinweis am Feld"
+			placeholder={t('optional, erscheint als Hinweis am Feld')}
 		/>
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={saving}>Abbrechen</Button>
+		<Button onclick={() => (open = false)} disabled={saving}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="primary" icon="save" loading={saving}
-			>{editing ? 'Speichern' : 'Anlegen'}</Button
+			>{editing ? t('Speichern') : t('Anlegen')}</Button
 		>
 	{/snippet}
 </Modal>

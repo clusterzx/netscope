@@ -53,12 +53,12 @@ func (s *Server) registerPlugins() {
 
 func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {
 	list, err := s.Host.Views(r.Context())
-	s.respond(w, r, list, err)
+	s.respond(w, r, localizePluginViews(list, requestLocale(r)), err)
 }
 
 func (s *Server) handlePlugin(w http.ResponseWriter, r *http.Request) {
 	v, err := s.Host.View(r.Context(), r.PathValue("id"))
-	s.respond(w, r, v, err)
+	s.respond(w, r, localizePluginView(v, requestLocale(r)), err)
 }
 
 func (s *Server) handlePluginConfig(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +76,7 @@ func (s *Server) handlePluginConfig(w http.ResponseWriter, r *http.Request) {
 	p, _ := s.Host.Plugin(id)
 	s.record(r, "plugin.config", "plugin", id, "Konfiguration geändert: "+p.Info().Name, before, after)
 	v, err := s.Host.View(r.Context(), id)
-	s.respond(w, r, v, err)
+	s.respond(w, r, localizePluginView(v, requestLocale(r)), err)
 }
 
 func (s *Server) handleRunPlugin(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +122,7 @@ func (s *Server) handlePluginAction(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	out = localizeActionResult(out, requestLocale(r))
 	s.record(r, "plugin.action", "plugin", id, "Aktion "+action, nil, req.Params)
 	writeJSON(w, http.StatusOK, out)
 }
@@ -129,7 +130,7 @@ func (s *Server) handlePluginAction(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTestPublisher(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := s.Host.TestPublisher(r.Context(), id, actorName(r)); err != nil {
-		writeError(w, http.StatusBadGateway, "publish_failed", "Versand fehlgeschlagen: "+err.Error(), nil)
+		writeError(w, r, http.StatusBadGateway, "publish_failed", "Versand fehlgeschlagen: "+err.Error(), nil)
 		return
 	}
 	s.record(r, "plugin.test", "plugin", id, "Testnachricht gesendet", nil, nil)
@@ -148,12 +149,12 @@ func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, runList{Total: total, Items: list})
+	writeJSON(w, http.StatusOK, runList{Total: total, Items: localizeRuns(list, requestLocale(r))})
 }
 
 func (s *Server) handleActiveRuns(w http.ResponseWriter, r *http.Request) {
 	list, err := s.Host.ActiveRuns(r.Context())
-	s.respond(w, r, list, err)
+	s.respond(w, r, localizeRuns(list, requestLocale(r)), err)
 }
 
 func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +164,7 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, err := s.Host.Run(r.Context(), id)
-	s.respond(w, r, v, err)
+	s.respond(w, r, localizeRun(v, requestLocale(r)), err)
 }
 
 func (s *Server) handleRunLogs(w http.ResponseWriter, r *http.Request) {
@@ -173,7 +174,7 @@ func (s *Server) handleRunLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logs, err := s.Host.RunLogs(r.Context(), id, qInt64(r, "after"), qInt(r, "limit", 1000))
-	s.respond(w, r, logs, err)
+	s.respond(w, r, localizeRunLogs(logs, requestLocale(r)), err)
 }
 
 func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {

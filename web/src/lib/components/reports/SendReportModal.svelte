@@ -7,6 +7,7 @@
 	import { api, errorMessage } from '$lib/api';
 	import type { PublisherInfo } from '$lib/api';
 	import { Alert, Button, Checkbox, Modal, Skeleton } from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 
@@ -47,7 +48,7 @@
 
 	async function send() {
 		if (!selected.length) {
-			err = 'Mindestens einen Publisher wählen.';
+			err = t('Mindestens einen Publisher wählen.');
 			return;
 		}
 		sending = true;
@@ -55,10 +56,13 @@
 		try {
 			await api.post('/api/v1/reports/send', { body: { publishers: selected, from, to: to || undefined } });
 			toast.success(
-				`Änderungsbericht (${rangeText}) wird über ${selected.length === 1 ? 'einen Publisher' : `${selected.length} Publisher`} versendet.`,
-				{
-					title: 'Versand eingeplant'
-				}
+				tn(
+					selected.length,
+					'Änderungsbericht ({range}) wird über einen Publisher versendet.',
+					'Änderungsbericht ({range}) wird über {n} Publisher versendet.',
+					{ range: rangeText }
+				),
+				{ title: t('Versand eingeplant') }
 			);
 			open = false;
 		} catch (e) {
@@ -71,7 +75,7 @@
 
 <Modal
 	bind:open
-	title="Änderungsbericht versenden"
+	title={t('Änderungsbericht versenden')}
 	description={rangeText}
 	size="md"
 	as="form"
@@ -79,24 +83,25 @@
 	busy={sending}
 >
 	<div class="flex flex-col gap-3 text-sm">
-		{#if err}<Alert tone="danger" title="Versand nicht möglich">{err}</Alert>{/if}
+		{#if err}<Alert tone="danger" title={t('Versand nicht möglich')}>{err}</Alert>{/if}
 		{#if publishers.error}
-			<Alert tone="danger" title="Publisher konnten nicht geladen werden"
+			<Alert tone="danger" title={t('Publisher konnten nicht geladen werden')}
 				>{errorMessage(publishers.error)}</Alert
 			>
 		{:else if !publishers.data}
 			<Skeleton lines={3} />
 		{:else if enabled.length === 0}
-			<Alert tone="warn" title="Kein Publisher aktiv">
-				Um Berichte zu versenden, zuerst einen Publisher (z. B. Telegram, E-Mail oder ntfy) unter Plugins
-				konfigurieren und aktivieren.
+			<Alert tone="warn" title={t('Kein Publisher aktiv')}>
+				{t(
+					'Um Berichte zu versenden, zuerst einen Publisher (z. B. Telegram, E-Mail oder ntfy) unter Plugins konfigurieren und aktivieren.'
+				)}
 				{#snippet actions()}
 					<Button size="xs" href="/plugins" iconRight="arrow-right">Plugins</Button>
 				{/snippet}
 			</Alert>
 		{:else}
 			<p class="text-fg-muted">
-				Der Bericht wird als Markdown-Nachricht an die gewählten Publisher übergeben.
+				{t('Der Bericht wird als Markdown-Nachricht an die gewählten Publisher übergeben.')}
 			</p>
 		{/if}
 		{#if list.length}
@@ -108,7 +113,7 @@
 						disabled={!p.enabled}
 						class={p.enabled ? '' : 'cursor-not-allowed opacity-60'}
 						label={p.name}
-						description={p.enabled ? undefined : 'inaktiv – unter Plugins aktivieren'}
+						description={p.enabled ? undefined : t('inaktiv – unter Plugins aktivieren')}
 						onchange={(e) => toggle(p.id, (e.currentTarget as HTMLInputElement).checked)}
 					/>
 				{/each}
@@ -116,9 +121,9 @@
 		{/if}
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={sending}>Abbrechen</Button>
+		<Button onclick={() => (open = false)} disabled={sending}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="primary" icon="send" loading={sending} disabled={!enabled.length}
-			>Jetzt versenden</Button
+			>{t('Jetzt versenden')}</Button
 		>
 	{/snippet}
 </Modal>

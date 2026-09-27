@@ -5,18 +5,19 @@
 	import Popover from '$lib/components/ui/Popover.svelte';
 	import StatusDot from '$lib/components/ui/StatusDot.svelte';
 	import { federation, siteFilter } from '$lib/stores/federation.svelte';
+	import { t, tn } from '$lib/i18n';
 
 	type Option = { value: string; label: string; status?: string; hint?: string };
 
 	const disconnected = $derived(federation.sites.filter((s) => !s.connected && s.contacted).length);
 	const options = $derived<Option[]>([
-		{ value: '', label: 'Alle Standorte' },
-		{ value: 'local', label: federation.localName, hint: 'diese Instanz' },
+		{ value: '', label: t('Alle Standorte') },
+		{ value: 'local', label: federation.localName, hint: t('diese Instanz') },
 		...federation.sites.map((s) => ({
 			value: s.slug,
 			label: s.name,
 			status: s.connected ? 'online' : s.contacted ? 'warn' : 'idle',
-			hint: s.connected ? '' : s.contacted ? 'getrennt' : 'noch keine Meldung'
+			hint: s.connected ? '' : s.contacted ? t('getrennt') : t('noch keine Meldung')
 		}))
 	]);
 	const current = $derived(options.find((o) => o.value === siteFilter.value) ?? options[0]);
@@ -70,10 +71,10 @@
 		type="button"
 		aria-haspopup="listbox"
 		aria-expanded={open}
-		aria-label="Standort: {current.label}"
+		aria-label={t('Standort: {name}', { name: current.label })}
 		title={disconnected
-			? `${disconnected} Standort(e) melden sich zurzeit nicht`
-			: 'Ansicht auf einen Standort einschränken'}
+			? tn(disconnected, '{n} Standort meldet sich zurzeit nicht', '{n} Standorte melden sich zurzeit nicht')
+			: t('Ansicht auf einen Standort einschränken')}
 		onclick={() => (open = !open)}
 		class="inline-flex h-8 max-w-[10rem] items-center gap-1.5 rounded-md border border-border bg-surface-2 pr-1.5 pl-2 text-xs font-medium
 			text-fg hover:border-border-strong focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none sm:max-w-[14rem]
@@ -89,7 +90,7 @@
 		anchor={button}
 		placement="bottom-end"
 		role="listbox"
-		label="Standort"
+		label={t('Standort')}
 		class="min-w-56 py-1"
 	>
 		<!-- svelte-ignore a11y_no_static_element_interactions -->

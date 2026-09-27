@@ -6,7 +6,8 @@
 <script lang="ts">
 	import { api, errorMessage, fieldErrors } from '$lib/api';
 	import type { ActionOutcome, PluginAction, PluginView, RunView } from '$lib/api';
-	import { SchemaForm, schemaInitial, schemaPayload, validateSchema } from '$lib/components/schema';
+	import { t } from '$lib/i18n';
+	import { SchemaForm, schemaInitial, schemaPayload, validateSchema } from '$lib/components/schema'; // i18n-ignore (import path)
 	import { Alert, Button, Card, EmptyState, JsonView, ProgressBar } from '$lib/components/ui';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { runs } from '$lib/stores/runs.svelte';
@@ -70,7 +71,7 @@
 		const fields = a.params ?? [];
 		s.errors = validateSchema(fields, s.values);
 		if (Object.keys(s.errors).length) return;
-		if (a.confirm && !(await confirm({ title: a.label, message: a.confirm, confirmLabel: 'Ausführen' })))
+		if (a.confirm && !(await confirm({ title: a.label, message: a.confirm, confirmLabel: t('Ausführen') })))
 			return;
 		s.busy = true;
 		s.error = '';
@@ -148,7 +149,11 @@
 		testResult = null;
 		try {
 			await api.post('/api/v1/plugins/{id}/test', { path: { id } });
-			testResult = { ok: true, message: 'Die Testnachricht wurde zugestellt.', at: new Date().toISOString() };
+			testResult = {
+				ok: true,
+				message: t('Die Testnachricht wurde zugestellt.'),
+				at: new Date().toISOString()
+			};
 		} catch (e) {
 			testResult = { ok: false, message: errorMessage(e), at: new Date().toISOString() };
 		} finally {
@@ -157,29 +162,36 @@
 	}
 
 	const runHref = (runId: number) => `/plugins/${encodeURIComponent(id)}/runs/${runId}`;
+
+	// sentence with a link inside: split at the placeholder
+	const deviceActionsText = t(
+		'Geräteaktionen werden in der Gerätedetailansicht oder als Massenaktion in der {link} ausgeführt.'
+	).split('{link}');
 </script>
 
 <div class="flex flex-col gap-4">
 	{#if isPublisher(plugin)}
 		<Card
-			title="Testnachricht"
+			title={t('Testnachricht')}
 			icon="send"
-			description="Prüft die Zustellung mit den gespeicherten Einstellungen."
+			description={t('Prüft die Zustellung mit den gespeicherten Einstellungen.')}
 		>
 			<div class="flex flex-col gap-3">
 				<p class="text-sm text-fg-muted">
-					Sendet eine kurze Testnachricht über {plugin.info.name} – auch wenn der Publisher noch nicht aktiv ist.
-					Ungespeicherte Änderungen im Tab „Einstellungen“ werden dabei nicht berücksichtigt.
+					{t(
+						'Sendet eine kurze Testnachricht über {name} – auch wenn der Publisher noch nicht aktiv ist. Ungespeicherte Änderungen im Tab „Einstellungen“ werden dabei nicht berücksichtigt.',
+						{ name: plugin.info.name }
+					)}
 				</p>
 				<div>
 					<Button variant="primary" icon="send" loading={testBusy} onclick={sendTest}
-						>Testnachricht senden</Button
+						>{t('Testnachricht senden')}</Button
 					>
 				</div>
 				{#if testResult}
 					<Alert
 						tone={testResult.ok ? 'ok' : 'danger'}
-						title={testResult.ok ? 'Gesendet' : 'Versand fehlgeschlagen'}
+						title={testResult.ok ? t('Gesendet') : t('Versand fehlgeschlagen')}
 					>
 						<span class="break-words">{testResult.message}</span>
 						<span class="mt-1 block text-xs text-fg-subtle">{formatDateTime(testResult.at, true)}</span>
@@ -190,8 +202,8 @@
 	{/if}
 
 	{#if pluginActions.length && !enabled}
-		<Alert tone="warn" title="Plugin ist inaktiv">
-			Aktionen können nur bei aktivem Plugin ausgeführt werden.
+		<Alert tone="warn" title={t('Plugin ist inaktiv')}>
+			{t('Aktionen können nur bei aktivem Plugin ausgeführt werden.')}
 		</Alert>
 	{/if}
 
@@ -218,7 +230,7 @@
 					{/if}
 					{#if a.confirm}
 						<p class="flex items-start gap-1.5 text-xs text-fg-subtle">
-							Vor dem Ausführen wird nachgefragt: „{a.confirm}“
+							{t('Vor dem Ausführen wird nachgefragt: „{question}“', { question: a.confirm })}
 						</p>
 					{/if}
 					<div class="flex flex-wrap items-center gap-2">
@@ -227,12 +239,12 @@
 							variant="primary"
 							icon="play"
 							loading={s.busy || (!!s.outcome && !s.outcome.finished)}
-							disabled={!enabled}>Ausführen</Button
+							disabled={!enabled}>{t('Ausführen')}</Button
 						>
 					</div>
 
 					{#if s.error}
-						<Alert tone="danger" title="Aktion fehlgeschlagen"
+						<Alert tone="danger" title={t('Aktion fehlgeschlagen')}
 							><span class="break-words">{s.error}</span></Alert
 						>
 					{/if}
@@ -247,7 +259,7 @@
 							<div class="flex flex-wrap items-center gap-2 text-sm">
 								<RunStatusBadge status={lr?.status ?? o.status} />
 								{#if o.runId}
-									<a class="link mono" href={runHref(o.runId)}>Lauf #{o.runId}</a>
+									<a class="link mono" href={runHref(o.runId)}>{t('Lauf #{id}', { id: o.runId })}</a>
 								{/if}
 								{#if s.at}<span class="text-xs text-fg-subtle">{formatDateTime(s.at, true)}</span>{/if}
 							</div>
@@ -255,11 +267,12 @@
 								{#if lr && isActive(lr.status)}
 									<RunProgress run={lr} />
 								{:else}
-									<ProgressBar label="Aktion wird ausgeführt" />
+									<ProgressBar label={t('Aktion wird ausgeführt')} />
 								{/if}
 								<p class="text-xs text-fg-subtle">
-									Das Ergebnis erscheint hier, sobald die Aktion fertig ist – die Seite kann auch verlassen
-									werden; der Lauf ist dann in der Laufhistorie zu finden.
+									{t(
+										'Das Ergebnis erscheint hier, sobald die Aktion fertig ist – die Seite kann auch verlassen werden; der Lauf ist dann in der Laufhistorie zu finden.'
+									)}
 								</p>
 							{/if}
 							{#if o.error}
@@ -272,7 +285,7 @@
 								<JsonView value={o.result.data} openDepth={1} maxHeight="20rem" />
 							{/if}
 							{#if o.finished && !o.error && !o.result?.message && (o.result?.data === undefined || o.result?.data === null)}
-								<p class="text-sm text-fg-muted">Die Aktion wurde ohne Rückmeldung abgeschlossen.</p>
+								<p class="text-sm text-fg-muted">{t('Die Aktion wurde ohne Rückmeldung abgeschlossen.')}</p>
 							{/if}
 						</div>
 					{/if}
@@ -282,7 +295,7 @@
 	{/each}
 
 	{#if deviceActions.length}
-		<Card title="Geräteaktionen" icon="devices">
+		<Card title={t('Geräteaktionen')} icon="devices">
 			<ul class="flex flex-col gap-2">
 				{#each deviceActions as a (a.name)}
 					<li class="text-sm">
@@ -292,13 +305,16 @@
 				{/each}
 			</ul>
 			<p class="mt-3 text-xs text-fg-subtle">
-				Geräteaktionen werden in der Gerätedetailansicht oder als Massenaktion in der
-				<a href="/devices" class="link">Geräteliste</a> ausgeführt.
+				{deviceActionsText[0]}<a href="/devices" class="link">{t('Geräteliste')}</a>{deviceActionsText[1]}
 			</p>
 		</Card>
 	{/if}
 
 	{#if !pluginActions.length && !deviceActions.length && !isPublisher(plugin)}
-		<EmptyState icon="zap" title="Keine Aktionen" description="Dieses Plugin bietet keine Aktionen an." />
+		<EmptyState
+			icon="zap"
+			title={t('Keine Aktionen')}
+			description={t('Dieses Plugin bietet keine Aktionen an.')}
+		/>
 	{/if}
 </div>

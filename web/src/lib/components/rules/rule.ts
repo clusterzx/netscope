@@ -2,13 +2,14 @@
 // (mirrors rules.Rule.Validate in the backend).
 import type { EventSpec, PublisherInfo, Rule, RuleAction, RuleConditions } from '$lib/api';
 import { isCidr } from '$lib/components/schema';
+import { intlLocale, t, tn } from '$lib/i18n';
 import { severityLabel, stateLabel, type Tone } from '$lib/utils/labels';
 
 export const priorityLabel: Record<string, string> = {
-	low: 'Niedrig',
+	low: t('Niedrig'),
 	normal: 'Normal',
-	high: 'Hoch',
-	urgent: 'Dringend'
+	high: t('Hoch'),
+	urgent: t('Dringend')
 };
 export const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 
@@ -25,36 +26,42 @@ export function priorityTone(p: string | undefined): Tone {
 	}
 }
 
-export const modeLabel: Record<string, string> = { immediate: 'sofort', batch: 'gesammelt' };
+export const modeLabel: Record<string, string> = { immediate: t('sofort'), batch: t('gesammelt') };
 
 export const opLabel: Record<string, string> = {
-	'=': 'gleich',
-	'!=': 'ungleich',
-	'>': 'größer als',
-	'>=': 'größer/gleich',
-	'<': 'kleiner als',
-	'<=': 'kleiner/gleich',
-	contains: 'enthält'
+	'=': t('gleich'),
+	'!=': t('ungleich'),
+	'>': t('größer als'),
+	'>=': t('größer/gleich'),
+	'<': t('kleiner als'),
+	'<=': t('kleiner/gleich'),
+	contains: t('enthält')
 };
 export const OPS = ['=', '!=', '>', '>=', '<', '<=', 'contains'] as const;
 
-/** Week days in German order (Mo–So) with the backend numbers (0 = Sunday). */
-export const WEEKDAYS: { value: number; short: string; long: string }[] = [
-	{ value: 1, short: 'Mo', long: 'Montag' },
-	{ value: 2, short: 'Di', long: 'Dienstag' },
-	{ value: 3, short: 'Mi', long: 'Mittwoch' },
-	{ value: 4, short: 'Do', long: 'Donnerstag' },
-	{ value: 5, short: 'Fr', long: 'Freitag' },
-	{ value: 6, short: 'Sa', long: 'Samstag' },
-	{ value: 0, short: 'So', long: 'Sonntag' }
-];
+/** Name of a backend week day (0 = Sunday) in the UI language, without the period of "Mo.". */
+function weekdayName(day: number, style: 'short' | 'long'): string {
+	// 7 January 2024 was a Sunday
+	return new Intl.DateTimeFormat(intlLocale, { weekday: style })
+		.format(new Date(2024, 0, 7 + day))
+		.replace(/\.$/, '');
+}
+
+/** Week days Monday to Sunday with the backend numbers (0 = Sunday). */
+export const WEEKDAYS: { value: number; short: string; long: string }[] = [1, 2, 3, 4, 5, 6, 0].map(
+	(value) => ({
+		value,
+		short: weekdayName(value, 'short'),
+		long: weekdayName(value, 'long')
+	})
+);
 
 export const notificationStatusLabel: Record<string, string> = {
-	pending: 'Geplant',
-	sending: 'Wird gesendet',
-	sent: 'Gesendet',
-	failed: 'Fehlgeschlagen',
-	skipped: 'Übersprungen'
+	pending: t('Geplant'),
+	sending: t('Wird gesendet'),
+	sent: t('Gesendet'),
+	failed: t('Fehlgeschlagen'),
+	skipped: t('Übersprungen')
 };
 
 export function notificationStatusTone(s: string | undefined): Tone {
@@ -75,18 +82,18 @@ export function notificationStatusTone(s: string | undefined): Tone {
 
 export const notificationKindLabel: Record<string, string> = {
 	event: 'Event',
-	escalation: 'Eskalation',
+	escalation: t('Eskalation'),
 	test: 'Test',
-	report: 'Bericht'
+	report: t('Bericht')
 };
 
 // ---------------------------------------------------------------- event type catalog
 
 /** Label of an event type or pattern ("port.*", "*"). */
-export function eventTypeName(t: string, catalog: EventSpec[]): string {
-	if (t === '*') return 'Alle Events';
-	if (t.endsWith('.*')) return `Alle ${t.slice(0, -2)}-Events`;
-	return catalog.find((e) => e.type === t)?.label ?? t;
+export function eventTypeName(type: string, catalog: EventSpec[]): string {
+	if (type === '*') return t('Alle Events');
+	if (type.endsWith('.*')) return t('Alle {prefix}-Events', { prefix: type.slice(0, -2) });
+	return catalog.find((e) => e.type === type)?.label ?? type;
 }
 
 /** Event types matched by a pattern list (for payload field suggestions). */
@@ -113,7 +120,7 @@ export function publisherName(id: string, publishers: PublisherInfo[]): string {
 	return publishers.find((p) => p.id === id)?.name ?? id;
 }
 
-/** Short German description of the conditions ("Wenn …"). */
+/** Short description of the conditions ("Wenn …") in the UI language. */
 export function conditionSummary(
 	c: RuleConditions,
 	catalog: EventSpec[],
@@ -122,47 +129,59 @@ export function conditionSummary(
 ): string[] {
 	const parts: string[] = [];
 	const types = c.eventTypes ?? [];
-	parts.push(types.length ? types.map((t) => eventTypeName(t, catalog)).join(' oder ') : 'jedes Event');
-	if (c.minSeverity) parts.push(`ab Schweregrad ${severityLabel[c.minSeverity] ?? c.minSeverity}`);
-	if (c.sites?.length)
-		parts.push(
-			(c.sites.length === 1 ? 'Standort ' : 'Standorte ') +
-				c.sites.map((s) => siteName?.(s) ?? (s === 0 ? 'diese Instanz' : `#${s}`)).join(', ')
-		);
-	if (c.onlyUnknown) parts.push('nur nicht bekannte Geräte');
+	parts.push(
+		types.length
+			? new Intl.ListFormat(intlLocale, { type: 'disjunction' }).format(
+					types.map((x) => eventTypeName(x, catalog))
+				)
+			: t('jedes Event')
+	);
+	if (c.minSeverity)
+		parts.push(t('ab Schweregrad {severity}', { severity: severityLabel[c.minSeverity] ?? c.minSeverity }));
+	if (c.sites?.length) {
+		const list = c.sites.map((s) => siteName?.(s) ?? (s === 0 ? t('diese Instanz') : `#${s}`)).join(', ');
+		parts.push(tn(c.sites.length, 'Standort {list}', 'Standorte {list}', { list }));
+	}
+	if (c.onlyUnknown) parts.push(t('nur nicht bekannte Geräte'));
 	if (c.deviceStates?.length)
-		parts.push('Gerätezustand ' + c.deviceStates.map((s) => stateLabel[s] ?? s).join('/'));
-	if (c.tags?.length) parts.push((c.tags.length === 1 ? 'Tag ' : 'Tags ') + c.tags.join(', '));
-	if (c.groups?.length)
 		parts.push(
-			(c.groups.length === 1 ? 'Gruppe ' : 'Gruppen ') +
-				c.groups.map((g) => groupName?.(g) ?? `#${g}`).join(', ')
+			t('Gerätezustand {states}', { states: c.deviceStates.map((s) => stateLabel[s] ?? s).join('/') })
 		);
-	if (c.subnets?.length) parts.push('Subnetz ' + c.subnets.join(', '));
-	if (c.deviceQuery) parts.push(`Filter „${c.deviceQuery}“`);
-	const sym: Record<string, string> = { '>=': '≥', '<=': '≤', '!=': '≠', contains: 'enthält' };
+	if (c.tags?.length) parts.push((c.tags.length === 1 ? 'Tag ' : 'Tags ') + c.tags.join(', '));
+	if (c.groups?.length) {
+		const list = c.groups.map((g) => groupName?.(g) ?? `#${g}`).join(', ');
+		parts.push(tn(c.groups.length, 'Gruppe {list}', 'Gruppen {list}', { list }));
+	}
+	if (c.subnets?.length) parts.push(t('Subnetz {list}', { list: c.subnets.join(', ') }));
+	if (c.deviceQuery) parts.push(t('Filter „{query}“', { query: c.deviceQuery }));
+	const sym: Record<string, string> = { '>=': '≥', '<=': '≤', '!=': '≠', contains: t('enthält') };
 	for (const p of c.payload ?? []) parts.push(`${p.field} ${sym[p.op] ?? p.op} ${p.value}`);
 	if (c.timeWindow) {
-		const days = (c.timeWindow.days ?? []).length
-			? WEEKDAYS.filter((d) => c.timeWindow?.days?.includes(d.value))
-					.map((d) => d.short)
-					.join(', ') + ' '
-			: '';
-		parts.push(`${days}${c.timeWindow.from}–${c.timeWindow.to} Uhr`);
+		const { from, to } = c.timeWindow;
+		const days = WEEKDAYS.filter((d) => c.timeWindow?.days?.includes(d.value))
+			.map((d) => d.short)
+			.join(', ');
+		parts.push(days ? t('{days} {from}–{to} Uhr', { days, from, to }) : t('{from}–{to} Uhr', { from, to }));
 	}
 	return parts;
 }
 
-/** Short German description of one action ("Telegram · Hoch · sofort"). */
+/** Short description of one action ("Telegram · Hoch · sofort") in the UI language. */
 export function actionSummary(a: RuleAction, publishers: PublisherInfo[]): string {
 	const parts = [publisherName(a.publisher, publishers), priorityLabel[a.priority] ?? a.priority];
-	parts.push(a.mode === 'batch' ? `gesammelt ${a.batchMinutes ?? 0} min` : 'sofort');
-	if (a.throttle) parts.push(`höchstens alle ${durationText(a.throttle)}`);
-	if (a.quietHours) parts.push(`Ruhezeit ${a.quietHours.from}–${a.quietHours.to}`);
+	parts.push(
+		a.mode === 'batch' ? t('gesammelt {minutes} min', { minutes: a.batchMinutes ?? 0 }) : t('sofort')
+	);
+	if (a.throttle) parts.push(t('höchstens alle {duration}', { duration: durationText(a.throttle) }));
+	if (a.quietHours) parts.push(t('Ruhezeit {from}–{to}', { from: a.quietHours.from, to: a.quietHours.to }));
 	if (a.escalateAfterMinutes)
 		parts.push(
-			`Eskalation nach ${a.escalateAfterMinutes} min` +
-				(a.escalatePublisher ? ` an ${publisherName(a.escalatePublisher, publishers)}` : '')
+			a.escalatePublisher
+				? t('Eskalation nach {minutes} min an {publisher}', {
+						minutes: a.escalateAfterMinutes,
+						publisher: publisherName(a.escalatePublisher, publishers)
+					})
+				: t('Eskalation nach {minutes} min', { minutes: a.escalateAfterMinutes })
 		);
 	return parts.join(' · ');
 }
@@ -286,45 +305,47 @@ export type RuleErrors = Record<string, string>;
  */
 export function validateRule(r: Rule): RuleErrors {
 	const e: RuleErrors = {};
-	if (!r.name.trim()) e.name = 'Name erforderlich';
+	if (!r.name.trim()) e.name = t('Name erforderlich');
 	(r.conditions.subnets ?? []).forEach((s, i) => {
-		if (!isCidr(s)) e[`conditions.subnets.${i}`] = `„${s}“ ist kein gültiges Subnetz (CIDR)`;
+		if (!isCidr(s))
+			e[`conditions.subnets.${i}`] = t('„{value}“ ist kein gültiges Subnetz (CIDR)', { value: s });
 	});
 	(r.conditions.payload ?? []).forEach((p, i) => {
-		if (!p.field.trim()) e[`conditions.payload.${i}.field`] = 'Feld fehlt';
+		if (!p.field.trim()) e[`conditions.payload.${i}.field`] = t('Feld fehlt');
 	});
 	const tw = r.conditions.timeWindow;
-	if (tw && !hm.test(tw.from)) e['conditions.timeWindow.from'] = 'HH:MM erwartet';
-	if (tw && !hm.test(tw.to)) e['conditions.timeWindow.to'] = 'HH:MM erwartet';
-	if (!r.actions.length) e.actions = 'Mindestens eine Aktion erforderlich';
+	if (tw && !hm.test(tw.from)) e['conditions.timeWindow.from'] = t('HH:MM erwartet');
+	if (tw && !hm.test(tw.to)) e['conditions.timeWindow.to'] = t('HH:MM erwartet');
+	if (!r.actions.length) e.actions = t('Mindestens eine Aktion erforderlich');
 	r.actions.forEach((a, i) => {
 		const k = (f: string) => `actions.${i}.${f}`;
-		if (!a.publisher) e[k('publisher')] = 'Publisher wählen';
+		if (!a.publisher) e[k('publisher')] = t('Publisher wählen');
 		if (a.mode === 'batch') {
 			const n = Number(a.batchMinutes);
-			if (!Number.isInteger(n) || n < 1 || n > 1440) e[k('batchMinutes')] = '1–1440 Minuten';
+			if (!Number.isInteger(n) || n < 1 || n > 1440) e[k('batchMinutes')] = t('1–1440 Minuten');
 		}
 		if (a.throttle?.trim()) {
-			const t = a.throttle.trim();
-			if (!goDuration.test(t) || durationMs(t) < 60000) e[k('throttle')] = 'Dauer ≥ 1 Minute, z. B. 30m, 24h';
+			const d = a.throttle.trim();
+			if (!goDuration.test(d) || durationMs(d) < 60000)
+				e[k('throttle')] = t('Dauer ≥ 1 Minute, z. B. 30m, 24h');
 		}
-		if (a.quietHours && !hm.test(a.quietHours.from)) e[k('quietHours.from')] = 'HH:MM erwartet';
-		if (a.quietHours && !hm.test(a.quietHours.to)) e[k('quietHours.to')] = 'HH:MM erwartet';
+		if (a.quietHours && !hm.test(a.quietHours.from)) e[k('quietHours.from')] = t('HH:MM erwartet');
+		if (a.quietHours && !hm.test(a.quietHours.to)) e[k('quietHours.to')] = t('HH:MM erwartet');
 		if (a.escalateAfterMinutes !== undefined) {
 			const n = Number(a.escalateAfterMinutes);
 			if (a.escalateAfterMinutes === null || !Number.isInteger(n) || n < 1 || n > 10080)
-				e[k('escalateAfterMinutes')] = '1–10080 Minuten';
+				e[k('escalateAfterMinutes')] = t('1–10080 Minuten');
 		}
 	});
 	return e;
 }
 
 /**
- * Server field messages repeat the position ("Aktion 2: …", "Payload-Bedingung 1: …");
- * next to the control that prefix is redundant.
+ * Server field messages repeat the position ("Aktion 2: …", "Payload-Bedingung 1: …",
+ * in English "Action 2: …"); next to the control that prefix is redundant.
  */
 export function fieldMessage(msg: string | undefined): string | undefined {
-	return msg?.replace(/^(Aktion|Payload-Bedingung) \d+:\s*/, '');
+	return msg?.replace(/^(Aktion|Action|Payload-Bedingung|Payload condition) \d+:\s*/i, '');
 }
 
 /** First error whose key starts with the given path prefix (e.g. "conditions.subnets."). */

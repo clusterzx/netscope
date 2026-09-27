@@ -287,7 +287,7 @@ func (p *Plugin) deliver(ctx context.Context, cfg config, cr *credentials, msg [
 		// the connection deadline equals the context deadline and may fire first
 		var ne net.Error
 		if err != nil && (ctx.Err() != nil || (errors.As(err, &ne) && ne.Timeout())) {
-			err = fmt.Errorf("%s: Zeitüberschreitung oder Abbruch nach %s (%w)%s", addr, cfg.timeout, err, portHint(cfg))
+			err = withPortHint(fmt.Errorf("%s: Zeitüberschreitung oder Abbruch nach %s (%w)", addr, cfg.timeout, err), cfg)
 		}
 	}()
 
@@ -301,13 +301,13 @@ func (p *Plugin) deliver(ctx context.Context, cfg config, cr *credentials, msg [
 	if cfg.security == "tls" {
 		tc := tls.Client(raw, tlsCfg)
 		if err := tc.HandshakeContext(ctx); err != nil {
-			return fmt.Errorf("TLS-Handshake mit %s fehlgeschlagen: %w%s", addr, err, portHint(cfg))
+			return withPortHint(fmt.Errorf("TLS-Handshake mit %s fehlgeschlagen: %w", addr, err), cfg)
 		}
 		conn = tc
 	}
 	c, err := smtp.NewClient(conn, cfg.host)
 	if err != nil {
-		return fmt.Errorf("keine gültige SMTP-Begrüßung von %s: %w%s", addr, err, portHint(cfg))
+		return withPortHint(fmt.Errorf("keine gültige SMTP-Begrüßung von %s: %w", addr, err), cfg)
 	}
 	defer c.Close()
 	if err := c.Hello(cfg.helo); err != nil {
@@ -349,14 +349,16 @@ func (p *Plugin) deliver(ctx context.Context, cfg config, cr *credentials, msg [
 	return nil
 }
 
-func portHint(cfg config) string {
+// withPortHint adds a hint on a port that does not fit the encryption. The hint wraps the
+// error (instead of being appended as text) so that the message stays translatable.
+func withPortHint(err error, cfg config) error {
 	switch {
 	case cfg.security == "starttls" && cfg.port == 465:
-		return " – Port 465 erwartet üblicherweise Verschlüsselung „TLS“"
+		return fmt.Errorf("%w – Port 465 erwartet üblicherweise Verschlüsselung „TLS“", err)
 	case cfg.security == "tls" && (cfg.port == 587 || cfg.port == 25):
-		return fmt.Sprintf(" – Port %d erwartet üblicherweise STARTTLS", cfg.port)
+		return fmt.Errorf("%w – Port %d erwartet üblicherweise STARTTLS", err, cfg.port)
 	}
-	return ""
+	return err
 }
 
 func authenticate(c *smtp.Client, host string, cr *credentials) error {

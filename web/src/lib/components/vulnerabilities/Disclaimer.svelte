@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
 	import { Alert } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		text: string | null | undefined;
@@ -17,7 +18,7 @@
 </script>
 
 {#if text}
-	<Alert tone="warn" title="Heuristischer Abgleich – Treffer vor Maßnahmen prüfen" class={klass}>
+	<Alert tone="warn" title={t('Heuristischer Abgleich – Treffer vor Maßnahmen prüfen')} class={klass}>
 		<p id="{uid}-txt" class={compact && !expanded ? 'line-clamp-2' : ''}>{text}</p>
 		{#if compact}
 			<button
@@ -25,7 +26,7 @@
 				class="mt-1 text-xs font-medium text-fg hover:underline"
 				aria-expanded={expanded}
 				aria-controls="{uid}-txt"
-				onclick={() => (expanded = !expanded)}>{expanded ? 'Weniger' : 'Mehr anzeigen'}</button
+				onclick={() => (expanded = !expanded)}>{expanded ? t('Weniger') : t('Mehr anzeigen')}</button
 			>
 		{/if}
 	</Alert>

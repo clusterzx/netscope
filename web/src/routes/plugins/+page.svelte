@@ -4,6 +4,7 @@
 	import { untrack } from 'svelte';
 	import { api, errorMessage } from '$lib/api';
 	import type { PluginView, RunMessageData } from '$lib/api';
+	import { intlLocale, t } from '$lib/i18n';
 	import {
 		Badge,
 		Button,
@@ -55,12 +56,12 @@
 	$effect(() => () => applyText.cancel());
 
 	const statusOptions = [
-		{ value: '', label: 'Alle Plugins' },
-		{ value: 'enabled', label: 'Aktiv' },
-		{ value: 'disabled', label: 'Inaktiv' },
-		{ value: 'running', label: 'Läuft gerade' },
-		{ value: 'failed', label: 'Letzter Lauf fehlgeschlagen' },
-		{ value: 'problems', label: 'Programme fehlen' }
+		{ value: '', label: t('Alle Plugins') },
+		{ value: 'enabled', label: t('Aktiv') },
+		{ value: 'disabled', label: t('Inaktiv') },
+		{ value: 'running', label: t('Läuft gerade') },
+		{ value: 'failed', label: t('Letzter Lauf fehlgeschlagen') },
+		{ value: 'problems', label: t('Programme fehlen') }
 	];
 
 	function activeRunOf(p: PluginView) {
@@ -98,7 +99,7 @@
 			total: all.filter((p) => p.info.kind === kind).length,
 			items: all
 				.filter((p) => p.info.kind === kind && matches(p))
-				.sort((a, b) => a.info.name.localeCompare(b.info.name, 'de'))
+				.sort((a, b) => a.info.name.localeCompare(b.info.name, intlLocale))
 		})).filter((g) => g.total > 0)
 	);
 	const shown = $derived(groups.reduce((n, g) => n + g.items.length, 0));
@@ -126,10 +127,14 @@
 			const list = data.data ?? [];
 			const i = list.findIndex((x) => x.info.id === next.info.id);
 			if (i >= 0) list[i] = next;
-			toast.success(`${next.info.name} ${v ? 'aktiviert' : 'deaktiviert'}`);
+			toast.success(
+				v
+					? t('{name} aktiviert', { name: next.info.name })
+					: t('{name} deaktiviert', { name: next.info.name })
+			);
 		} catch (e) {
 			if (p.config) p.config.enabled = prev;
-			toast.error(errorMessage(e), { title: `${p.info.name}: Umschalten fehlgeschlagen` });
+			toast.error(errorMessage(e), { title: t('{name}: Umschalten fehlgeschlagen', { name: p.info.name }) });
 		} finally {
 			busy[p.info.id] = false;
 		}
@@ -141,13 +146,13 @@
 		try {
 			const res = await api.post('/api/v1/plugins/{id}/run', { path: { id: p.info.id }, body: {} });
 			const href = `/plugins/${encodeURIComponent(p.info.id)}/runs/${res.id}`;
-			toast.success(`Lauf #${res.id} wurde eingeplant.`, {
+			toast.success(t('Lauf #{id} wurde eingeplant.', { id: res.id }), {
 				title: p.info.name,
-				action: { label: 'Protokoll', onClick: () => goto(href) }
+				action: { label: t('Laufprotokoll'), onClick: () => goto(href) }
 			});
 			refresh();
 		} catch (e) {
-			toast.error(errorMessage(e), { title: `${p.info.name}: Start fehlgeschlagen` });
+			toast.error(errorMessage(e), { title: t('{name}: Start fehlgeschlagen', { name: p.info.name }) });
 		} finally {
 			starting[p.info.id] = false;
 		}
@@ -158,19 +163,21 @@
 
 <PageHeader
 	title="Plugins"
-	description="Scanner, Importer, Processor und Publisher – aktivieren, planen, ausführen und überwachen"
+	description={t('Scanner, Importer, Processor und Publisher – aktivieren, planen, ausführen und überwachen')}
 >
 	{#snippet meta()}
 		{#if data.data}
-			<span>{formatNumber(all.length)} Plugins · {formatNumber(counts.enabled)} aktiv</span>
+			<span>{formatNumber(all.length)} Plugins · {t('{n} aktiv', { n: formatNumber(counts.enabled) })}</span>
 			{#if counts.failed}
 				<button type="button" onclick={() => setParams({ status: 'failed' })} class="cursor-pointer">
-					<Badge tone="danger" dot>{counts.failed} fehlgeschlagen</Badge>
+					<Badge tone="danger" dot>{t('{n} fehlgeschlagen', { n: formatNumber(counts.failed) })}</Badge>
 				</button>
 			{/if}
 			{#if counts.missing}
 				<button type="button" onclick={() => setParams({ status: 'problems' })} class="cursor-pointer">
-					<Badge tone="warn" dot>{counts.missing} mit fehlenden Programmen</Badge>
+					<Badge tone="warn" dot
+						>{t('{n} mit fehlenden Programmen', { n: formatNumber(counts.missing) })}</Badge
+					>
 				</button>
 			{/if}
 		{/if}
@@ -179,10 +186,10 @@
 
 <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
 	<Input
-		label="Suche"
+		label={t('Suche')}
 		icon="search"
 		type="search"
-		placeholder="Name, ID oder Beschreibung …"
+		placeholder={t('Name, ID oder Beschreibung …')}
 		bind:value={text}
 		oninput={() => applyText(text)}
 		class="sm:w-80"
@@ -194,7 +201,7 @@
 		onchange={(e) => setParams({ status: (e.currentTarget as HTMLSelectElement).value || null })}
 		class="sm:w-60"
 	/>
-	<nav aria-label="Plugin-Typen" class="flex flex-wrap gap-1 sm:ml-auto">
+	<nav aria-label={t('Plugin-Typen')} class="flex flex-wrap gap-1 sm:ml-auto">
 		{#each groups as g (g.kind)}
 			<a
 				href="#kind-{g.kind}"
@@ -217,17 +224,21 @@
 {:else if all.length === 0}
 	<EmptyState
 		icon="plugins"
-		title="Keine Plugins"
-		description="Der Server meldet keine installierten Plugins."
+		title={t('Keine Plugins')}
+		description={t('Der Server meldet keine installierten Plugins.')}
 	/>
 {:else if shown === 0}
-	<EmptyState icon="filter" title="Keine Treffer" description="Kein Plugin passt zu Suche und Statusfilter.">
+	<EmptyState
+		icon="filter"
+		title={t('Keine Treffer')}
+		description={t('Kein Plugin passt zu Suche und Statusfilter.')}
+	>
 		{#snippet actions()}
 			<Button
 				onclick={() => {
 					text = '';
 					setParams({ q: null, status: null });
-				}}>Filter zurücksetzen</Button
+				}}>{t('Filter zurücksetzen')}</Button
 			>
 		{/snippet}
 	</EmptyState>
@@ -259,7 +270,7 @@
 											checked={enabled}
 											onchange={(v) => setEnabled(p, v)}
 											disabled={busy[p.info.id]}
-											label="{p.info.name} aktiv"
+											label={t('{name} aktiv', { name: p.info.name })}
 											hideLabel
 											size="sm"
 										/>
@@ -273,17 +284,19 @@
 											>{p.info.name}</a
 										>
 										<span class="mono text-xs text-fg-subtle">{p.info.id}</span>
-										{#if !enabled}<Badge>inaktiv</Badge>{/if}
+										{#if !enabled}<Badge>{t('inaktiv')}</Badge>{/if}
 										{#if p.missingBinaries?.length}
-											<Badge tone="warn" title="Fehlende Programme: {p.missingBinaries.join(', ')}">
-												<Icon name="alert" size={12} class="-mt-px inline align-middle" /> fehlt: {p.missingBinaries.join(
-													', '
-												)}
+											<Badge
+												tone="warn"
+												title={t('Fehlende Programme: {list}', { list: p.missingBinaries.join(', ') })}
+											>
+												<Icon name="alert" size={12} class="-mt-px inline align-middle" />
+												{t('fehlt: {list}', { list: p.missingBinaries.join(', ') })}
 											</Badge>
 										{/if}
 										{#if p.backlog > 0}
-											<Badge tone="warn" title="Ausstehende Änderungen in der Warteschlange">
-												{formatNumber(p.backlog)} ausstehend
+											<Badge tone="warn" title={t('Ausstehende Änderungen in der Warteschlange')}>
+												{t('{n} ausstehend', { n: formatNumber(p.backlog) })}
 											</Badge>
 										{/if}
 									</div>
@@ -325,10 +338,10 @@
 									{:else}
 										<span class="text-xs text-fg-subtle">
 											{isPublisher(p)
-												? 'Versand über Regeln'
+												? t('Versand über Regeln')
 												: canRun(p)
-													? 'Noch nicht gelaufen'
-													: 'Nur Aktionen'}
+													? t('Noch nicht gelaufen')
+													: t('Nur Aktionen')}
 										</span>
 									{/if}
 								</div>
@@ -343,16 +356,16 @@
 											</span>
 											{#if enabled && p.nextRun}
 												<span class="block text-xs text-fg-subtle"
-													>nächster Lauf <RelativeTime value={p.nextRun} /></span
+													>{t('nächster Lauf')} <RelativeTime value={p.nextRun} /></span
 												>
 											{:else if !enabled}
-												<span class="block text-xs text-fg-subtle">pausiert (inaktiv)</span>
+												<span class="block text-xs text-fg-subtle">{t('pausiert (inaktiv)')}</span>
 											{/if}
 										{:else}
-											<span class="text-fg-muted">Nur manuell</span>
+											<span class="text-fg-muted">{t('Nur manuell')}</span>
 										{/if}
 									{:else}
-										<span class="text-xs text-fg-subtle">kein Zeitplan</span>
+										<span class="text-xs text-fg-subtle">{t('kein Zeitplan')}</span>
 									{/if}
 								</div>
 
@@ -365,16 +378,18 @@
 											loading={starting[p.info.id]}
 											onclick={() => runNow(p)}
 											disabled={!!run && run.status === 'queued'}
-											label="{p.info.name} jetzt ausführen"
+											label={t('{name} jetzt ausführen', { name: p.info.name })}
 										>
-											<span class="lg:hidden xl:inline">Jetzt ausführen</span>
+											<span class="lg:hidden xl:inline">{t('Jetzt ausführen')}</span>
 										</Button>
 									{/if}
 									<Button
 										size="sm"
 										variant="ghost"
 										icon="system"
-										label={canManage ? `${p.info.name} konfigurieren` : `${p.info.name} öffnen`}
+										label={canManage
+											? t('{name} konfigurieren', { name: p.info.name })
+											: t('{name} öffnen', { name: p.info.name })}
 										href={href(p)}
 									/>
 								</div>

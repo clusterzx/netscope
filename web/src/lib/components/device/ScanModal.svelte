@@ -22,6 +22,7 @@
 	import { meta } from '$lib/stores/catalog.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { loadPref, savePref } from '$lib/utils/url';
+	import { locale, t } from '$lib/i18n';
 
 	interface Props {
 		open: boolean;
@@ -34,7 +35,7 @@
 
 	const scanners = $derived(
 		[...(meta.value?.scanners ?? [])].sort(
-			(a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name, 'de')
+			(a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name, locale)
 		)
 	);
 	const slow = new Set(['nmap', 'nmap_udp']);
@@ -55,11 +56,16 @@
 		selected = on ? [...new Set([...selected, id])] : selected.filter((x) => x !== id);
 	}
 
+	// the sentence links to the plugins page: split at the placeholder
+	const inactiveText = t(
+		'Inaktive Scanner lassen sich unter {plugins} aktivieren. Fortschritt und Ergebnis erscheinen oben auf der Geräteseite.'
+	).split('{plugins}');
+
 	const valid = $derived(selected.filter((id) => scanners.some((s) => s.id === id && s.enabled)));
 
 	async function submit() {
 		if (!valid.length) {
-			error = 'Mindestens einen aktiven Scanner wählen';
+			error = t('Mindestens einen aktiven Scanner wählen');
 			return;
 		}
 		busy = true;
@@ -77,7 +83,9 @@
 			}));
 			onstarted(started);
 			toast.info(
-				started.length === 1 ? `${started[0].name} gestartet` : `${started.length} Scanner gestartet`,
+				started.length === 1
+					? t('{name} gestartet', { name: started[0].name })
+					: t('{n} Scanner gestartet', { n: started.length }),
 				{ title: deviceName }
 			);
 			open = false;
@@ -91,8 +99,8 @@
 
 <Modal
 	bind:open
-	title="Scan jetzt"
-	description="Ausgewählte Scanner sofort nur für „{deviceName}“ ausführen."
+	title={t('Scan jetzt')}
+	description={t('Ausgewählte Scanner sofort nur für „{name}“ ausführen.', { name: deviceName })}
 	size="sm"
 	as="form"
 	onsubmit={submit}
@@ -101,9 +109,9 @@
 	<div class="flex flex-col gap-3">
 		{#if error}<Alert tone="danger">{error}</Alert>{/if}
 		{#if !meta.value && meta.loading}
-			<p class="text-sm text-fg-muted">Scanner werden geladen …</p>
+			<p class="text-sm text-fg-muted">{t('Scanner werden geladen …')}</p>
 		{:else if !scanners.length}
-			<p class="text-sm text-fg-muted">Keine Scanner verfügbar.</p>
+			<p class="text-sm text-fg-muted">{t('Keine Scanner verfügbar.')}</p>
 		{:else}
 			<fieldset class="flex flex-col gap-1">
 				<legend class="mb-1.5 text-[0.8125rem] font-medium">Scanner</legend>
@@ -122,23 +130,22 @@
 						/>
 						<span class="min-w-0 flex-1">{s.name}</span>
 						{#if !s.enabled}
-							<span class="text-xs text-fg-subtle">inaktiv</span>
+							<span class="text-xs text-fg-subtle">{t('inaktiv')}</span>
 						{:else if slow.has(s.id)}
-							<span class="text-xs text-fg-subtle">dauert länger</span>
+							<span class="text-xs text-fg-subtle">{t('dauert länger')}</span>
 						{/if}
 					</label>
 				{/each}
 			</fieldset>
 			<p class="text-xs text-fg-subtle">
-				Inaktive Scanner lassen sich unter <a href="/plugins" class="link">Plugins</a> aktivieren. Fortschritt und
-				Ergebnis erscheinen oben auf der Geräteseite.
+				{inactiveText[0]}<a href="/plugins" class="link">Plugins</a>{inactiveText[1] ?? ''}
 			</p>
 		{/if}
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
 		<Button type="submit" variant="primary" icon="radar" loading={busy} disabled={!valid.length}>
-			{valid.length > 1 ? `${valid.length} Scanner starten` : 'Scan starten'}
+			{valid.length > 1 ? t('{n} Scanner starten', { n: valid.length }) : t('Scan starten')}
 		</Button>
 	{/snippet}
 </Modal>

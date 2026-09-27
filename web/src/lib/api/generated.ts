@@ -456,6 +456,10 @@ export interface ApiPluginStatus {
 	running: boolean;
 }
 
+export interface ApiPreferencesRequest {
+	locale: string;
+}
+
 export interface ApiRecoveryCodesResponse {
 	recoveryCodes: string[];
 }
@@ -737,6 +741,7 @@ export interface AuthPrincipal {
 	admin: boolean;
 	displayName?: string;
 	kind: string;
+	locale?: string;
 	mfaSetup?: boolean;
 	passwordChange?: boolean;
 	permissions: string[];
@@ -812,6 +817,7 @@ export interface AuthUser {
 	email: string;
 	id: number;
 	lastLoginAt?: string;
+	locale: string;
 	mfaRequired: boolean;
 	mustChangePassword: boolean;
 	passkeys: number;
@@ -827,6 +833,7 @@ export interface AuthUserInput {
 	disabled: boolean;
 	displayName: string;
 	email: string;
+	locale?: string;
 	password?: string;
 	roleId: number;
 	username: string;
@@ -2042,6 +2049,7 @@ export interface RulesTimeWindow {
 export interface SettingsSystem {
 	deviceTypes: string[];
 	hostnamePriority: string[];
+	language: string;
 	maxParallelRuns: number;
 	metricsPublic: boolean;
 	observationRawMaxKb: number;
@@ -2301,6 +2309,10 @@ export interface ApiPaths {
 	'/api/v1/auth/password': {
 		/** Eigenes Passwort ändern (beendet andere Sessions) */
 		put: { query: never; body: ApiPasswordRequest; response: ApiOkResponse };
+	};
+	'/api/v1/auth/preferences': {
+		/** Eigene Einstellungen ändern (Sprache der Oberfläche) */
+		put: { query: never; body: ApiPreferencesRequest; response: ApiMeResponse };
 	};
 	'/api/v1/auth/providers': {
 		/** Anmeldeverfahren für die Login-Seite (OIDC, LDAP) */

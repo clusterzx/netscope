@@ -12,6 +12,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -28,7 +29,24 @@ import (
 	"netscope/internal/auth"
 	"netscope/internal/config"
 	"netscope/internal/db"
+	"netscope/internal/i18n"
 )
+
+// cliLang is the language of the CLI output: German unless the environment (LC_ALL,
+// LC_MESSAGES, LANG) asks for English, e.g. LANG=en_US.UTF-8.
+var cliLang = func() i18n.Locale {
+	for _, k := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
+		if v := os.Getenv(k); v != "" {
+			if l, ok := i18n.Parse(strings.SplitN(v, ".", 2)[0]); ok {
+				return l
+			}
+			return i18n.Default
+		}
+	}
+	return i18n.Default
+}()
+
+func tr(s string) string { return i18n.T(cliLang, s) }
 
 // version is set at build time: -ldflags "-X main.version=1.2.3".
 var version = "dev"
@@ -62,13 +80,13 @@ func main() {
 		err = fmt.Errorf("unbekannter Befehl %q", cmd)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Fehler:", err)
+		fmt.Fprintln(os.Stderr, tr("Fehler:"), i18n.Err(cliLang, err.Error()))
 		os.Exit(1)
 	}
 }
 
-func usage() {
-	fmt.Fprint(os.Stderr, `NetScope – Netzwerk-Inventar und Asset-Monitoring
+// usageText is the help text (English through the catalog, see i18n_en.go).
+const usageText = `NetScope – Netzwerk-Inventar und Asset-Monitoring
 
 Befehle:
   serve                                   Server starten (Standard)
@@ -82,8 +100,9 @@ Befehle:
   version                                 Version ausgeben
 
 Konfiguration: /data/config.yaml bzw. NETSCOPE_CONFIG, Überschreibungen per NETSCOPE_*.
-`)
-}
+`
+
+func usage() { fmt.Fprint(os.Stderr, tr(usageText)) }
 
 func serve() error {
 	cfg, err := config.Load()
@@ -108,12 +127,12 @@ func openDB() (*config.Config, *db.DB, error) {
 
 func token(args []string) error {
 	if len(args) == 0 || args[0] != "create" {
-		return fmt.Errorf("verwende: netscope token create --name NAME --scope read|write [--ttl 24h]")
+		return errors.New("verwende: netscope token create --name NAME --scope read|write [--ttl 24h]")
 	}
 	fs := flag.NewFlagSet("token create", flag.ContinueOnError)
-	name := fs.String("name", "", "Name des Tokens")
-	scope := fs.String("scope", "read", "read oder write")
-	ttl := fs.Duration("ttl", 0, "Gültigkeit (0 = unbegrenzt)")
+	name := fs.String("name", "", tr("Name des Tokens"))
+	scope := fs.String("scope", "read", tr("read oder write"))
+	ttl := fs.Duration("ttl", 0, tr("Gültigkeit (0 = unbegrenzt)"))
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -143,13 +162,13 @@ func token(args []string) error {
 
 func passwd(args []string) error {
 	fs := flag.NewFlagSet("passwd", flag.ContinueOnError)
-	pw := fs.String("password", "", "neues Passwort (sonst über stdin)")
-	user := fs.String("user", "admin", "Benutzer")
+	pw := fs.String("password", "", tr("neues Passwort (sonst über stdin)"))
+	user := fs.String("user", "admin", tr("Name des Benutzers"))
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *pw == "" {
-		fmt.Fprint(os.Stderr, "Neues Passwort: ")
+		fmt.Fprint(os.Stderr, tr("Neues Passwort: "))
 		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil && line == "" {
 			return err
@@ -165,7 +184,7 @@ func passwd(args []string) error {
 		return err
 	}
 	_ = os.Remove(cfg.DataDir + "/" + app.InitialPasswordFile)
-	fmt.Println("Passwort geändert, alle Sitzungen beendet.")
+	fmt.Println(tr("Passwort geändert, alle Sitzungen beendet."))
 	return nil
 }
 
@@ -203,7 +222,7 @@ func openapi() error {
 // resetMFA removes the second factors of a user who lost the device (and the recovery codes).
 func resetMFA(args []string) error {
 	fs := flag.NewFlagSet("2fa-reset", flag.ContinueOnError)
-	user := fs.String("user", "admin", "Benutzer")
+	user := fs.String("user", "admin", tr("Name des Benutzers"))
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -215,6 +234,6 @@ func resetMFA(args []string) error {
 	if err := auth.New(d, nil).ResetMFAByName(context.Background(), *user); err != nil {
 		return err
 	}
-	fmt.Println("Zweiter Faktor entfernt, alle Sitzungen beendet. Verlangt die Rolle 2FA, wird sie beim nächsten Login neu eingerichtet.")
+	fmt.Println(tr("Zweiter Faktor entfernt, alle Sitzungen beendet. Verlangt die Rolle 2FA, wird sie beim nächsten Login neu eingerichtet."))
 	return nil
 }

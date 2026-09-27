@@ -4,6 +4,7 @@
 	<TagInput label="Tags" bind:value={tags} suggestions={allTags} placeholder="Tag hinzufügen" />
 -->
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import FormField from './FormField.svelte';
 	import Icon from './Icon.svelte';
 
@@ -29,7 +30,7 @@
 		label,
 		hint,
 		error,
-		placeholder = 'Hinzufügen …',
+		placeholder = t('Hinzufügen …'),
 		required = false,
 		disabled = false,
 		normalize = (s: string) => s.trim(),
@@ -66,7 +67,7 @@
 	}
 
 	function remove(tag: string) {
-		const next = (value ?? []).filter((t) => t !== tag);
+		const next = (value ?? []).filter((x) => x !== tag);
 		value = next;
 		onchange?.(next);
 		input?.focus();
@@ -113,7 +114,7 @@
 							<button
 								type="button"
 								class="rounded p-0.5 text-fg-subtle hover:bg-border hover:text-fg"
-								aria-label="{tag} entfernen"
+								aria-label={t('{tag} entfernen', { tag })}
 								onclick={() => remove(tag)}
 							>
 								<Icon name="x" size={12} />

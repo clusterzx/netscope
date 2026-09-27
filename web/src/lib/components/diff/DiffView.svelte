@@ -7,6 +7,7 @@
 	import { Button, EmptyState, Icon, Input } from '$lib/components/ui';
 	import { formatNumber, plural } from '$lib/utils/format';
 	import { deviceTypeName, diffChangeLabel, diffKindLabel, label } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		result: DiffResult;
@@ -58,9 +59,9 @@
 			.map(([kind, c]) => ({ kind, added: c.added ?? 0, removed: c.removed ?? 0, changed: c.changed ?? 0 }));
 	});
 	const totals = $derived.by(() => {
-		const t: Record<string, number> = { added: 0, removed: 0, changed: 0 };
-		for (const it of items) t[it.change] = (t[it.change] ?? 0) + 1;
-		return t;
+		const sum: Record<string, number> = { added: 0, removed: 0, changed: 0 };
+		for (const it of items) sum[it.change] = (sum[it.change] ?? 0) + 1;
+		return sum;
 	});
 
 	const filtered = $derived.by(() => {
@@ -117,32 +118,34 @@
 
 	/** device items: the value is only "gesehen"/"vorhanden" – describe the change instead */
 	function deviceText(it: DiffItem): string {
-		if (it.change === 'added') return result.a.kind === 'run' ? 'im neueren Lauf gesehen' : 'neu im Inventar';
+		if (it.change === 'added')
+			return result.a.kind === 'run' ? t('im neueren Lauf gesehen') : t('neu im Inventar');
 		if (it.change === 'removed')
-			return result.a.kind === 'run' ? 'im neueren Lauf nicht mehr gesehen' : 'nicht mehr im Inventar';
-		return 'geändert';
+			return result.a.kind === 'run' ? t('im neueren Lauf nicht mehr gesehen') : t('nicht mehr im Inventar');
+		return t('geändert');
 	}
 
 	/** display value (device types are translated) */
 	const val = (it: DiffItem, v: string | undefined) =>
 		it.kind === 'type' && v ? deviceTypeName(v) : v || '–';
 
-	const deleted = (name: string) => /\(gelöscht\)$/.test(name);
+	// the server names removed devices "Gerät 12 (gelöscht)" / "Device 12 (deleted)"
+	const deleted = (name: string) => /\((gelöscht|deleted)\)$/.test(name); // i18n-ignore
 	const filterActive = $derived(kinds.length > 0 || !!change || !!text.trim());
 </script>
 
 {#if items.length === 0}
 	<EmptyState
 		icon="check-circle"
-		title="Keine Änderungen"
+		title={t('Keine Änderungen')}
 		description={result.a.kind === 'run'
-			? 'Beide Läufe haben dieselben Daten geliefert.'
-			: 'Zwischen den beiden Zeitpunkten hat sich im Inventar nichts geändert.'}
+			? t('Beide Läufe haben dieselben Daten geliefert.')
+			: t('Zwischen den beiden Zeitpunkten hat sich im Inventar nichts geändert.')}
 	/>
 {:else}
 	<div class="flex flex-col gap-4">
 		<!-- summary per kind -->
-		<section aria-label="Zusammenfassung" class="flex flex-wrap gap-2">
+		<section aria-label={t('Zusammenfassung')} class="flex flex-wrap gap-2">
 			{#each perKind as k (k.kind)}
 				{@const on = kinds.includes(k.kind)}
 				<button
@@ -154,9 +157,11 @@
 				>
 					<span class="font-medium text-fg">{label(diffKindLabel, k.kind)}</span>
 					<span class="flex items-center gap-1.5 text-xs tabular">
-						{#if k.added}<span class="text-ok" title="neu">+{formatNumber(k.added)}</span>{/if}
-						{#if k.removed}<span class="text-danger" title="entfernt">−{formatNumber(k.removed)}</span>{/if}
-						{#if k.changed}<span class="text-warn" title="geändert">~{formatNumber(k.changed)}</span>{/if}
+						{#if k.added}<span class="text-ok" title={t('neu')}>+{formatNumber(k.added)}</span>{/if}
+						{#if k.removed}<span class="text-danger" title={t('entfernt')}>−{formatNumber(k.removed)}</span
+							>{/if}
+						{#if k.changed}<span class="text-warn" title={t('geändert')}>~{formatNumber(k.changed)}</span
+							>{/if}
 					</span>
 				</button>
 			{/each}
@@ -167,7 +172,7 @@
 			<div
 				class="inline-flex rounded-md border border-border bg-surface p-0.5 shadow-sm"
 				role="group"
-				aria-label="Art der Änderung"
+				aria-label={t('Art der Änderung')}
 			>
 				<button
 					type="button"
@@ -177,7 +182,7 @@
 						: 'text-fg-muted hover:text-fg'}"
 					onclick={() => onchange('')}
 				>
-					Alle <span class="text-xs text-fg-subtle tabular">{formatNumber(items.length)}</span>
+					{t('Alle')} <span class="text-xs text-fg-subtle tabular">{formatNumber(items.length)}</span>
 				</button>
 				{#each CHANGES as c (c)}
 					<button
@@ -201,12 +206,15 @@
 				icon="search"
 				bind:value={text}
 				oninput={() => ontext(text)}
-				placeholder="Gerät, Port, Wert …"
-				aria-label="Änderungen durchsuchen"
+				placeholder={t('Gerät, Port, Wert …')}
+				aria-label={t('Änderungen durchsuchen')}
 				class="w-full sm:w-64"
 			/>
 			<span class="text-xs text-fg-subtle" aria-live="polite">
-				{plural(filtered.length, 'Änderung', 'Änderungen')} auf {plural(groups.length, 'Gerät', 'Geräten')}
+				{t('{changes} auf {devices}', {
+					changes: plural(filtered.length, t('Änderung'), t('Änderungen')),
+					devices: plural(groups.length, t('Gerät'), t('Geräten'))
+				})}
 			</span>
 			{#if filterActive}
 				<Button
@@ -216,7 +224,7 @@
 					onclick={() => {
 						text = '';
 						onreset();
-					}}>Filter zurücksetzen</Button
+					}}>{t('Filter zurücksetzen')}</Button
 				>
 			{/if}
 		</div>
@@ -225,8 +233,8 @@
 			<EmptyState
 				compact
 				icon="filter"
-				title="Keine Treffer"
-				description="Keine Änderung passt zu den Filtern."
+				title={t('Keine Treffer')}
+				description={t('Keine Änderung passt zu den Filtern.')}
 			/>
 		{:else}
 			<div class="flex flex-col gap-3">
@@ -235,7 +243,7 @@
 					{@const shown = open ? g.items : g.items.slice(0, GROUP_LIMIT)}
 					<section
 						class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
-						aria-label="Änderungen an {g.name}"
+						aria-label={t('Änderungen an {name}', { name: g.name })}
 					>
 						<header
 							class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-surface-2 px-4 py-2"
@@ -277,7 +285,7 @@
 												<span class="block break-words sm:inline">
 													{#if it.key}<span class="mx-1.5 hidden text-fg-subtle sm:inline">·</span>{/if}
 													<del class="text-danger decoration-danger/60">{val(it, it.old)}</del>
-													<span class="mx-1 text-fg-subtle" aria-label="geändert zu">→</span>
+													<span class="mx-1 text-fg-subtle" aria-label={t('geändert zu')}>→</span>
 													<ins class="text-ok no-underline">{val(it, it.new)}</ins>
 												</span>
 											{:else if it.change === 'added' && it.new}
@@ -313,7 +321,7 @@
 										expanded = next;
 									}}
 								>
-									{open ? 'Weniger anzeigen' : `Alle ${formatNumber(g.items.length)} anzeigen`}
+									{open ? t('Weniger anzeigen') : t('Alle {n} anzeigen', { n: formatNumber(g.items.length) })}
 								</Button>
 							</div>
 						{/if}
@@ -321,9 +329,10 @@
 				{/each}
 				{#if groups.length > groupLimit}
 					<Button onclick={() => (groupLimit += PAGE_GROUPS)} class="self-center">
-						Weitere {formatNumber(Math.min(PAGE_GROUPS, groups.length - groupLimit))} von {formatNumber(
-							groups.length - groupLimit
-						)} Geräten anzeigen
+						{t('Weitere {n} von {total} Geräten anzeigen', {
+							n: formatNumber(Math.min(PAGE_GROUPS, groups.length - groupLimit)),
+							total: formatNumber(groups.length - groupLimit)
+						})}
 					</Button>
 				{/if}
 			</div>

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 )
 
@@ -405,11 +406,11 @@ func TestRenderWorstCase(t *testing.T) {
 		mustValid(t, m)
 	}
 	head := strings.SplitN(msgs[0], "\n\n", 2)[0]
-	if utf16Len(head)+utf16Len(eventBlock(ev, time.UTC))+2 > maxMessageLen-partReserve {
+	if utf16Len(head)+utf16Len(eventBlock(ev, time.UTC, i18n.DE))+2 > maxMessageLen-partReserve {
 		t.Logf("header and worst-case event do not fit together; header is sent separately")
 	}
 	cont := headerEmoji(n) + " *" + escape(clip(title(n), 80)) + "* _" + escape("(Fortsetzung)") + "_"
-	if l := utf16Len(cont) + 2 + utf16Len(eventBlock(ev, time.UTC)); l > maxMessageLen-partReserve {
+	if l := utf16Len(cont) + 2 + utf16Len(eventBlock(ev, time.UTC, i18n.DE)); l > maxMessageLen-partReserve {
 		t.Fatalf("worst-case event block does not fit into a continuation message (%d units)", l)
 	}
 }

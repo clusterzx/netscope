@@ -6,6 +6,7 @@
 	import { meta } from '$lib/stores/catalog.svelte';
 	import { federation } from '$lib/stores/federation.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { t, tn } from '$lib/i18n';
 
 	let { onnavigate }: { onnavigate?: () => void } = $props();
 </script>
@@ -19,7 +20,7 @@
 		<img src="/favicon.svg" alt="" width="26" height="26" class="rounded-md" />
 		<span class="text-[0.95rem] font-semibold tracking-tight text-fg">NetScope</span>
 	</a>
-	<nav class="flex-1 overflow-y-auto px-3 py-3" aria-label="Hauptnavigation">
+	<nav class="flex-1 overflow-y-auto px-3 py-3" aria-label={t('Hauptnavigation')}>
 		{#each nav as section (section.label)}
 			<div class="mb-4">
 				<p class="px-2.5 pb-1.5 text-[0.68rem] font-semibold tracking-wider text-fg-subtle uppercase">
@@ -43,8 +44,11 @@
 								{#if item.badge === 'events' && eventCounts.urgent > 0}
 									<span
 										class="min-w-5 rounded-full bg-sev-critical px-1.5 text-center text-[0.68rem] leading-5 font-semibold text-white tabular"
-										title="{eventCounts.urgent} offene Events mit Schweregrad hoch oder kritisch"
-										>{eventCounts.urgent > 99 ? '99+' : eventCounts.urgent}</span
+										title={tn(
+											eventCounts.urgent,
+											'{n} offenes Event mit Schweregrad hoch oder kritisch',
+											'{n} offene Events mit Schweregrad hoch oder kritisch'
+										)}>{eventCounts.urgent > 99 ? '99+' : eventCounts.urgent}</span
 									>
 								{/if}
 							</a>
@@ -55,7 +59,7 @@
 		{/each}
 	</nav>
 	<div class="shrink-0 border-t border-border px-5 py-3 text-xs text-fg-subtle">
-		<a href="/api/docs" target="_blank" rel="noopener" class="hover:text-fg">API-Dokumentation</a>
+		<a href="/api/docs" target="_blank" rel="noopener" class="hover:text-fg">{t('API-Dokumentation')}</a>
 		{#if meta.value?.version}<span class="ml-1">· v{meta.value.version}</span>{/if}
 	</div>
 </div>

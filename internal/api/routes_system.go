@@ -21,6 +21,7 @@ import (
 	"netscope/internal/config"
 	"netscope/internal/cron"
 	"netscope/internal/db"
+	"netscope/internal/i18n"
 	"netscope/internal/inventory"
 	"netscope/internal/logging"
 	"netscope/internal/plugin"
@@ -267,7 +268,7 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	if entries == nil {
 		entries = []logging.Entry{}
 	}
-	writeJSON(w, http.StatusOK, entries)
+	writeJSON(w, http.StatusOK, localizeLogEntries(entries, requestLocale(r)))
 }
 
 // backupNameRe matches backups: gzip-compressed (.db.gz) or plain from older versions.
@@ -360,7 +361,7 @@ func (s *Server) handleDeleteBackup(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 	if s.Restore == nil {
-		writeError(w, http.StatusNotImplemented, "unsupported", "Wiederherstellung nicht verfügbar", nil)
+		writeError(w, r, http.StatusNotImplemented, "unsupported", "Wiederherstellung nicht verfügbar", nil)
 		return
 	}
 	stage := filepath.Join(s.Config.DataDir, "restore")
@@ -426,7 +427,7 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRotate(w http.ResponseWriter, r *http.Request) {
 	if s.Vault.Source().FromEnv {
-		writeError(w, http.StatusConflict, "unsupported",
+		writeError(w, r, http.StatusConflict, "unsupported",
 			"Der Master-Key kommt aus NETSCOPE_MASTER_KEY und kann nur dort geändert werden. Für eine Rotation per UI den Schlüssel in eine Datei auslagern.", nil)
 		return
 	}
@@ -452,30 +453,32 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, auditList{Total: total, Items: items})
+	writeJSON(w, http.StatusOK, auditList{Total: total, Items: localizeAudit(items, requestLocale(r))})
 }
 
 func (s *Server) handleCron(w http.ResponseWriter, r *http.Request) {
 	expr := r.URL.Query().Get("expr")
+	loc := requestLocale(r)
 	sched, err := cron.Parse(expr)
 	if err != nil {
-		writeJSON(w, http.StatusOK, cronResponse{Valid: false, Error: err.Error(), Next: []time.Time{}})
+		writeJSON(w, http.StatusOK, cronResponse{Valid: false, Error: i18n.Err(loc, err.Error()), Next: []time.Time{}})
 		return
 	}
-	text, _ := cron.Describe(expr)
+	text, _ := describeCron(expr, loc)
 	writeJSON(w, http.StatusOK, cronResponse{Valid: true, Text: text, Next: cron.NextN(sched, time.Now().In(s.Config.Location), 5)})
 }
 
 func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
-	m := metaResponse{Version: s.Version, EventTypes: plugin.Catalog(), CredentialTypes: plugin.CredentialTypes(),
-		DeviceTypes: s.Settings.System().DeviceTypes, QueryFields: inventory.QueryFields(), SortFields: inventory.SortFields(),
-		PublicURL: s.Settings.System().PublicURL, TimeZone: s.Config.Timezone, Publishers: s.Host.Publishers(),
+	loc := requestLocale(r)
+	m := metaResponse{Version: s.Version, EventTypes: plugin.LocalizedCatalog(loc), CredentialTypes: plugin.LocalizedCredentialTypes(loc),
+		DeviceTypes: s.Settings.System().DeviceTypes, QueryFields: localizeQueryFields(loc), SortFields: inventory.SortFields(),
+		PublicURL: s.Settings.System().PublicURL, TimeZone: s.Config.Timezone, Publishers: localizePublishers(s.Host.Publishers(), loc),
 		DeviceActions: []deviceAction{}, Scanners: []pluginShort{}}
 	if m.Publishers == nil {
 		m.Publishers = []pluginhost.PublisherInfo{}
 	}
 	for _, sv := range plugin.Severities {
-		m.Severities = append(m.Severities, severityInfo{Value: string(sv), Label: sv.Label()})
+		m.Severities = append(m.Severities, severityInfo{Value: string(sv), Label: sv.LabelIn(loc)})
 	}
 	for _, p := range plugin.Priorities {
 		m.Priorities = append(m.Priorities, string(p))
@@ -483,9 +486,9 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	for _, id := range s.Host.IDs() {
 		p, _ := s.Host.Plugin(id)
 		cfg, _ := s.Host.Config(id)
-		info := p.Info()
+		info := p.Info().Localize(loc)
 		if ap, ok := p.(plugin.ActionProvider); ok {
-			for _, a := range ap.Actions() {
+			for _, a := range plugin.LocalizeActions(ap.Actions(), loc) {
 				if a.Scope == plugin.ActionDevice {
 					m.DeviceActions = append(m.DeviceActions, deviceAction{Plugin: id, PluginName: info.Name, Name: a.Name, Label: a.Label,
 						Description: a.Description, Confirm: a.Confirm, Params: a.Params})

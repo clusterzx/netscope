@@ -14,6 +14,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDateTime, fromDateTimeLocal, toDateTimeLocal } from '$lib/utils/format';
 	import { setParams } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 
 	// ---------------------------------------------------------------- period (URL: ?range=24h|7d|30d or ?from=&to=)
 	const sp = $derived(page.url.searchParams);
@@ -51,10 +52,10 @@
 	function applyCustom() {
 		const e: { from?: string; to?: string } = {};
 		const f = fromText ? new Date(fromText) : null;
-		const t = toText ? new Date(toText) : null;
-		if (!f || isNaN(f.getTime())) e.from = 'Startzeitpunkt angeben';
-		if (toText && (!t || isNaN(t.getTime()))) e.to = 'Ungültiges Datum';
-		if (f && t && !e.from && !e.to && f >= t) e.to = 'Ende muss nach dem Start liegen';
+		const end = toText ? new Date(toText) : null;
+		if (!f || isNaN(f.getTime())) e.from = t('Startzeitpunkt angeben');
+		if (toText && (!end || isNaN(end.getTime()))) e.to = t('Ungültiges Datum');
+		if (f && end && !e.from && !e.to && f >= end) e.to = t('Ende muss nach dem Start liegen');
 		rangeErrors = e;
 		if (Object.keys(e).length) return;
 		setParams({ range: null, from: fromText, to: toText || null });
@@ -85,7 +86,7 @@
 	const rangeText = $derived(
 		report.data
 			? `${formatDateTime(report.data.from)} – ${formatDateTime(report.data.to)}`
-			: `${formatDateTime(query.from)} – ${query.to ? formatDateTime(query.to) : 'jetzt'}`
+			: `${formatDateTime(query.from)} – ${query.to ? formatDateTime(query.to) : t('jetzt')}`
 	);
 
 	let downloading = $state<string | null>(null);
@@ -95,10 +96,12 @@
 			await api.download(
 				'/api/v1/reports/changes',
 				{ from: query.from, to: query.to || null, format },
-				`netscope-aenderungen.${format}`
+				`${t('netscope-aenderungen')}.${format}`
 			);
 		} catch (e) {
-			toast.error(e instanceof ApiError ? e.message : errorMessage(e), { title: 'Download fehlgeschlagen' });
+			toast.error(e instanceof ApiError ? e.message : errorMessage(e), {
+				title: t('Download fehlgeschlagen')
+			});
 		} finally {
 			downloading = null;
 		}
@@ -108,7 +111,7 @@
 	const canSend = $derived(auth.can('reports.send'));
 </script>
 
-<PageHeader title="Reports" description="Inventar-Export, Änderungsberichte und geplanter Versand" />
+<PageHeader title="Reports" description={t('Inventar-Export, Änderungsberichte und geplanter Versand')} />
 
 <div class="flex flex-col gap-4">
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -117,8 +120,8 @@
 	</div>
 
 	<Card
-		title="Änderungsbericht"
-		description="Was sich im gewählten Zeitraum im Netzwerk geändert hat"
+		title={t('Änderungsbericht')}
+		description={t('Was sich im gewählten Zeitraum im Netzwerk geändert hat')}
 		icon="reports"
 	>
 		{#snippet actions()}
@@ -126,7 +129,7 @@
 				size="sm"
 				variant="ghost"
 				icon="refresh"
-				label="Neu erstellen"
+				label={t('Neu erstellen')}
 				loading={report.loading && !!report.data}
 				onclick={() => report.reload()}
 			/>
@@ -143,7 +146,7 @@
 				novalidate
 			>
 				<fieldset class="flex flex-col gap-1">
-					<legend class="mb-1 text-[0.8125rem] font-medium text-fg">Zeitraum</legend>
+					<legend class="mb-1 text-[0.8125rem] font-medium text-fg">{t('Zeitraum')}</legend>
 					<div class="flex w-fit items-center gap-0.5 rounded-md bg-surface-3 p-0.5">
 						{#each RANGE_PRESETS as r (r.id)}
 							<button
@@ -158,16 +161,22 @@
 					</div>
 				</fieldset>
 				<div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start lg:max-w-2xl">
-					<Input label="Von" type="datetime-local" bind:value={fromText} error={rangeErrors.from} required />
-					<Input label="Bis" type="datetime-local" bind:value={toText} error={rangeErrors.to} />
-					<Button type="submit" class="sm:mt-6" active={custom}>Übernehmen</Button>
+					<Input
+						label={t('Von')}
+						type="datetime-local"
+						bind:value={fromText}
+						error={rangeErrors.from}
+						required
+					/>
+					<Input label={t('Bis')} type="datetime-local" bind:value={toText} error={rangeErrors.to} />
+					<Button type="submit" class="sm:mt-6" active={custom}>{t('Übernehmen')}</Button>
 				</div>
 			</form>
 
 			<!-- actions -->
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="mr-auto text-sm text-fg-muted">
-					{#if report.data}Zeitraum <span class="font-medium text-fg">{rangeText}</span>{/if}
+					{#if report.data}{t('Zeitraum')} <span class="font-medium text-fg">{rangeText}</span>{/if}
 				</span>
 				<Button
 					icon="download"
@@ -182,7 +191,9 @@
 					onclick={() => download('pdf')}>PDF</Button
 				>
 				{#if canSend}
-					<Button variant="primary" icon="send" onclick={() => (sendOpen = true)}>Jetzt versenden</Button>
+					<Button variant="primary" icon="send" onclick={() => (sendOpen = true)}
+						>{t('Jetzt versenden')}</Button
+					>
 				{/if}
 			</div>
 
@@ -197,7 +208,9 @@
 				<div class={report.loading ? 'opacity-60 transition-opacity' : ''}>
 					<ChangeReportView report={report.data} {pluginNames} />
 				</div>
-				<p class="text-xs text-fg-subtle">Erstellt {formatDateTime(report.data.generatedAt, true)}</p>
+				<p class="text-xs text-fg-subtle">
+					{t('Erstellt {time}', { time: formatDateTime(report.data.generatedAt, true) })}
+				</p>
 			{/if}
 		</div>
 	</Card>

@@ -17,11 +17,12 @@
 	import VaultTab from '$lib/components/system/VaultTab.svelte';
 	import { SYSTEM_TABS } from '$lib/components/system/system';
 	import { Icon, PageHeader } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 
-	const tabs = $derived(SYSTEM_TABS.filter((t) => !t.perm || auth.can(t.perm)));
+	const tabs = $derived(SYSTEM_TABS.filter((x) => !x.perm || auth.can(x.perm)));
 	const tabId = $derived(page.url.searchParams.get('tab') ?? 'overview');
-	const tab = $derived(tabs.find((t) => t.id === tabId) ?? tabs[0]);
+	const tab = $derived(tabs.find((x) => x.id === tabId) ?? tabs[0]);
 
 	// keep the active entry visible in the horizontally scrolling nav (phones)
 	let navList: HTMLUListElement | null = $state(null);
@@ -36,21 +37,21 @@
 <PageHeader
 	title="System"
 	docTitle="{tab.label} · System"
-	description="Einstellungen, Zugänge, Datenpflege und Protokolle"
+	description={t('Einstellungen, Zugänge, Datenpflege und Protokolle')}
 />
 
 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
-	<nav aria-label="Systembereiche" class="-mx-4 shrink-0 sm:-mx-6 lg:sticky lg:top-4 lg:mx-0 lg:w-52">
+	<nav aria-label={t('Systembereiche')} class="-mx-4 shrink-0 sm:-mx-6 lg:sticky lg:top-4 lg:mx-0 lg:w-52">
 		<ul
 			bind:this={navList}
 			class="flex gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] sm:px-6 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-0 lg:px-0"
 		>
-			{#each tabs as t (t.id)}
-				{@const active = t.id === tab.id}
+			{#each tabs as item (item.id)}
+				{@const active = item.id === tab.id}
 				<li class="shrink-0">
 					<a
-						href="?tab={t.id}"
-						data-tab={t.id}
+						href="?tab={item.id}"
+						data-tab={item.id}
 						aria-current={active ? 'page' : undefined}
 						data-sveltekit-noscroll
 						class="flex items-center gap-2 border-b-2 px-2.5 py-2 text-sm whitespace-nowrap transition-colors lg:rounded-md lg:border-b-0 lg:py-1.5
@@ -58,8 +59,8 @@
 							? 'border-accent font-medium text-fg lg:bg-accent-soft lg:text-accent'
 							: 'border-transparent text-fg-muted hover:text-fg lg:hover:bg-surface-3'}"
 					>
-						<Icon name={t.icon} size={16} class={active ? 'text-accent' : 'text-fg-subtle'} />
-						{t.label}
+						<Icon name={item.icon} size={16} class={active ? 'text-accent' : 'text-fg-subtle'} />
+						{item.label}
 					</a>
 				</li>
 			{/each}

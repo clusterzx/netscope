@@ -17,6 +17,7 @@
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatDate, formatNumber, formatTime } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
 	import { LazyData } from './util';
 
 	interface Props {
@@ -47,12 +48,12 @@
 
 	const KINDS: { id: string; label: string; icon: IconName }[] = [
 		{ id: 'event', label: 'Events', icon: 'events' },
-		{ id: 'ip', label: 'IP-Adressen', icon: 'network' },
+		{ id: 'ip', label: t('IP-Adressen'), icon: 'network' },
 		{ id: 'port', label: 'Ports', icon: 'radar' },
-		{ id: 'cert', label: 'Zertifikate', icon: 'lock' },
+		{ id: 'cert', label: t('Zertifikate'), icon: 'lock' },
 		{ id: 'container', label: 'Container', icon: 'box' },
-		{ id: 'package', label: 'Pakete', icon: 'package' },
-		{ id: 'fact', label: 'Merkmale', icon: 'tag' }
+		{ id: 'package', label: t('Pakete'), icon: 'package' },
+		{ id: 'fact', label: t('Merkmale'), icon: 'tag' }
 	];
 	const kindMeta = (k: string) =>
 		KINDS.find((x) => x.id === k) ?? { id: k, label: k, icon: 'info' as IconName };
@@ -64,11 +65,11 @@
 		const evById = new Map((data.data.events.items ?? []).map((e) => [e.id, e]));
 		const seen = new Set<number>();
 		const out: Entry[] = [];
-		for (const t of data.data.timeline) {
-			if (t.kind === 'event' && t.eventId) {
-				seen.add(t.eventId);
-				out.push({ ...t, event: evById.get(t.eventId) });
-			} else out.push(t);
+		for (const te of data.data.timeline) {
+			if (te.kind === 'event' && te.eventId) {
+				seen.add(te.eventId);
+				out.push({ ...te, event: evById.get(te.eventId) });
+			} else out.push(te);
 		}
 		// events outside the timeline limit
 		for (const e of data.data.events.items ?? [])
@@ -107,14 +108,18 @@
 	function changeTone(c: string): string {
 		return c === 'added' ? 'text-ok' : c === 'removed' ? 'text-danger' : c === 'changed' ? 'text-accent' : '';
 	}
-	const changeLabel: Record<string, string> = { added: 'neu', removed: 'entfernt', changed: 'geändert' };
+	const changeLabel: Record<string, string> = {
+		added: t('neu'),
+		removed: t('entfernt'),
+		changed: t('geändert')
+	};
 
 	/** time-based diff around a change (the diff page compares the state before and after) */
 	function timeDiffHref(ts: string): string {
-		const t = new Date(ts).getTime();
-		const from = new Date(t - 1000).toISOString();
-		const to = new Date(t + 1000).toISOString();
-		return `/diff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&device=${deviceId}`;
+		const ms = new Date(ts).getTime();
+		const from = new Date(ms - 1000).toISOString();
+		const to = new Date(ms + 1000).toISOString();
+		return `/diff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&device=${deviceId}`; // i18n-ignore (URL)
 	}
 
 	let opening = $state<number | null>(null);
@@ -124,7 +129,8 @@
 		opening = e.eventId;
 		try {
 			const d = await api.get('/api/v1/events/{id}', { path: { id: e.eventId } });
-			if (d.prevRunId && d.runId) goto(`/diff?runA=${d.prevRunId}&runB=${d.runId}&device=${deviceId}`);
+			if (d.prevRunId && d.runId)
+				goto(`/diff?runA=${d.prevRunId}&runB=${d.runId}&device=${deviceId}`); // i18n-ignore (URL)
 			else goto(timeDiffHref(e.ts));
 		} catch (err) {
 			toast.error(err);
@@ -136,11 +142,11 @@
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-center gap-2">
-		<h2 class="mr-2 text-sm font-semibold">Historie</h2>
+		<h2 class="mr-2 text-sm font-semibold">{t('Historie')}</h2>
 		<div
 			class="flex flex-wrap gap-1 {data.data ? '' : 'invisible'}"
 			role="group"
-			aria-label="Nach Art filtern"
+			aria-label={t('Nach Art filtern')}
 		>
 			<button
 				type="button"
@@ -150,7 +156,7 @@
 				aria-pressed={kind === ''}
 				onclick={() => (kind = '')}
 			>
-				Alle <span class="tabular">{formatNumber(entries.length)}</span>
+				{t('Alle')} <span class="tabular">{formatNumber(entries.length)}</span>
 			</button>
 			{#each KINDS.filter((k) => counts[k.id]) as k (k.id)}
 				<button
@@ -168,7 +174,7 @@
 		</div>
 		<span class="flex-1"></span>
 		<Button size="sm" variant="ghost" href="/events?device={deviceId}" iconRight="arrow-right"
-			>Alle Events</Button
+			>{t('Alle Events')}</Button
 		>
 	</div>
 
@@ -181,8 +187,8 @@
 			<EmptyState
 				compact
 				icon="history"
-				title="Keine Einträge"
-				description="Für dieses Gerät ist noch nichts passiert."
+				title={t('Keine Einträge')}
+				description={t('Für dieses Gerät ist noch nichts passiert.')}
 			/>
 		</div>
 	{:else}
@@ -221,8 +227,8 @@
 								<p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
 									{#if e.kind === 'event'}
 										{#if e.event?.label}<span>{e.event.label}</span>{/if}
-										{#if e.event?.ackedAt}<Badge tone="ok">quittiert</Badge>{:else if e.event}<Badge
-												>offen</Badge
+										{#if e.event?.ackedAt}<Badge tone="ok">{t('quittiert')}</Badge>{:else if e.event}<Badge
+												>{t('offen')}</Badge
 											>{/if}
 									{:else if changeLabel[e.change]}
 										<span class={changeTone(e.change)}>{changeLabel[e.change]}</span>
@@ -234,6 +240,7 @@
 											disabled={opening === e.eventId}
 											onclick={() => openEventDiff(e)}
 										>
+											<!-- i18n-ignore: "Diff" is the name of the page in both languages -->
 											<Icon name="diff" size={12} /> Diff
 										</button>
 									{:else if e.kind !== 'event' && e.kind !== 'package'}
@@ -241,6 +248,7 @@
 											href={timeDiffHref(e.ts)}
 											class="inline-flex items-center gap-1 text-accent hover:underline"
 										>
+											<!-- i18n-ignore: "Diff" is the name of the page in both languages -->
 											<Icon name="diff" size={12} /> Diff
 										</a>
 									{/if}
@@ -255,7 +263,7 @@
 		{#if truncated}
 			<div class="flex justify-center">
 				<Button size="sm" loading={data.loading} onclick={() => (limit = Math.min(2000, limit + 500))}
-					>Ältere Einträge laden</Button
+					>{t('Ältere Einträge laden')}</Button
 				>
 			</div>
 		{/if}

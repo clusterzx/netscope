@@ -1,6 +1,7 @@
 // Helpers for the system pages: tab catalogue, labels, validation and a JSON diff.
 import { errorMessage, fieldErrors } from '$lib/api';
 import type { IconName } from '$lib/components/ui';
+import { t } from '$lib/i18n';
 import type { Permission } from '$lib/stores/auth.svelte';
 import type { Tone } from '$lib/utils/labels';
 
@@ -16,79 +17,94 @@ export interface SystemTab {
 export const SYSTEM_TABS: SystemTab[] = [
 	{
 		id: 'overview',
-		label: 'Überblick',
+		label: t('Überblick'),
 		icon: 'monitor',
-		description: 'Version, Laufzeit, Datenbank und Umgebung'
+		description: t('Version, Laufzeit, Datenbank und Umgebung')
 	},
 	{
 		id: 'settings',
-		label: 'Einstellungen',
+		label: t('Einstellungen'),
 		icon: 'system',
-		description: 'Systemweite Einstellungen und Log-Level'
+		description: t('Systemweite Einstellungen und Log-Level')
 	},
 	{
 		id: 'federation',
-		label: 'Verbund',
+		label: t('Verbund'),
 		icon: 'globe',
-		description: 'Mehrere NetScope-Instanzen bündeln: Standorte liefern an eine Zentrale'
+		description: t('Mehrere NetScope-Instanzen bündeln: Standorte liefern an eine Zentrale')
 	},
-	{ id: 'account', label: 'Konto', icon: 'user', description: 'Eigenes Passwort und Zwei-Faktor-Anmeldung' },
+	{
+		id: 'account',
+		label: t('Konto'),
+		icon: 'user',
+		description: t('Eigenes Passwort, Sprache und Zwei-Faktor-Anmeldung')
+	},
 	{
 		id: 'users',
-		label: 'Benutzer',
+		label: t('Benutzer@@Mehrzahl'),
 		icon: 'user',
-		description: 'Konten anlegen, Rollen zuweisen, Passwörter und 2FA zurücksetzen',
+		description: t('Konten anlegen, Rollen zuweisen, Passwörter und 2FA zurücksetzen'),
 		perm: 'users.manage'
 	},
 	{
 		id: 'roles',
-		label: 'Rollen',
+		label: t('Rollen'),
 		icon: 'shield',
-		description: 'Welche Rechte eine Rolle hat und ob sie 2FA verlangt',
+		description: t('Welche Rechte eine Rolle hat und ob sie 2FA verlangt'),
 		perm: 'users.manage'
 	},
 	{
 		id: 'auth',
-		label: 'Anmeldung',
+		label: t('Anmeldung'),
 		icon: 'lock',
-		description: 'Zentrale Anmeldung über OIDC (SSO) und LDAP / Active Directory',
+		description: t('Zentrale Anmeldung über OIDC (SSO) und LDAP / Active Directory'),
 		perm: 'users.manage'
 	},
-	{ id: 'tokens', label: 'API-Tokens', icon: 'key', description: 'Tokens für Skripte und Automatisierung' },
+	{
+		id: 'tokens',
+		label: t('API-Tokens'),
+		icon: 'key',
+		description: t('Tokens für Skripte und Automatisierung')
+	},
 	{
 		id: 'subnets',
-		label: 'Subnetze',
+		label: t('Subnetze'),
 		icon: 'network',
-		description: 'Netze, die gescannt und zugeordnet werden'
+		description: t('Netze, die gescannt und zugeordnet werden')
 	},
-	{ id: 'groups', label: 'Gruppen', icon: 'layers', description: 'Manuelle und regelbasierte Gerätegruppen' },
-	{ id: 'fields', label: 'Custom Fields', icon: 'tag', description: 'Eigene Geräteattribute' },
+	{
+		id: 'groups',
+		label: t('Gruppen'),
+		icon: 'layers',
+		description: t('Manuelle und regelbasierte Gerätegruppen')
+	},
+	{ id: 'fields', label: t('Custom Fields'), icon: 'tag', description: t('Eigene Geräteattribute') },
 	{
 		id: 'backups',
 		label: 'Backups',
 		icon: 'disk',
-		description: 'Datenbank sichern und wiederherstellen',
+		description: t('Datenbank sichern und wiederherstellen'),
 		perm: 'backups.manage'
 	},
 	{
 		id: 'vault',
 		label: 'Vault',
 		icon: 'lock',
-		description: 'Master-Key der verschlüsselten Credentials',
+		description: t('Master-Key der verschlüsselten Credentials'),
 		perm: 'system.manage'
 	},
 	{
 		id: 'logs',
-		label: 'Log-Viewer',
+		label: t('Log-Viewer'),
 		icon: 'terminal',
-		description: 'Anwendungsprotokoll mit Live-Ansicht',
+		description: t('Anwendungsprotokoll mit Live-Ansicht'),
 		perm: 'audit.view'
 	},
 	{
 		id: 'audit',
-		label: 'Audit-Log',
+		label: t('Audit-Log'),
 		icon: 'history',
-		description: 'Protokoll aller manuellen Änderungen',
+		description: t('Protokoll aller manuellen Änderungen'),
 		perm: 'audit.view'
 	}
 ];
@@ -100,8 +116,8 @@ export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export const logLevelLabel: Record<string, string> = {
 	debug: 'Debug',
 	info: 'Info',
-	warn: 'Warnung',
-	error: 'Fehler'
+	warn: t('Warnung'),
+	error: t('Fehler')
 };
 
 const levelRank: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3 };
@@ -121,27 +137,27 @@ export function logTone(level: string): Tone {
 // ---------------------------------------------------------------- audit
 
 export const entityLabel: Record<string, string> = {
-	device: 'Gerät',
+	device: t('Gerät'),
 	credential: 'Credential',
-	customfield: 'Custom Field',
-	group: 'Gruppe',
-	subnet: 'Subnetz',
-	healthcheck: 'Health-Check',
+	customfield: t('Custom Field'),
+	group: t('Gruppe'),
+	subnet: t('Subnetz'),
+	healthcheck: t('Health-Check'),
 	plugin: 'Plugin',
-	rule: 'Regel',
-	run: 'Lauf',
+	rule: t('Regel'),
+	run: t('Lauf'),
 	event: 'Event',
-	report: 'Bericht',
+	report: t('Bericht'),
 	backup: 'Backup',
-	settings: 'Einstellungen',
-	token: 'API-Token',
-	user: 'Benutzer',
-	relation: 'Topologie-Kante',
-	file: 'Datei',
+	settings: t('Einstellungen'),
+	token: t('API-Token'),
+	user: t('Benutzer'),
+	relation: t('Topologie-Kante'),
+	file: t('Datei'),
 	vault: 'Vault',
-	view: 'Ansicht',
-	site: 'Standort',
-	federation: 'Verbund'
+	view: t('Ansicht'),
+	site: t('Standort'),
+	federation: t('Verbund')
 };
 
 /** Link to the UI page of an audited entity (null if none). */
@@ -183,7 +199,7 @@ function flatten(v: unknown, prefix: string, out: Map<string, unknown>) {
 		for (const [k, x] of entries) flatten(x, prefix ? `${prefix}.${k}` : k, out);
 		return;
 	}
-	out.set(prefix || '(Wert)', v);
+	out.set(prefix || t('(Wert)'), v);
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -232,15 +248,15 @@ export function cidrError(s: string): string | null {
 	const v = s.trim();
 	const [addr, bits, extra] = v.split('/');
 	if (!addr || bits === undefined || extra !== undefined)
-		return 'CIDR-Notation erwartet, z. B. 192.168.1.0/24';
+		return t('CIDR-Notation erwartet, z. B. 192.168.1.0/24');
 	const n = Number(bits);
 	if (isIPv4(addr)) {
-		if (!Number.isInteger(n) || n < 0 || n > 32) return 'Präfixlänge 0–32';
-		if (n < 16) return 'Maximal /16 (65.536 Adressen)';
+		if (!Number.isInteger(n) || n < 0 || n > 32) return t('Präfixlänge 0–32');
+		if (n < 16) return t('Maximal /16 (65.536 Adressen)');
 		return null;
 	}
-	if (isIP(addr)) return Number.isInteger(n) && n >= 0 && n <= 128 ? null : 'Präfixlänge 0–128';
-	return 'Ungültige IP-Adresse';
+	if (isIP(addr)) return Number.isInteger(n) && n >= 0 && n <= 128 ? null : t('Präfixlänge 0–128');
+	return t('Ungültige IP-Adresse');
 }
 
 /** Whether an IPv4 address lies in an IPv4 CIDR. */
@@ -271,6 +287,15 @@ export function apiErrors(
 	}
 	const general = rest.length ? rest.join(' · ') : Object.keys(errors).length ? null : errorMessage(e);
 	return { errors, general };
+}
+
+/**
+ * Splits a translated sentence at the placeholders left in it, so that their values can be
+ * set in markup (code, links): even entries are text, odd entries placeholder names.
+ *   'Back up {file} first.' → ['Back up ', 'file', ' first.']
+ */
+export function markupParts(s: string): string[] {
+	return s.split(/\{(\w+)\}/);
 }
 
 /** Quotes a query value if needed: group:"Mein Netz". */

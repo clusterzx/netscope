@@ -6,6 +6,7 @@
 <script lang="ts">
 	import type { AuthRoleMapping } from '$lib/api/generated';
 	import { Button, Input, Select, Toggle } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		mappings: AuthRoleMapping[];
@@ -50,9 +51,11 @@
 
 <div class="flex flex-col gap-3">
 	<div>
-		<p class="text-sm font-medium text-fg">Rollen aus Gruppen</p>
+		<p class="text-sm font-medium text-fg">{t('Rollen aus Gruppen')}</p>
 		<p class="text-xs text-fg-subtle">
-			Von oben nach unten: Die erste Gruppe, der ein Konto angehört, bestimmt die Rolle. {groupHint}
+			{t('Von oben nach unten: Die erste Gruppe, der ein Konto angehört, bestimmt die Rolle. {hint}', {
+				hint: groupHint
+			})}
 		</p>
 	</div>
 	{#if mappings.length}
@@ -60,14 +63,14 @@
 			{#each mappings as m, i (i)}
 				<li class="grid grid-cols-[1fr_12rem_auto] items-start gap-2 max-sm:grid-cols-1">
 					<Input
-						aria-label="Gruppe {i + 1}"
+						aria-label={t('Gruppe {n}', { n: i + 1 })}
 						bind:value={m.group}
 						placeholder={groupPlaceholder}
 						error={errors[`mappings.${i}.group`]}
 						mono
 					/>
 					<Select
-						aria-label="Rolle für Gruppe {i + 1}"
+						aria-label={t('Rolle für Gruppe {n}', { n: i + 1 })}
 						value={String(m.roleId)}
 						options={roleOptions}
 						error={errors[`mappings.${i}.roleId`]}
@@ -78,7 +81,7 @@
 							size="sm"
 							variant="ghost"
 							icon="arrow-up"
-							label="Nach oben"
+							label={t('Nach oben')}
 							disabled={i === 0}
 							onclick={() => move(i, -1)}
 						/>
@@ -86,32 +89,34 @@
 							size="sm"
 							variant="ghost"
 							icon="arrow-down"
-							label="Nach unten"
+							label={t('Nach unten')}
 							disabled={i === mappings.length - 1}
 							onclick={() => move(i, 1)}
 						/>
-						<Button size="sm" variant="ghost" icon="trash" label="Entfernen" onclick={() => remove(i)} />
+						<Button size="sm" variant="ghost" icon="trash" label={t('Entfernen')} onclick={() => remove(i)} />
 					</div>
 				</li>
 			{/each}
 		</ol>
 	{/if}
 	<div>
-		<Button size="sm" icon="plus" onclick={add}>Gruppe zuordnen</Button>
+		<Button size="sm" icon="plus" onclick={add}>{t('Gruppe zuordnen')}</Button>
 	</div>
 	<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 		<Select
-			label="Ohne passende Gruppe"
+			label={t('Ohne passende Gruppe')}
 			value={String(defaultRoleId)}
-			options={[{ value: '0', label: 'Kein Zugriff' }, ...roleOptions]}
-			hint="Rolle für Konten, die keiner Gruppe oben angehören"
+			options={[{ value: '0', label: t('Kein Zugriff') }, ...roleOptions]}
+			hint={t('Rolle für Konten, die keiner Gruppe oben angehören')}
 			error={errors.defaultRoleId}
 			onchange={(e) => (defaultRoleId = Number((e.currentTarget as HTMLSelectElement).value))}
 		/>
 		<Toggle
 			bind:checked={syncRole}
-			label="Rolle bei jeder Anmeldung übernehmen"
-			description="Aus: Die Gruppen bestimmen die Rolle nur bei der ersten Anmeldung, danach gilt, was in NetScope eingestellt ist."
+			label={t('Rolle bei jeder Anmeldung übernehmen')}
+			description={t(
+				'Aus: Die Gruppen bestimmen die Rolle nur bei der ersten Anmeldung, danach gilt, was in NetScope eingestellt ist.'
+			)}
 		/>
 	</div>
 </div>

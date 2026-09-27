@@ -1,6 +1,7 @@
 <!-- One field of a SchemaForm (dispatch by field type). -->
 <script lang="ts">
 	import type { SchemaField } from '$lib/api/types';
+	import { t } from '$lib/i18n';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import FormField from '$lib/components/ui/FormField.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
@@ -29,9 +30,10 @@
 	const hint = $derived(f.description);
 	const defaultHint = $derived.by(() => {
 		if (f.default === undefined || f.default === null || f.default === '') return '';
-		if (Array.isArray(f.default)) return f.default.length ? `Standard: ${f.default.join(', ')}` : '';
+		if (Array.isArray(f.default))
+			return f.default.length ? t('Standard: {value}', { value: f.default.join(', ') }) : '';
 		if (typeof f.default === 'boolean') return '';
-		return `Standard: ${f.default}`;
+		return t('Standard: {value}', { value: String(f.default) });
 	});
 	const fullHint = $derived(
 		[hint, f.type === 'int' || f.type === 'duration' ? defaultHint : ''].filter(Boolean).join(' · ')
@@ -144,7 +146,7 @@
 			{options}
 			value={list()}
 			onchange={(v) => set(v)}
-			placeholder={f.placeholder || 'Auswählen …'}
+			placeholder={f.placeholder || t('Auswählen …')}
 		/>
 	{/if}
 {:else if f.type === 'enum'}
@@ -156,7 +158,7 @@
 		required={f.required}
 		{disabled}
 		{options}
-		placeholder={f.required && f.default ? undefined : '— keine Auswahl —'}
+		placeholder={f.required && f.default ? undefined : t('— keine Auswahl —')}
 		class="max-w-md"
 		bind:value={() => str(), (v) => set(v ?? '')}
 	/>
@@ -167,8 +169,8 @@
 		hint={[
 			fullHint,
 			f.type === 'subnet-list'
-				? 'Ein Subnetz pro Zeile (CIDR, z. B. 192.168.8.0/24)'
-				: 'Ein Eintrag pro Zeile'
+				? t('Ein Subnetz pro Zeile (CIDR, z. B. 192.168.8.0/24)')
+				: t('Ein Eintrag pro Zeile')
 		]
 			.filter(Boolean)
 			.join(' · ')}
@@ -195,10 +197,10 @@
 	<Input
 		{id}
 		label={f.label}
-		hint={fullHint || 'Dauer, z. B. 30s, 5m, 2h'}
+		hint={fullHint || t('Dauer, z. B. 30s, 5m, 2h')}
 		{error}
 		required={f.required}
-		placeholder={f.placeholder || 'z. B. 30s, 5m, 1h'}
+		placeholder={f.placeholder || t('z. B. 30s, 5m, 1h')}
 		mono
 		{disabled}
 		class="max-w-60"

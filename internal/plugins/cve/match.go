@@ -1170,14 +1170,14 @@ var matchTypeText = map[string]string{
 
 func (mr *matchRun) newEvent(dv *device, h *hit) plugin.Event {
 	ci := mr.info[h.cve]
-	title := fmt.Sprintf("%s auf %s", h.cve, dv.name)
+	title := fmt.Sprintf("%s auf %s", h.cve, dv.name) // i18n:ignore – translated via "CVE-%s auf %s" (a bare "%s auf %s" would match any text)
 	var cvss any
 	if ci != nil && ci.score != nil {
 		title = fmt.Sprintf("%s (CVSS %.1f) auf %s", h.cve, *ci.score, dv.name)
 		cvss = *ci.score
 	}
 	var msg strings.Builder
-	fmt.Fprintf(&msg, "%s %s – Abgleich: %s.", h.e.product, h.e.version, matchTypeText[h.typ])
+	fmt.Fprintf(&msg, "%s %s – Abgleich: %s.", h.e.product, h.e.version, matchTypeText[h.typ]) // i18n:ignore – translated per match type (see i18n_en.go)
 	if h.typ == MatchHeuristic {
 		msg.WriteString(" Die Distribution hat die Lücke möglicherweise bereits per Backport geschlossen.")
 	}

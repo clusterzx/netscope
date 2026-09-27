@@ -1,36 +1,37 @@
 // Helpers for the plugin pages (list, detail, runs).
 import { api, ApiError } from '$lib/api';
+import { t, tn } from '$lib/i18n';
 import type { PluginScope, PluginView, RunView } from '$lib/api';
 import { formatBytes, formatNumber } from '$lib/utils/format';
 
 export const KIND_ORDER = ['scanner', 'importer', 'processor', 'publisher'] as const;
 
 export const kindDescription: Record<string, string> = {
-	scanner: 'Erzeugen Beobachtungen über Geräte durch aktive Abfragen im Netz.',
-	importer: 'Holen Bestandsdaten aus fremden Systemen (API/SSH), ohne zu scannen.',
-	processor: 'Verarbeiten Beobachtungen zu Zustand, Events und Berichten.',
-	publisher: 'Verschicken Benachrichtigungen, die von Regeln ausgelöst werden.'
+	scanner: t('Erzeugen Beobachtungen über Geräte durch aktive Abfragen im Netz.'),
+	importer: t('Holen Bestandsdaten aus fremden Systemen (API/SSH), ohne zu scannen.'),
+	processor: t('Verarbeiten Beobachtungen zu Zustand, Events und Berichten.'),
+	publisher: t('Verschicken Benachrichtigungen, die von Regeln ausgelöst werden.')
 };
 
 export const capabilityLabel: Record<string, string> = {
-	run: 'Läufe',
-	publish: 'Versand',
-	changes: 'Änderungs-Hook',
-	runFinished: 'Folgelauf-Hook',
-	actions: 'Aktionen'
+	run: t('Läufe'),
+	publish: t('Versand'),
+	changes: t('Änderungs-Hook'),
+	runFinished: t('Folgelauf-Hook'),
+	actions: t('Aktionen')
 };
 
 export const capabilityHint: Record<string, string> = {
-	run: 'Kann geplant und manuell ausgeführt werden',
-	publish: 'Stellt Benachrichtigungen zu',
-	changes: 'Reagiert auf Zustandsänderungen anderer Plugins',
-	runFinished: 'Wird nach Läufen anderer Plugins aktiv',
-	actions: 'Bietet Aktionen (Schaltflächen) an'
+	run: t('Kann geplant und manuell ausgeführt werden'),
+	publish: t('Stellt Benachrichtigungen zu'),
+	changes: t('Reagiert auf Zustandsänderungen anderer Plugins'),
+	runFinished: t('Wird nach Läufen anderer Plugins aktiv'),
+	actions: t('Bietet Aktionen (Schaltflächen) an')
 };
 
 export const targetsLabel: Record<string, string> = {
-	subnets: 'Arbeitet auf Subnetzen',
-	devices: 'Arbeitet auf Geräten'
+	subnets: t('Arbeitet auf Subnetzen'),
+	devices: t('Arbeitet auf Geräten')
 };
 
 /** Plugin can be scheduled / run manually. */
@@ -113,23 +114,24 @@ export function normScope(s: PluginScope | null | undefined): PluginScope {
 	};
 }
 
-/** Short German description of a scope. */
+/** Short description of a scope ("Alle aktiven Subnetze · Gruppe Server · 3 Geräte"). */
 export function scopeSummary(s: PluginScope | null | undefined, groupName?: (id: number) => string): string {
-	if (!s) return 'Alle aktiven Subnetze';
+	if (!s) return t('Alle aktiven Subnetze');
 	const parts: string[] = [];
-	if (s.allSubnets) parts.push('alle aktiven Subnetze');
+	// "all active subnets" is always the first part
+	if (s.allSubnets) parts.push(t('Alle aktiven Subnetze'));
 	else if (s.subnets?.length) parts.push(s.subnets.join(', '));
 	if (s.groups?.length)
 		parts.push(
-			(s.groups.length === 1 ? 'Gruppe ' : 'Gruppen ') +
-				s.groups.map((g) => groupName?.(g) ?? `#${g}`).join(', ')
+			tn(s.groups.length, 'Gruppe {names}', 'Gruppen {names}', {
+				names: s.groups.map((g) => groupName?.(g) ?? `#${g}`).join(', ')
+			})
 		);
 	if (s.tags?.length) parts.push((s.tags.length === 1 ? 'Tag ' : 'Tags ') + s.tags.join(', '));
-	if (s.devices?.length) parts.push(s.devices.length === 1 ? '1 Gerät' : `${s.devices.length} Geräte`);
-	if (s.query) parts.push(`Filter „${s.query}“`);
-	if (!parts.length) return 'Keine Ziele';
-	const text = parts.join(' · ');
-	return text.charAt(0).toUpperCase() + text.slice(1);
+	if (s.devices?.length) parts.push(tn(s.devices.length, '{n} Gerät', '{n} Geräte'));
+	if (s.query) parts.push(t('Filter „{query}“', { query: s.query }));
+	if (!parts.length) return t('Keine Ziele');
+	return parts.join(' · ');
 }
 
 /** A scope that selects devices (groups, tags, single devices or a filter). */
@@ -137,20 +139,22 @@ export function isDeviceScope(s: PluginScope | null | undefined): boolean {
 	return !isFullScope(s);
 }
 
-/** Short German description of a credential scope ("Überall", "Subnetz …", "Tag …"). */
+/** Short description of a credential scope ("Überall", "Subnetz …", "Tag …"). */
 export function credentialScopeSummary(
 	s: PluginScope | null | undefined,
 	groupName?: (id: number) => string
 ): string {
-	if (!s) return 'Überall';
+	if (!s) return t('Überall');
 	const subnets = s.subnets ?? [];
 	if (isDeviceScope(s)) {
 		const text = scopeSummary({ ...s, allSubnets: false, subnets: [] }, groupName);
-		return !s.allSubnets && subnets.length ? `${text} · nur in ${subnets.join(', ')}` : text;
+		return !s.allSubnets && subnets.length
+			? t('{scope} · nur in {subnets}', { scope: text, subnets: subnets.join(', ') })
+			: text;
 	}
 	if (!s.allSubnets && subnets.length)
-		return (subnets.length === 1 ? 'Subnetz ' : 'Subnetze ') + subnets.join(', ');
-	return 'Überall';
+		return tn(subnets.length, 'Subnetz {list}', 'Subnetze {list}', { list: subnets.join(', ') });
+	return t('Überall');
 }
 
 /** How specific a credential scope is (plugins try the most specific credential first). */
@@ -169,7 +173,7 @@ export function credentialScopeLevel(
 export function statValue(key: string, v: unknown): string {
 	if (v === null || v === undefined) return '–';
 	if (typeof v === 'number') return /bytes?$/.test(key) ? formatBytes(v) : formatNumber(v, 2);
-	if (typeof v === 'boolean') return v ? 'ja' : 'nein';
+	if (typeof v === 'boolean') return v ? t('ja') : t('nein');
 	if (typeof v === 'string') return v;
 	return JSON.stringify(v);
 }
@@ -226,7 +230,7 @@ export function diffUrl(prev: RunView, run: RunView): string {
 	return `/diff?runA=${prev.id}&runB=${run.id}${device}`;
 }
 
-/** Log level → CSS classes and German label. */
+/** Log level → CSS classes. */
 export function logLevelClass(level: string): string {
 	switch (level.toUpperCase()) {
 		case 'ERROR':

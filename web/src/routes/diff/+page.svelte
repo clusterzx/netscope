@@ -27,10 +27,12 @@
 		formatDuration,
 		formatNumber,
 		fromDateTimeLocal,
+		plural,
 		toDateTimeLocal
 	} from '$lib/utils/format';
 	import { pluginKindLabel, runTriggerLabel, label } from '$lib/utils/labels';
 	import { debounce, intParam, listParam, setParams } from '$lib/utils/url';
+	import { intlLocale, t } from '$lib/i18n';
 
 	// ---------------------------------------------------------------- URL state
 	const sp = $derived(page.url.searchParams);
@@ -70,7 +72,7 @@
 			.sort(
 				(a, b) =>
 					Number(b.info.kind === 'scanner') - Number(a.info.kind === 'scanner') ||
-					a.info.name.localeCompare(b.info.name, 'de')
+					a.info.name.localeCompare(b.info.name, intlLocale)
 			)
 			.map((p) => ({ value: p.info.id, label: `${p.info.name} (${label(pluginKindLabel, p.info.kind)})` }));
 		const side = diff.data?.b;
@@ -191,7 +193,11 @@
 		for (const k of ['hosts', 'devices', 'observations']) {
 			const v = s[k];
 			if (typeof v === 'number')
-				return `${formatNumber(v)} ${k === 'hosts' ? 'Hosts' : k === 'devices' ? 'Geräte' : 'Beob.'}`;
+				return k === 'hosts'
+					? `${formatNumber(v)} Hosts`
+					: k === 'devices'
+						? plural(v, t('Gerät'), t('Geräte'))
+						: t('{n} Beob.', { n: formatNumber(v) });
 		}
 		return '';
 	}
@@ -208,7 +214,7 @@
 			if (side && id && (id === runA || id === runB) && !opts.some((o) => o.value === String(id)))
 				opts.push({
 					value: String(id),
-					label: `#${id} · ${formatDateTime(side.time)}${side.partial ? ' · Teilscan' : ''}`
+					label: `#${id} · ${formatDateTime(side.time)}${side.partial ? ` · ${t('Teilscan')}` : ''}`
 				});
 		}
 		for (const id of [runA, runB])
@@ -239,17 +245,17 @@
 	let timeError = $state<string | null>(null);
 	$effect(() => {
 		const f = from;
-		const t = to;
+		const until = to;
 		untrack(() => {
 			fromLocal = f ? toDateTimeLocal(f) : fromLocal || toDateTimeLocal(Date.now() - 86400e3);
-			toLocal = toDateTimeLocal(t);
+			toLocal = toDateTimeLocal(until);
 		});
 	});
 
 	const PRESETS = [
-		{ label: 'Letzte 24 h', ms: 86400e3 },
-		{ label: 'Letzte 7 Tage', ms: 7 * 86400e3 },
-		{ label: 'Letzte 30 Tage', ms: 30 * 86400e3 }
+		{ label: t('Letzte 24 h'), ms: 86400e3 },
+		{ label: t('Letzte 7 Tage'), ms: 7 * 86400e3 },
+		{ label: t('Letzte 30 Tage'), ms: 30 * 86400e3 }
 	];
 
 	function applyPreset(ms: number) {
@@ -267,20 +273,20 @@
 	function applyTime() {
 		timeError = null;
 		const f = fromDateTimeLocal(fromLocal);
-		const t = fromDateTimeLocal(toLocal);
+		const until = fromDateTimeLocal(toLocal);
 		if (!f) {
-			timeError = 'Startzeitpunkt angeben';
+			timeError = t('Startzeitpunkt angeben');
 			return;
 		}
-		if (t && new Date(f) >= new Date(t)) {
-			timeError = '„Von“ muss vor „Bis“ liegen';
+		if (until && new Date(f) >= new Date(until)) {
+			timeError = t('„Von“ muss vor „Bis“ liegen');
 			return;
 		}
 		if (new Date(f).getTime() > Date.now()) {
-			timeError = '„Von“ liegt in der Zukunft';
+			timeError = t('„Von“ liegt in der Zukunft');
 			return;
 		}
-		setParams({ mode: null, runA: null, runB: null, plugin: null, from: f, to: t || null });
+		setParams({ mode: null, runA: null, runB: null, plugin: null, from: f, to: until || null });
 	}
 
 	function setMode(m: string) {
@@ -317,30 +323,37 @@
 	// ---------------------------------------------------------------- result filters (URL)
 	let textInput = $state(untrack(() => sp.get('text') ?? ''));
 	$effect(() => {
-		const t = textParam;
+		const text = textParam;
 		untrack(() => {
-			if (t !== textInput.trim()) textInput = t;
+			if (text !== textInput.trim()) textInput = text;
 		});
 	});
-	const applyText = debounce((t: string) => setParams({ text: t.trim() || null }), 300);
+	const applyText = debounce((text: string) => setParams({ text: text.trim() || null }), 300);
 	$effect(() => () => applyText.cancel());
 
 	const selectedRunB = $derived(runList.data?.find((r) => r.id === runB));
 	const olderFirst = $derived(!result || result.a.kind !== 'run' || result.a.time <= result.b.time);
+	/** how run B was started and by whom */
+	const runBTrigger = $derived.by(() => {
+		if (!selectedRunB) return '';
+		const trigger = label(runTriggerLabel, selectedRunB.trigger);
+		const by = selectedRunB.requestedBy;
+		return by && by !== trigger ? `${trigger} · ${by}` : trigger;
+	});
 </script>
 
-<PageHeader title="Diff" description="Zwei Läufe oder zwei Zeitpunkte gegeneinander vergleichen" />
+<PageHeader title="Diff" description={t('Zwei Läufe oder zwei Zeitpunkte gegeneinander vergleichen')} />
 
 <div class="flex flex-col gap-4">
 	<Card padding="none">
 		<Tabs
 			items={[
-				{ id: 'runs', label: 'Läufe vergleichen', icon: 'play' },
-				{ id: 'time', label: 'Zeitpunkte vergleichen', icon: 'clock' }
+				{ id: 'runs', label: t('Läufe vergleichen'), icon: 'play' },
+				{ id: 'time', label: t('Zeitpunkte vergleichen'), icon: 'clock' }
 			]}
 			active={mode}
 			onchange={setMode}
-			label="Vergleichsart"
+			label={t('Vergleichsart')}
 			idPrefix="diff-"
 			class="px-4 pt-1"
 		/>
@@ -353,43 +366,44 @@
 						label="Plugin"
 						options={pluginOptions}
 						value={plugin}
-						placeholder={plugins.loading && !plugins.data ? 'Lädt …' : 'Plugin wählen …'}
+						placeholder={plugins.loading && !plugins.data ? t('Lädt …') : t('Plugin wählen …')}
 						onchange={(e) => setPlugin(e.currentTarget.value)}
-						hint="Scanner und Importer"
+						hint={t('Scanner und Importer')}
 					/>
 					<Select
-						label="Lauf A (älter)"
+						label={t('Lauf A (älter)')}
 						options={runOptions}
 						value={runA ? String(runA) : ''}
-						placeholder={runList.loading ? 'Lädt …' : 'Lauf wählen …'}
+						placeholder={runList.loading ? t('Lädt …') : t('Lauf wählen …')}
 						onchange={(e) => setRunA(e.currentTarget.value)}
 						disabled={!plugin}
 					/>
 					<Button
 						icon="swap"
-						label="Läufe tauschen"
+						label={t('Läufe tauschen')}
 						class="hidden xl:mt-6 xl:inline-flex"
 						disabled={!runA || !runB}
 						onclick={swapRuns}
 					/>
 					<Select
-						label="Lauf B (neuer)"
+						label={t('Lauf B (neuer)')}
 						options={runOptions}
 						value={runB ? String(runB) : ''}
-						placeholder={runList.loading ? 'Lädt …' : 'Lauf wählen …'}
+						placeholder={runList.loading ? t('Lädt …') : t('Lauf wählen …')}
 						onchange={(e) => setRunB(e.currentTarget.value)}
 						disabled={!plugin}
-						error={sameRun ? 'Zwei verschiedene Läufe wählen' : null}
+						error={sameRun ? t('Zwei verschiedene Läufe wählen') : null}
 					/>
 				</div>
 				<div class="mt-3 flex flex-wrap items-center gap-2">
 					<Button size="sm" icon="swap" class="xl:hidden" disabled={!runA || !runB} onclick={swapRuns}
-						>Tauschen</Button
+						>{t('Tauschen')}</Button
 					>
 					<DevicePicker value={device} size="sm" onchange={(id) => setParams({ device: id })} />
 					{#if !olderFirst}
 						<span class="flex items-center gap-1 text-xs text-warn">
-							<Icon name="alert" size={13} /> Lauf A ist neuer als Lauf B – „neu“ und „entfernt“ sind vertauscht.
+							<Icon name="alert" size={13} />
+							{t('Lauf A ist neuer als Lauf B – „neu“ und „entfernt“ sind vertauscht.')}
 						</span>
 					{/if}
 				</div>
@@ -397,7 +411,7 @@
 					<ErrorState error={runList.error} compact class="mt-3" onretry={() => runList.reload()} />
 				{:else if plugin && runList.data && runList.data.length < 2 && !runA}
 					<p class="mt-3 text-sm text-fg-muted">
-						Für dieses Plugin gibt es noch keine zwei erfolgreichen Läufe.
+						{t('Für dieses Plugin gibt es noch keine zwei erfolgreichen Läufe.')}
 					</p>
 				{/if}
 			{:else}
@@ -408,15 +422,21 @@
 						applyTime();
 					}}
 				>
-					<Input type="datetime-local" label="Von" bind:value={fromLocal} required class="w-full sm:w-56" />
 					<Input
 						type="datetime-local"
-						label="Bis"
-						bind:value={toLocal}
-						hint="leer = jetzt"
+						label={t('Von')}
+						bind:value={fromLocal}
+						required
 						class="w-full sm:w-56"
 					/>
-					<Button type="submit" variant="primary" icon="diff" class="sm:mt-6">Vergleichen</Button>
+					<Input
+						type="datetime-local"
+						label={t('Bis')}
+						bind:value={toLocal}
+						hint={t('leer = jetzt')}
+						class="w-full sm:w-56"
+					/>
+					<Button type="submit" variant="primary" icon="diff" class="sm:mt-6">{t('Vergleichen')}</Button>
 					<div class="flex flex-wrap gap-1.5 sm:mt-6">
 						{#each PRESETS as p (p.label)}
 							<Button size="sm" variant="subtle" onclick={() => applyPreset(p.ms)}>{p.label}</Button>
@@ -435,10 +455,12 @@
 		{#if !(mode === 'runs' && (latest.loading || runList.loading))}
 			<EmptyState
 				icon="diff"
-				title={mode === 'runs' ? 'Zwei Läufe wählen' : 'Zeitraum wählen'}
+				title={mode === 'runs' ? t('Zwei Läufe wählen') : t('Zeitraum wählen')}
 				description={mode === 'runs'
-					? 'Vergleicht die Beobachtungen zweier erfolgreicher Läufe eines Plugins.'
-					: 'Vergleicht den Inventarzustand zu zwei Zeitpunkten (Geräte, IPs, Ports, Zertifikate, Pakete, Container …).'}
+					? t('Vergleicht die Beobachtungen zweier erfolgreicher Läufe eines Plugins.')
+					: t(
+							'Vergleicht den Inventarzustand zu zwei Zeitpunkten (Geräte, IPs, Ports, Zertifikate, Pakete, Container …).'
+						)}
 			/>
 		{:else}
 			<Skeleton rows={4} />
@@ -467,17 +489,17 @@
 									class="hover:text-accent hover:underline"
 									href="/plugins/{side.pluginId}/runs/{side.runId}"
 								>
-									{side.pluginName || side.pluginId} · Lauf #{side.runId}
+									{side.pluginName || side.pluginId} · {t('Lauf #{id}', { id: side.runId ?? '' })}
 								</a>
 							{:else}
-								Lauf #{side.runId}
+								{t('Lauf #{id}', { id: side.runId ?? '' })}
 							{/if}
 						</div>
 						<div class="text-sm text-fg-muted">
 							{formatDateTime(side.time, true)}
 							{#if side.partial}
-								<Badge tone="warn" class="ml-1" title="Der Lauf umfasste nur ausgewählte Geräte"
-									>Teilscan</Badge
+								<Badge tone="warn" class="ml-1" title={t('Der Lauf umfasste nur ausgewählte Geräte')}
+									>{t('Teilscan')}</Badge
 								>
 							{/if}
 							{#if side.finished}
@@ -488,7 +510,7 @@
 						</div>
 					{:else}
 						<div class="font-medium text-fg">{formatDateTime(side.time, true)}</div>
-						<div class="text-sm text-fg-muted">Inventarzustand</div>
+						<div class="text-sm text-fg-muted">{t('Inventarzustand')}</div>
 					{/if}
 				</div>
 			{/each}
@@ -496,23 +518,26 @@
 
 		{#if partialSide}
 			<Alert tone="warn">
-				Lauf #{partialSide.runId} umfasste nur ausgewählte Geräte – Geräte außerhalb dieses Laufs erscheinen als
-				„neu“ bzw. „entfernt“.{#if !device}{' '}Mit einem Gerätefilter lässt sich der Vergleich auf ein
-					erfasstes Gerät beschränken.{/if}
+				{t(
+					'Lauf #{id} umfasste nur ausgewählte Geräte – Geräte außerhalb dieses Laufs erscheinen als „neu“ bzw. „entfernt“.',
+					{ id: partialSide.runId ?? '' }
+				)}{#if !device}{' '}{t(
+						'Mit einem Gerätefilter lässt sich der Vergleich auf ein erfasstes Gerät beschränken.'
+					)}{/if}
 			</Alert>
 		{/if}
 		{#if differentPlugins}
 			<Alert tone="warn">
-				Die Läufe stammen von verschiedenen Plugins – Unterschiede können aus den unterschiedlichen
-				Datenquellen kommen.
+				{t(
+					'Die Läufe stammen von verschiedenen Plugins – Unterschiede können aus den unterschiedlichen Datenquellen kommen.'
+				)}
 			</Alert>
 		{/if}
 		{#if mode === 'runs' && selectedRunB}
 			<p class="-mt-2 text-xs text-fg-subtle">
-				Lauf B: {label(runTriggerLabel, selectedRunB.trigger)}{selectedRunB.requestedBy &&
-				selectedRunB.requestedBy !== label(runTriggerLabel, selectedRunB.trigger)
-					? ` · ${selectedRunB.requestedBy}`
-					: ''} · „Entfernt“ bedeutet: im neueren Lauf nicht mehr beobachtet.
+				{t('Lauf B: {trigger}', { trigger: runBTrigger })} · {t(
+					'„Entfernt“ bedeutet: im neueren Lauf nicht mehr beobachtet.'
+				)}
 			</p>
 		{/if}
 
@@ -523,7 +548,7 @@
 			bind:text={textInput}
 			onkinds={(k) => setParams({ kind: k })}
 			onchange={(c) => setParams({ change: c || null })}
-			ontext={(t) => applyText(t)}
+			ontext={(text) => applyText(text)}
 			onreset={() => {
 				applyText.cancel();
 				setParams({ kind: null, change: null, text: null });

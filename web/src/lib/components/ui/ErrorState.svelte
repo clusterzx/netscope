@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
 	import { errorMessage, ApiError } from '$lib/api/client';
+	import { t } from '$lib/i18n';
 	import Alert from './Alert.svelte';
 	import Button from './Button.svelte';
 	import Icon from './Icon.svelte';
@@ -19,7 +20,7 @@
 
 	let {
 		error,
-		title = 'Laden fehlgeschlagen',
+		title = t('Laden fehlgeschlagen'),
 		compact = false,
 		onretry,
 		class: klass = ''
@@ -33,7 +34,7 @@
 	<Alert tone="danger" {title} class={klass}>
 		{msg}
 		{#snippet actions()}
-			{#if onretry}<Button size="xs" icon="refresh" onclick={onretry}>Erneut</Button>{/if}
+			{#if onretry}<Button size="xs" icon="refresh" onclick={onretry}>{t('Erneut')}</Button>{/if}
 		{/snippet}
 	</Alert>
 {:else}
@@ -46,7 +47,7 @@
 			{msg}{#if status}<span class="text-fg-subtle"> ({status})</span>{/if}
 		</p>
 		{#if onretry}
-			<Button size="sm" icon="refresh" onclick={onretry} class="mt-1">Erneut versuchen</Button>
+			<Button size="sm" icon="refresh" onclick={onretry} class="mt-1">{t('Erneut versuchen')}</Button>
 		{/if}
 	</div>
 {/if}

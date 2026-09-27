@@ -5,6 +5,7 @@
 <script lang="ts">
 	import JsonView from '$lib/components/ui/JsonView.svelte';
 	import GenericData from './GenericData.svelte';
+	import { t } from '$lib/i18n';
 	import { fieldLabel, formatField, isScalar } from './inventory';
 
 	interface Props {
@@ -51,7 +52,7 @@
 </script>
 
 {#if Array.isArray(value)}
-	<GenericData value={{ Einträge: value }} {depth} />
+	<GenericData value={{ entries: value }} {depth} />
 {:else if !obj}
 	<p class="text-sm">{formatField('', value)}</p>
 {:else}
@@ -84,7 +85,7 @@
 								class="text-xs text-accent hover:underline"
 								onclick={() => (showAll[k] = true)}
 							>
-								+ {arr.length - 40} weitere
+								{t('+ {n} weitere', { n: arr.length - 40 })}
 							</button>
 						{/if}
 					</div>
@@ -121,7 +122,7 @@
 								class="w-full py-1.5 text-xs text-accent hover:underline"
 								onclick={() => (showAll[k] = true)}
 							>
-								Alle {rows.length} anzeigen
+								{t('Alle {n} anzeigen', { n: rows.length })}
 							</button>
 						{/if}
 					</div>

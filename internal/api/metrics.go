@@ -78,7 +78,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if !s.Settings.System().MetricsPublic {
 		if p, _ := s.authenticate(w, r); p == nil {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="netscope"`)
-			writeError(w, http.StatusUnauthorized, "unauthenticated", "Anmeldung erforderlich (API-Token)", nil)
+			writeError(w, r, http.StatusUnauthorized, "unauthenticated", "Anmeldung erforderlich (API-Token)", nil)
 			return
 		}
 	}

@@ -2,10 +2,11 @@
 <script lang="ts">
 	import { errorMessage, fieldErrors } from '$lib/api';
 	import type { DeviceAction } from '$lib/api';
-	import { SchemaForm, schemaInitial, schemaPayload, validateSchema } from '$lib/components/schema';
+	import { SchemaForm, schemaInitial, schemaPayload, validateSchema } from '$lib/components/schema'; // i18n-ignore
 	import Alert from '$lib/components/ui/Alert.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		open: boolean;
@@ -51,7 +52,7 @@
 
 <Modal
 	bind:open
-	title={action?.label ?? 'Aktion'}
+	title={action?.label ?? t('Aktion')}
 	description="{action?.pluginName} · {target}"
 	as="form"
 	onsubmit={submit}
@@ -72,7 +73,7 @@
 		{/if}
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="play" loading={busy}>Ausführen</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="play" loading={busy}>{t('Ausführen')}</Button>
 	{/snippet}
 </Modal>

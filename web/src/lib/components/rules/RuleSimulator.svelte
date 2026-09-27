@@ -24,9 +24,10 @@
 	import DevicePicker from '$lib/components/plugins/DevicePicker.svelte';
 	import { eventTypes } from '$lib/stores/catalog.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
+	import { t } from '$lib/i18n';
 	import { formatDateTime } from '$lib/utils/format';
 	import { eventCategoryLabel, severityLabel } from '$lib/utils/labels';
-	import { priorityLabel, priorityTone } from './rule';
+	import { modeLabel, priorityLabel, priorityTone } from './rule';
 
 	interface Props {
 		/** the rule as it would be saved (rulePayload of the editor state) */
@@ -63,9 +64,9 @@
 		const cat = catalog;
 		untrack(() => {
 			if (type && cat.some((e) => e.type === type)) return;
-			const concrete = types.find((t) => cat.some((e) => e.type === t));
+			const concrete = types.find((x) => cat.some((e) => e.type === x));
 			const byPattern = types
-				.filter((t) => t.endsWith('.*'))
+				.filter((x) => x.endsWith('.*'))
 				.map((p) => cat.find((e) => e.type.startsWith(p.slice(0, -1))))
 				.find(Boolean);
 			type = concrete ?? byPattern?.type ?? cat[0]?.type ?? '';
@@ -86,18 +87,18 @@
 		});
 	});
 
-	function payloadValue(t: string, raw: string): unknown {
+	function payloadValue(kind: string, raw: string): unknown {
 		const v = raw.trim();
-		if (t === 'number') {
+		if (kind === 'number') {
 			const n = Number(v.replace(',', '.'));
 			return isFinite(n) ? n : v;
 		}
-		if (t === 'list')
+		if (kind === 'list')
 			return v
 				.split(',')
 				.map((s) => s.trim())
 				.filter(Boolean);
-		if (t === 'bool') return v === 'true' || v === 'ja' || v === '1';
+		if (kind === 'bool') return ['true', '1', 'ja', 'yes'].includes(v.toLowerCase()); // i18n-ignore: accepted input words
 		return v;
 	}
 
@@ -121,9 +122,16 @@
 		if (deliver) {
 			const names = [...new Set(rule.actions.map((a) => a.publisher))].join(', ');
 			const ok = await confirm({
-				title: 'Testnachricht wirklich senden?',
-				message: `Wenn die Regel greift, wird für jede Aktion eine als Test markierte Nachricht über ${names || 'die Publisher'} verschickt.`,
-				confirmLabel: 'Senden'
+				title: t('Testnachricht wirklich senden?'),
+				message: names
+					? t(
+							'Wenn die Regel greift, wird für jede Aktion eine als Test markierte Nachricht über {publishers} verschickt.',
+							{ publishers: names }
+						)
+					: t(
+							'Wenn die Regel greift, wird für jede Aktion eine als Test markierte Nachricht über die Publisher verschickt.'
+						),
+				confirmLabel: t('Senden')
 			});
 			if (!ok) return;
 		}
@@ -154,7 +162,7 @@
 			run(false);
 		}}
 	>
-		<FormField label="Event-Typ" required>
+		<FormField label={t('Event-Typ')} required>
 			{#snippet children(fid, describedby)}
 				<div class="relative flex items-center">
 					<select
@@ -178,19 +186,21 @@
 		{#if spec?.description}<p class="-mt-2 text-xs text-fg-subtle">{spec.description}</p>{/if}
 
 		<Select
-			label="Schweregrad"
+			label={t('Schweregrad')}
 			options={severityOptions}
 			placeholder={spec
-				? `Standard (${severityLabel[spec.defaultSeverity] ?? spec.defaultSeverity})`
-				: 'Standard'}
+				? t('Standard ({severity})', {
+						severity: severityLabel[spec.defaultSeverity] ?? spec.defaultSeverity
+					})
+				: t('Standard')}
 			bind:value={severity}
 		/>
 
 		<DevicePicker
-			label="Gerät"
+			label={t('Gerät')}
 			single
 			bind:value={deviceIds}
-			hint="Optional. Name, IP, MAC und Zustand des Geräts werden ins Event übernommen."
+			hint={t('Optional. Name, IP, MAC und Zustand des Geräts werden ins Event übernommen.')}
 		/>
 
 		{#if fields.length}
@@ -204,7 +214,7 @@
 						type={f.type === 'number' ? 'number' : 'text'}
 						step="any"
 						bind:value={payload[f.key]}
-						placeholder={f.type === 'list' ? 'kommagetrennt' : f.type === 'number' ? 'Zahl' : ''}
+						placeholder={f.type === 'list' ? t('kommagetrennt') : f.type === 'number' ? t('Zahl') : ''}
 						hint={f.description || undefined}
 					/>
 				{/each}
@@ -216,16 +226,20 @@
 				class="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-[0.8125rem] font-medium text-fg-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden"
 			>
 				<Icon name="chevron-right" size={14} class="transition-transform group-open:rotate-90" />
-				Titel und Nachricht
+				{t('Titel und Nachricht')}
 			</summary>
 			<div class="flex flex-col gap-3 border-t border-border px-3 py-3">
-				<Input label="Titel" bind:value={title} placeholder="{spec?.label ?? 'Event'} (Simulation)" />
-				<Input label="Nachricht" bind:value={message} />
+				<Input
+					label={t('Titel')}
+					bind:value={title}
+					placeholder={t('{event} (Simulation)', { event: spec?.label ?? 'Event' })}
+				/>
+				<Input label={t('Nachricht')} bind:value={message} />
 			</div>
 		</details>
 
 		{#if blocked}
-			<Alert tone="warn" title="Regel noch unvollständig">{blocked}</Alert>
+			<Alert tone="warn" title={t('Regel noch unvollständig')}>{blocked}</Alert>
 		{/if}
 
 		<div class="flex flex-wrap gap-2">
@@ -236,7 +250,7 @@
 				loading={busy === 'check'}
 				disabled={!type || !!blocked || !!busy}
 			>
-				Nur prüfen
+				{t('Nur prüfen')}
 			</Button>
 			<Button
 				icon="send"
@@ -244,13 +258,13 @@
 				disabled={!type || !!blocked || !!busy}
 				onclick={() => run(true)}
 			>
-				Test wirklich senden
+				{t('Test wirklich senden')}
 			</Button>
 		</div>
 	</form>
 
 	{#if error}
-		<Alert tone="danger" title={errorList.length ? 'Die Regel ist ungültig' : 'Test fehlgeschlagen'}>
+		<Alert tone="danger" title={errorList.length ? t('Die Regel ist ungültig') : t('Test fehlgeschlagen')}>
 			{#if errorList.length}
 				<ul class="list-disc pl-4">
 					{#each errorList as msg, i (i)}<li class="break-words">{msg}</li>{/each}
@@ -262,7 +276,7 @@
 	{/if}
 
 	{#if result && resultFor}
-		<section class="flex flex-col gap-3" aria-live="polite" aria-label="Testergebnis">
+		<section class="flex flex-col gap-3" aria-live="polite" aria-label={t('Testergebnis')}>
 			<div
 				class="flex items-center gap-3 rounded-lg border px-3.5 py-3 {result.matched
 					? 'border-ok/35 bg-ok-soft'
@@ -274,9 +288,9 @@
 					class={result.matched ? 'text-ok' : 'text-fg-subtle'}
 				/>
 				<div class="min-w-0 flex-1">
-					<p class="font-semibold">{result.matched ? 'Regel greift' : 'Regel greift nicht'}</p>
+					<p class="font-semibold">{result.matched ? t('Regel greift') : t('Regel greift nicht')}</p>
 					<p class="text-xs text-fg-muted">
-						{resultFor.type} · {resultFor.deliver ? 'mit Versand' : 'nur geprüft'} · {formatDateTime(
+						{resultFor.type} · {resultFor.deliver ? t('mit Versand') : t('nur geprüft')} · {formatDateTime(
 							resultFor.at,
 							true
 						)}
@@ -286,9 +300,11 @@
 			{#if result.note}<Alert tone="info">{result.note}</Alert>{/if}
 
 			<div>
-				<h3 class="mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">Bedingungen</h3>
+				<h3 class="mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+					{t('Bedingungen')}
+				</h3>
 				{#if !result.conditions?.length}
-					<p class="text-sm text-fg-muted">Keine Bedingungen – jedes Event passt.</p>
+					<p class="text-sm text-fg-muted">{t('Keine Bedingungen – jedes Event passt.')}</p>
 				{:else}
 					<ul class="flex flex-col gap-1">
 						{#each result.conditions as c, i (i)}
@@ -297,7 +313,7 @@
 									name={c.ok ? 'check' : 'x'}
 									size={16}
 									class="mt-0.5 shrink-0 {c.ok ? 'text-ok' : 'text-danger'}"
-									label={c.ok ? 'erfüllt' : 'nicht erfüllt'}
+									label={c.ok ? t('erfüllt') : t('nicht erfüllt')}
 								/>
 								<span class="min-w-0">
 									<span class="font-medium">{c.condition}</span>
@@ -311,48 +327,57 @@
 
 			{#if result.matched}
 				<div>
-					<h3 class="mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">Aktionen</h3>
+					<h3 class="mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">{t('Aktionen')}</h3>
 					<ul class="flex flex-col gap-2">
 						{#each result.actions ?? [] as a, i (i)}
 							{@const delivery = result.delivery?.[a.publisher]}
 							<li class="flex flex-col gap-1.5 rounded-md border border-border px-3 py-2 text-sm">
 								<div class="flex flex-wrap items-center gap-2">
 									<span class="font-medium">{a.publisherName || a.publisher}</span>
-									{#if !a.publisherEnabled}<Badge tone="warn">inaktiv</Badge>{/if}
+									{#if !a.publisherEnabled}<Badge tone="warn">{t('inaktiv')}</Badge>{/if}
 									<Badge tone={priorityTone(a.priority)}>{priorityLabel[a.priority] ?? a.priority}</Badge>
-									<span class="text-xs text-fg-muted">{a.mode === 'batch' ? 'gesammelt' : 'sofort'}</span>
+									<span class="text-xs text-fg-muted"
+										>{a.mode === 'batch' ? modeLabel.batch : modeLabel.immediate}</span
+									>
 								</div>
 								{#if a.skipped}
-									<p class="text-xs text-warn">Übersprungen: {a.skipped}</p>
+									<p class="text-xs text-warn">{t('Übersprungen: {reason}', { reason: a.skipped })}</p>
 								{:else if a.throttled}
 									<p class="text-xs text-warn">
-										Gedrosselt – innerhalb der Drosselzeit wurde bereits benachrichtigt.
+										{t('Gedrosselt – innerhalb der Drosselzeit wurde bereits benachrichtigt.')}
 									</p>
 								{:else}
 									<p class="text-xs text-fg-muted">
-										Zustellung {formatDateTime(a.deliverAt, true)} (<RelativeTime value={a.deliverAt} />)
+										{t('Zustellung {time}', { time: formatDateTime(a.deliverAt, true) })} (<RelativeTime
+											value={a.deliverAt}
+										/>)
 										{#if a.quiet === 'delayed'}
-											· wegen Ruhezeit verzögert{/if}
+											· {t('wegen Ruhezeit verzögert')}{/if}
 									</p>
 								{/if}
-								{#if a.quiet === 'dropped'}<p class="text-xs text-warn">In der Ruhezeit verworfen.</p>{/if}
+								{#if a.quiet === 'dropped'}<p class="text-xs text-warn">
+										{t('In der Ruhezeit verworfen.')}
+									</p>{/if}
 								{#if a.escalateAt}
 									<p class="text-xs text-fg-muted">
-										Eskalation {formatDateTime(a.escalateAt)}, falls nicht quittiert
+										{t('Eskalation {time}, falls nicht quittiert', { time: formatDateTime(a.escalateAt) })}
 									</p>
 								{/if}
 								{#if delivery}
 									{#if delivery === 'ok'}
 										<p class="flex items-center gap-1 text-xs text-ok">
-											<Icon name="check" size={13} /> Testnachricht zugestellt
+											<Icon name="check" size={13} />
+											{t('Testnachricht zugestellt')}
 										</p>
 									{:else}
-										<p class="text-xs break-words text-danger">Versand fehlgeschlagen: {delivery}</p>
+										<p class="text-xs break-words text-danger">
+											{t('Versand fehlgeschlagen: {error}', { error: delivery })}
+										</p>
 									{/if}
 								{/if}
 							</li>
 						{:else}
-							<li class="text-sm text-fg-muted">Keine Aktionen.</li>
+							<li class="text-sm text-fg-muted">{t('Keine Aktionen.')}</li>
 						{/each}
 					</ul>
 				</div>
@@ -361,7 +386,7 @@
 			{#if result.preview}
 				<div>
 					<h3 class="mb-1.5 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-						Vorschau der Benachrichtigung
+						{t('Vorschau der Benachrichtigung')}
 					</h3>
 					<div class="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3">
 						<p class="font-medium">{result.preview.title}</p>
@@ -377,7 +402,7 @@
 						{/each}
 					</div>
 					{#if result.previewText}
-						<CodeBlock code={result.previewText} label="Als Text" wrap maxHeight="14rem" class="mt-2" />
+						<CodeBlock code={result.previewText} label={t('Als Text')} wrap maxHeight="14rem" class="mt-2" />
 					{/if}
 				</div>
 			{/if}

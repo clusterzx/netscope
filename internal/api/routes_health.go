@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"netscope/internal/auth"
+	"netscope/internal/i18n"
 	"netscope/internal/inventory"
 	"netscope/internal/plugins/healthcheck"
 	"netscope/internal/timeseries"
@@ -111,12 +112,13 @@ func (s *Server) handleHealthBoard(w http.ResponseWriter, r *http.Request) {
 			c.Latency24h = pts
 		}
 	}
-	writeJSON(w, http.StatusOK, healthBoard{Summary: sum, Checks: checks, Outages: outages})
+	loc := requestLocale(r)
+	writeJSON(w, http.StatusOK, healthBoard{Summary: sum, Checks: localizeChecks(checks, loc), Outages: localizeOutages(outages, loc)})
 }
 
 func (s *Server) handleChecks(w http.ResponseWriter, r *http.Request) {
 	list, err := healthcheck.ListChecks(r.Context(), s.DB, qInt64(r, "device"))
-	s.respond(w, r, list, err)
+	s.respond(w, r, localizeChecks(list, requestLocale(r)), err)
 }
 
 func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +128,7 @@ func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, err := healthcheck.GetCheck(r.Context(), s.DB, id)
-	s.respond(w, r, c, err)
+	s.respond(w, r, localizeCheck(c, requestLocale(r)), err)
 }
 
 func (s *Server) handleSaveCheck(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +171,7 @@ func (s *Server) handleSaveCheck(w http.ResponseWriter, r *http.Request) {
 		action, status = "health.create", http.StatusCreated
 	}
 	s.record(r, action, "healthcheck", strconv.FormatInt(saved.ID, 10), "Health-Check „"+saved.Name+"“", before, saved)
-	writeJSON(w, status, saved)
+	writeJSON(w, status, localizeCheck(saved, requestLocale(r)))
 }
 
 func (s *Server) handleDeleteCheck(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +209,9 @@ func (s *Server) handleRunCheck(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, checkRunResult{Check: c, OK: res.OK && !res.Degraded, Error: res.Error, Millis: res.LatencyMs})
+	loc := requestLocale(r)
+	writeJSON(w, http.StatusOK, checkRunResult{Check: localizeCheck(c, loc), OK: res.OK && !res.Degraded, Error: i18n.Err(loc, res.Error),
+		Millis: res.LatencyMs})
 }
 
 func (s *Server) handleCheckOutages(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +221,7 @@ func (s *Server) handleCheckOutages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, err := healthcheck.Outages(r.Context(), s.DB, id, qInt(r, "limit", 100))
-	s.respond(w, r, list, err)
+	s.respond(w, r, localizeOutages(list, requestLocale(r)), err)
 }
 
 func (s *Server) handleCheckLatency(w http.ResponseWriter, r *http.Request) {

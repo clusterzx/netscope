@@ -192,7 +192,7 @@ type importer struct {
 // rowError logs a problem of one row (1-based line numbers of the file).
 func (im *importer) rowError(line int, msg string, args ...any) {
 	im.rc.AddStat("errors", 1)
-	im.rc.Log.Warn(fmt.Sprintf("Zeile %d: %s", line, msg), append([]any{"zeile", line}, args...)...)
+	im.rc.Log.Warn(fmt.Sprintf("Zeile %d: %s", line, msg), append([]any{"zeile", line}, args...)...) // i18n:ignore (log attribute key)
 }
 
 // importRow maps one record to an observation and writes it.
@@ -222,7 +222,7 @@ func (im *importer) importRow(ctx context.Context, line int, fields []string) {
 	for _, raw := range append(splitList(vals[colMAC], true), splitList(vals[colMACs], true)...) {
 		mac, ok := netutil.NormalizeMAC(raw)
 		if !ok {
-			im.rowError(line, "ungültige MAC-Adresse wird ignoriert", "wert", raw)
+			im.rowError(line, "ungültige MAC-Adresse wird ignoriert", "wert", raw) // i18n:ignore (log attribute key)
 			continue
 		}
 		if !seenMAC[mac] {
@@ -235,7 +235,7 @@ func (im *importer) importRow(ctx context.Context, line int, fields []string) {
 	for _, raw := range append(splitList(vals[colIP], true), splitList(vals[colIPs], true)...) {
 		a, err := netip.ParseAddr(raw)
 		if err != nil {
-			im.rowError(line, "ungültige IP-Adresse wird ignoriert", "wert", raw)
+			im.rowError(line, "ungültige IP-Adresse wird ignoriert", "wert", raw) // i18n:ignore (log attribute key)
 			continue
 		}
 		ip := a.Unmap().String()
@@ -262,14 +262,14 @@ func (im *importer) importRow(ctx context.Context, line int, fields []string) {
 		if st, ok := stateValues[strings.ToLower(v)]; ok {
 			m.State = st
 		} else {
-			im.rowError(line, "unbekannter Zustand wird ignoriert (bekannt, unbekannt, ignoriert)", "wert", v)
+			im.rowError(line, "unbekannter Zustand wird ignoriert (bekannt, unbekannt, ignoriert)", "wert", v) // i18n:ignore (log attribute key)
 		}
 	}
 	if v := vals[colCriticality]; v != "" {
 		if c, ok := criticalityValues[strings.ToLower(v)]; ok {
 			m.Criticality = c
 		} else {
-			im.rowError(line, "unbekannte Kritikalität wird ignoriert (niedrig, normal, hoch, kritisch)", "wert", v)
+			im.rowError(line, "unbekannte Kritikalität wird ignoriert (niedrig, normal, hoch, kritisch)", "wert", v) // i18n:ignore (log attribute key)
 		}
 	}
 	for _, t := range splitList(vals[colTags], false) {

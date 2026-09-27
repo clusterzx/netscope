@@ -44,6 +44,7 @@
 	import { runs } from '$lib/stores/runs.svelte';
 	import { formatDate, formatNumber } from '$lib/utils/format';
 	import { debounce, intParam, setParams } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 
 	const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -157,17 +158,24 @@
 		{ key: 'score', label: 'CVSS', sortable: 'score', sortDesc: true, width: '5.5rem' },
 		{ key: 'epss', label: 'EPSS', sortable: 'epss', sortDesc: true, width: '5.5rem', hideBelow: 'sm' },
 		{ key: 'cve', label: 'CVE', sortable: 'cve', class: 'min-w-64' },
-		{ key: 'devices', label: 'Geräte', sortable: 'devices', sortDesc: true, align: 'right', width: '6rem' },
-		{ key: 'products', label: 'Produkte', hideBelow: 'lg', class: 'max-w-72' },
-		{ key: 'match', label: 'Abgleich', hideBelow: 'md' },
-		{ key: 'published', label: 'Veröffentlicht', sortable: 'published', sortDesc: true, hideBelow: 'md' },
-		{ key: 'first_seen', label: 'Gefunden', sortable: 'first_seen', sortDesc: true, hideBelow: 'xl' }
+		{
+			key: 'devices',
+			label: t('Geräte'),
+			sortable: 'devices',
+			sortDesc: true,
+			align: 'right',
+			width: '6rem'
+		},
+		{ key: 'products', label: t('Produkte'), hideBelow: 'lg', class: 'max-w-72' },
+		{ key: 'match', label: t('Abgleich'), hideBelow: 'md' },
+		{ key: 'published', label: t('Veröffentlicht'), sortable: 'published', sortDesc: true, hideBelow: 'md' },
+		{ key: 'first_seen', label: t('Gefunden'), sortable: 'first_seen', sortDesc: true, hideBelow: 'xl' }
 	];
 </script>
 
 <PageHeader
-	title="Schwachstellen"
-	description="CVEs aller Geräte aus dem Abgleich gegen die lokale NVD-Kopie"
+	title={t('Schwachstellen')}
+	description={t('CVEs aller Geräte aus dem Abgleich gegen die lokale NVD-Kopie')}
 />
 
 <div class="flex flex-col gap-4">
@@ -188,31 +196,31 @@
 	<section aria-label="Filter" class="flex flex-col gap-2">
 		<div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
 			<Input
-				label="Suche"
+				label={t('Suche')}
 				type="search"
 				icon="search"
 				bind:value={qText}
 				oninput={() => applyQ(qText)}
-				placeholder="CVE-ID oder Beschreibung"
+				placeholder={t('CVE-ID oder Beschreibung')}
 			/>
 			<Input
-				label="Produkt"
+				label={t('Produkt')}
 				type="search"
 				icon="package"
 				bind:value={productText}
 				oninput={() => applyProduct(productText)}
-				placeholder="z. B. openssh, cpe:/a:…"
+				placeholder={t('z. B. openssh, cpe:/a:…')}
 			/>
 			<Select
-				label="Schweregrad"
+				label={t('Schweregrad')}
 				value={min}
 				options={MIN_OPTIONS}
-				placeholder="Alle"
+				placeholder={t('Alle')}
 				onchange={(e) =>
 					setParams({ min: (e.currentTarget as HTMLSelectElement).value || null, offset: null })}
 			/>
 			<DevicePicker
-				label="Gerät"
+				label={t('Gerät')}
 				bind:value={deviceId}
 				bind:name={deviceName}
 				onselect={(d) => setParams({ device: d?.id ?? null, offset: null })}
@@ -221,13 +229,13 @@
 		<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
 			<Checkbox
 				checked={exploited}
-				label="Nur aktiv ausgenutzte (CISA KEV)"
+				label={t('Nur aktiv ausgenutzte (CISA KEV)')}
 				onchange={(e) =>
 					setParams({ exploited: (e.currentTarget as HTMLInputElement).checked ? '1' : null, offset: null })}
 			/>
 			<Checkbox
 				checked={ignored}
-				label="Auch als irrelevant markierte"
+				label={t('Auch als irrelevant markierte')}
 				onchange={(e) =>
 					setParams({ ignored: (e.currentTarget as HTMLInputElement).checked ? '1' : null, offset: null })}
 			/>
@@ -235,14 +243,14 @@
 				label="EPSS"
 				value={minEpss}
 				options={EPSS_OPTIONS}
-				placeholder="Alle EPSS-Werte"
+				placeholder={t('Alle EPSS-Werte')}
 				size="sm"
 				class="w-44"
 				onchange={(e) =>
 					setParams({ minEpss: (e.currentTarget as HTMLSelectElement).value || null, offset: null })}
 			/>
 			<Select
-				label="Sortierung"
+				label={t('Sortierung')}
 				value={sort}
 				options={SORT_OPTIONS}
 				size="sm"
@@ -253,7 +261,7 @@
 				}}
 			/>
 			{#if hasFilter}
-				<Button variant="ghost" size="sm" icon="x" onclick={resetFilters}>Filter zurücksetzen</Button>
+				<Button variant="ghost" size="sm" icon="x" onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 			{/if}
 			{#if list.data}
 				<span class="text-xs text-fg-subtle sm:ml-auto">{formatNumber(total)} CVEs</span>
@@ -271,7 +279,7 @@
 			{sort}
 			onsort={(s) => setParams({ sort: s === DEFAULT_SORT ? null : s, offset: null })}
 			loading={list.loading}
-			caption="Schwachstellen"
+			caption={t('Schwachstellen')}
 			onrowclick={(r, e) =>
 				e.ctrlKey || e.metaKey
 					? window.open(`/vulnerabilities/${r.cve}`, '_blank')
@@ -283,7 +291,9 @@
 					{#if r.cvss !== undefined && r.cvss !== null}
 						<SeverityBadge cvss={r.cvss} size="md" />
 					{:else}
-						<Badge tone="neutral" title="Keine CVSS-Bewertung">{cveSeverityLabel[r.severity] ?? '–'}</Badge>
+						<Badge tone="neutral" title={t('Keine CVSS-Bewertung')}
+							>{cveSeverityLabel[r.severity] ?? '–'}</Badge
+						>
 					{/if}
 				{:else if col.key === 'epss'}
 					{#if r.epss !== undefined && r.epss !== null}
@@ -291,7 +301,7 @@
 							>{epssLabel(r.epss)}</Badge
 						>
 					{:else}
-						<span class="text-fg-subtle" title="Kein EPSS-Wert">–</span>
+						<span class="text-fg-subtle" title={t('Kein EPSS-Wert')}>–</span>
 					{/if}
 				{:else if col.key === 'cve'}
 					<div class="flex min-w-0 flex-col gap-0.5">
@@ -300,7 +310,8 @@
 							<ExploitBadges x={r} epss={false} />
 							{#if r.allIgnored}<Badge
 									tone="neutral"
-									title="Für alle betroffenen Geräte als irrelevant markiert">alle ignoriert</Badge
+									title={t('Für alle betroffenen Geräte als irrelevant markiert')}
+									>{t('alle ignoriert')}</Badge
 								>{/if}
 						</span>
 						{#if r.description}
@@ -308,7 +319,7 @@
 								>{r.description}</span
 							>
 						{:else}
-							<span class="text-xs text-fg-subtle">Keine Beschreibung (nicht in der NVD-Kopie)</span>
+							<span class="text-xs text-fg-subtle">{t('Keine Beschreibung (nicht in der NVD-Kopie)')}</span>
 						{/if}
 					</div>
 				{:else if col.key === 'devices'}
@@ -323,8 +334,8 @@
 					</span>
 				{:else if col.key === 'match'}
 					<span class="flex flex-wrap gap-1">
-						{#each r.matchTypes ?? [] as t (t)}
-							<Badge tone={matchTypeTone(t)} title={matchTypeHint[t]}>{matchTypeLabel[t] ?? t}</Badge>
+						{#each r.matchTypes ?? [] as mt (mt)}
+							<Badge tone={matchTypeTone(mt)} title={matchTypeHint[mt]}>{matchTypeLabel[mt] ?? mt}</Badge>
 						{/each}
 					</span>
 				{:else if col.key === 'published'}
@@ -335,24 +346,28 @@
 			{/snippet}
 			{#snippet empty()}
 				{#if hasFilter}
-					<EmptyState icon="filter" title="Keine Treffer" description="Keine CVE passt zu den Filtern.">
+					<EmptyState
+						icon="filter"
+						title={t('Keine Treffer')}
+						description={t('Keine CVE passt zu den Filtern.')}
+					>
 						{#snippet actions()}
-							<Button onclick={resetFilters}>Filter zurücksetzen</Button>
+							<Button onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 						{/snippet}
 					</EmptyState>
 				{:else if status.data?.empty}
 					<EmptyState
 						icon="cloud"
-						title="Noch keine CVE-Daten"
+						title={t('Noch keine CVE-Daten')}
 						description={auth.can('plugins.manage')
-							? 'Die lokale NVD-Kopie ist leer – zuerst oben die NVD synchronisieren.'
-							: 'Die lokale NVD-Kopie ist leer.'}
+							? t('Die lokale NVD-Kopie ist leer – zuerst oben die NVD synchronisieren.')
+							: t('Die lokale NVD-Kopie ist leer.')}
 					/>
 				{:else}
 					<EmptyState
 						icon="check-circle"
-						title="Keine offenen Schwachstellen"
-						description="Der Abgleich hat für kein Gerät eine (nicht ignorierte) CVE gefunden."
+						title={t('Keine offenen Schwachstellen')}
+						description={t('Der Abgleich hat für kein Gerät eine (nicht ignorierte) CVE gefunden.')}
 					/>
 				{/if}
 			{/snippet}

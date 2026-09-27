@@ -7,6 +7,7 @@
 	import { Badge, RelativeTime, Sparkline, StatusDot } from '$lib/components/ui';
 	import { formatMs, formatPercent } from '$lib/utils/format';
 	import { healthStateLabel, healthTone } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 	import {
 		availabilityText,
 		availabilityTone,
@@ -27,8 +28,8 @@
 	const section = $derived(sectionOf(c));
 	const windows = [
 		['24h', '24 h'],
-		['7d', '7 T'],
-		['30d', '30 T']
+		['7d', t('7 T')],
+		['30d', t('30 T')]
 	] as const;
 </script>
 
@@ -49,14 +50,16 @@
 			</h3>
 			<p class="truncate text-xs text-fg-subtle">
 				{#if c.deviceId}
-					<a href="/devices/{c.deviceId}" class="link">{c.deviceName || `Gerät #${c.deviceId}`}</a> ·
+					<a href="/devices/{c.deviceId}" class="link"
+						>{c.deviceName || t('Gerät #{id}', { id: c.deviceId })}</a
+					> ·
 				{/if}
 				<span class="mono">{targetText(c)}</span>
 			</p>
 		</div>
 		<div class="flex shrink-0 flex-col items-end gap-1">
 			<Badge tone={c.enabled ? healthTone(c.state) : 'neutral'}>
-				{c.enabled ? (healthStateLabel[c.state] ?? c.state) : 'Deaktiviert'}
+				{c.enabled ? (healthStateLabel[c.state] ?? c.state) : t('Deaktiviert')}
 			</Badge>
 			<span class="text-[0.7rem] font-medium tracking-wide text-fg-subtle"
 				>{checkTypeLabel[c.type] ?? c.type}</span
@@ -72,13 +75,15 @@
 					: '–'}
 			</div>
 			<div class="text-[0.7rem] text-fg-subtle">
-				{#if c.lastCheckAt}geprüft <RelativeTime value={c.lastCheckAt} />{:else}noch nicht geprüft{/if}
+				{#if c.lastCheckAt}{t('geprüft')} <RelativeTime value={c.lastCheckAt} />{:else}{t(
+						'noch nicht geprüft'
+					)}{/if}
 			</div>
 		</div>
 		<div class="ml-auto">
 			<Sparkline
 				points={points ?? []}
-				label="Latenz von {c.name}, letzte 24 Stunden"
+				label={t('Latenz von {name}, letzte 24 Stunden', { name: c.name })}
 				width={110}
 				height={30}
 			/>
@@ -103,7 +108,8 @@
 		</p>
 	{:else if c.stateSince && c.enabled}
 		<p class="text-xs text-fg-subtle">
-			{healthStateLabel[c.state] ?? c.state} seit <RelativeTime value={c.stateSince} absolute />
+			{t('{state} seit', { state: healthStateLabel[c.state] ?? c.state })}
+			<RelativeTime value={c.stateSince} absolute />
 		</p>
 	{/if}
 </article>

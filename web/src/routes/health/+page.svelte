@@ -31,6 +31,7 @@
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { formatNumber, formatPercent, formatTime } from '$lib/utils/format';
 	import { debounce, intParam, setParams } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 
 	// ---------------------------------------------------------------- URL state
 	const sp = $derived(page.url.searchParams);
@@ -161,9 +162,9 @@
 			p.deviceId = dev;
 			try {
 				const d = await api.get('/api/v1/devices/{id}', { path: { id: dev } });
-				p.deviceName = d.displayName || d.name || d.ip || `Gerät #${dev}`;
+				p.deviceName = d.displayName || d.name || d.ip || t('Gerät #{id}', { id: dev });
 			} catch {
-				p.deviceName = `Gerät #${dev}`;
+				p.deviceName = t('Gerät #{id}', { id: dev });
 			}
 		}
 		setParams({ new: null, device: null, type: null, port: null, target: null, name: null });
@@ -177,15 +178,17 @@
 
 	const stateOptions = [
 		{ value: 'down', label: 'Down' },
-		{ value: 'degraded', label: 'Beeinträchtigt' },
-		{ value: 'unknown', label: 'Unbekannt' },
+		{ value: 'degraded', label: t('Beeinträchtigt') },
+		{ value: 'unknown', label: t('Unbekannt') },
 		{ value: 'up', label: 'Up' },
-		{ value: 'disabled', label: 'Deaktiviert' }
+		{ value: 'disabled', label: t('Deaktiviert') }
 	];
-	const typeOptions = CHECK_TYPES.map((t) => ({ value: t, label: checkTypeLabel[t] }));
+	const typeOptions = CHECK_TYPES.map((ty) => ({ value: ty, label: checkTypeLabel[ty] }));
 	const hasFilter = $derived(!!(fState || fType || fq || fDevice));
 	const deviceLabel = $derived(
-		fDevice ? (checks.find((c) => c.deviceId === fDevice)?.deviceName ?? `Gerät #${fDevice}`) : ''
+		fDevice
+			? (checks.find((c) => c.deviceId === fDevice)?.deviceName ?? t('Gerät #{id}', { id: fDevice }))
+			: ''
 	);
 	const resetFilters = () => {
 		text = '';
@@ -194,22 +197,24 @@
 
 	const summaryTiles = [
 		{ state: 'down', label: 'Down', dot: 'down' },
-		{ state: 'degraded', label: 'Beeinträchtigt', dot: 'degraded' },
+		{ state: 'degraded', label: t('Beeinträchtigt'), dot: 'degraded' },
 		{ state: 'up', label: 'Up', dot: 'up' },
-		{ state: 'unknown', label: 'Unbekannt', dot: 'unknown' }
+		{ state: 'unknown', label: t('Unbekannt'), dot: 'unknown' }
 	];
 </script>
 
-<PageHeader title="Health" description="Statusboard aller Checks mit Verfügbarkeit und Ausfallhistorie">
+<PageHeader title="Health" description={t('Statusboard aller Checks mit Verfügbarkeit und Ausfallhistorie')}>
 	{#snippet actions()}
 		{#if loadedAt}
-			<span class="text-xs text-fg-subtle" title="Aktualisiert sich nach jedem Health-Check-Lauf automatisch"
-				>Stand {formatTime(loadedAt, true)}</span
+			<span
+				class="text-xs text-fg-subtle"
+				title={t('Aktualisiert sich nach jedem Health-Check-Lauf automatisch')}
+				>{t('Stand {time}', { time: formatTime(loadedAt, true) })}</span
 			>
 		{/if}
 		<Button
 			icon="refresh"
-			label="Aktualisieren"
+			label={t('Aktualisieren')}
 			loading={board.loading && !!board.data}
 			onclick={() => board.reload()}
 		/>
@@ -218,7 +223,7 @@
 				variant="primary"
 				icon="plus"
 				onclick={() => openCreate(fDevice ? { deviceId: fDevice, deviceName: deviceLabel } : undefined)}
-				>Check anlegen</Button
+				>{t('Check anlegen')}</Button
 			>
 		{/if}
 	{/snippet}
@@ -228,23 +233,27 @@
 	<ErrorState error={board.error} onretry={() => board.reload()} />
 {:else}
 	<!-- summary -->
-	<section aria-label="Zusammenfassung" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-		{#each summaryTiles as t (t.state)}
-			{@const n = summary[t.state] ?? 0}
+	<section aria-label={t('Zusammenfassung')} class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+		{#each summaryTiles as tile (tile.state)}
+			{@const n = summary[tile.state] ?? 0}
 			<button
 				type="button"
-				aria-pressed={fState === t.state}
-				onclick={() => setParams({ state: fState === t.state ? null : t.state })}
+				aria-pressed={fState === tile.state}
+				onclick={() => setParams({ state: fState === tile.state ? null : tile.state })}
 				class="flex flex-col gap-1 rounded-lg border bg-surface p-3.5 text-left shadow-sm transition-colors hover:border-border-strong hover:bg-surface-2
-					{fState === t.state ? 'border-accent ring-1 ring-accent' : 'border-border'}"
+					{fState === tile.state ? 'border-accent ring-1 ring-accent' : 'border-border'}"
 			>
 				<span class="flex items-center gap-1.5 text-[0.8125rem] font-medium text-fg-muted">
-					<StatusDot status={t.dot} pulse={t.state === 'down' && n > 0} />
-					{t.label}
+					<StatusDot status={tile.dot} pulse={tile.state === 'down' && n > 0} />
+					{tile.label}
 				</span>
 				<span
 					class="text-2xl font-semibold tracking-tight tabular
-						{n > 0 && t.state === 'down' ? 'text-danger' : n > 0 && t.state === 'degraded' ? 'text-warn' : 'text-fg'}"
+						{n > 0 && tile.state === 'down'
+						? 'text-danger'
+						: n > 0 && tile.state === 'degraded'
+							? 'text-warn'
+							: 'text-fg'}"
 				>
 					{#if board.data}{formatNumber(n)}{:else}<span class="ns-skeleton inline-block h-7 w-10 align-middle"
 						></span>{/if}
@@ -254,14 +263,17 @@
 		<div
 			class="col-span-2 flex flex-col gap-1 rounded-lg border border-border bg-surface p-3.5 shadow-sm sm:col-span-1"
 		>
-			<span class="text-[0.8125rem] font-medium text-fg-muted">Ø Verfügbarkeit 24 h</span>
+			<span class="text-[0.8125rem] font-medium text-fg-muted">{t('Ø Verfügbarkeit 24 h')}</span>
 			<span class="text-2xl font-semibold tracking-tight tabular">
 				{#if board.data}{avg24 === null ? '–' : formatPercent(avg24, 2)}{:else}<span
 						class="ns-skeleton inline-block h-7 w-16 align-middle"
 					></span>{/if}
 			</span>
 			<span class="text-xs text-fg-subtle"
-				>{formatNumber(enabledCount)} aktive von {formatNumber(checks.length)} Checks</span
+				>{t('{active} aktive von {total} Checks', {
+					active: formatNumber(enabledCount),
+					total: formatNumber(checks.length)
+				})}</span
 			>
 		</div>
 	</section>
@@ -273,27 +285,27 @@
 	>
 		<Input
 			icon="search"
-			label="Suche"
+			label={t('Suche')}
 			bind:value={text}
 			oninput={() => applyText(text)}
-			placeholder="Name, Gerät, Ziel …"
+			placeholder={t('Name, Gerät, Ziel …')}
 			class="sm:w-72"
 			type="search"
 		/>
 		<div class="grid grid-cols-2 gap-2 sm:flex">
 			<Select
-				label="Zustand"
+				label={t('Zustand')}
 				value={fState}
 				options={stateOptions}
-				placeholder="Alle Zustände"
+				placeholder={t('Alle Zustände')}
 				class="sm:w-44"
 				onchange={(e) => setParams({ state: (e.currentTarget as HTMLSelectElement).value || null })}
 			/>
 			<Select
-				label="Typ"
+				label={t('Typ')}
 				value={fType}
 				options={typeOptions}
-				placeholder="Alle Typen"
+				placeholder={t('Alle Typen')}
 				class="sm:w-36"
 				onchange={(e) => setParams({ type: (e.currentTarget as HTMLSelectElement).value || null })}
 			/>
@@ -302,22 +314,25 @@
 			<span
 				class="inline-flex h-8.5 items-center gap-1 self-start rounded-md border border-accent/40 bg-accent-soft pr-1 pl-2.5 text-sm text-accent sm:self-auto"
 			>
-				Gerät: <a href="/devices/{fDevice}" class="font-medium hover:underline">{deviceLabel}</a>
+				{t('Gerät:')} <a href="/devices/{fDevice}" class="font-medium hover:underline">{deviceLabel}</a>
 				<Button
 					variant="ghost"
 					size="xs"
 					icon="x"
-					label="Gerätefilter entfernen"
+					label={t('Gerätefilter entfernen')}
 					onclick={() => setParams({ device: null })}
 				/>
 			</span>
 		{/if}
 		{#if hasFilter}
-			<Button variant="ghost" icon="x" onclick={resetFilters}>Filter zurücksetzen</Button>
+			<Button variant="ghost" icon="x" onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 		{/if}
 		{#if board.data}
 			<span class="text-xs text-fg-subtle sm:ml-auto sm:pb-2">
-				{formatNumber(filtered.length)} von {formatNumber(checks.length)} Checks
+				{t('{n} von {total} Checks', {
+					n: formatNumber(filtered.length),
+					total: formatNumber(checks.length)
+				})}
 			</span>
 		{/if}
 	</div>
@@ -332,21 +347,28 @@
 			</div>
 		{:else if checks.length === 0}
 			{#snippet create()}
-				<Button variant="primary" icon="plus" onclick={() => openCreate()}>Ersten Check anlegen</Button>
+				<Button variant="primary" icon="plus" onclick={() => openCreate()}>{t('Ersten Check anlegen')}</Button
+				>
 			{/snippet}
 			<Card>
 				<EmptyState
 					icon="health"
-					title="Noch keine Health-Checks"
-					description="Checks prüfen Dienste regelmäßig per TCP, HTTP, TLS oder Ping, messen die Latenz und melden Ausfälle als Event."
+					title={t('Noch keine Health-Checks')}
+					description={t(
+						'Checks prüfen Dienste regelmäßig per TCP, HTTP, TLS oder Ping, messen die Latenz und melden Ausfälle als Event.'
+					)}
 					actions={canManage ? create : undefined}
 				/>
 			</Card>
 		{:else if filtered.length === 0}
 			<Card>
-				<EmptyState icon="filter" title="Keine Treffer" description="Kein Check passt zu den Filtern.">
+				<EmptyState
+					icon="filter"
+					title={t('Keine Treffer')}
+					description={t('Kein Check passt zu den Filtern.')}
+				>
 					{#snippet actions()}
-						<Button onclick={resetFilters}>Filter zurücksetzen</Button>
+						<Button onclick={resetFilters}>{t('Filter zurücksetzen')}</Button>
 					{/snippet}
 				</EmptyState>
 			</Card>
@@ -371,18 +393,20 @@
 
 		<!-- outage history -->
 		{#if board.data && checks.length > 0}
-			<Card title="Ausfallhistorie" description="Letzte 50 Ausfälle aller Checks" icon="history">
+			<Card title={t('Ausfallhistorie')} description={t('Letzte 50 Ausfälle aller Checks')} icon="history">
 				{#snippet actions()}
 					{#if outages.some((o) => !o.endedAt)}
-						<span class="text-xs text-danger">{outages.filter((o) => !o.endedAt).length} andauernd</span>
+						<span class="text-xs text-danger"
+							>{t('{n} andauernd', { n: formatNumber(outages.filter((o) => !o.endedAt).length) })}</span
+						>
 					{/if}
 				{/snippet}
 				{#if outages.length === 0}
 					<EmptyState
 						compact
 						icon="check-circle"
-						title="Keine Ausfälle"
-						description="Bisher wurde kein Ausfall aufgezeichnet."
+						title={t('Keine Ausfälle')}
+						description={t('Bisher wurde kein Ausfall aufgezeichnet.')}
 					/>
 				{:else}
 					<OutageList {outages} showCheck onopen={openCheck} class="-my-2.5" />

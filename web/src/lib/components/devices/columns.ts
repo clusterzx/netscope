@@ -1,12 +1,15 @@
 // Column catalogue of the device list (all DeviceRow fields + custom fields).
 import type { CustomField, DeviceRow } from '$lib/api/types';
 import type { Column } from '$lib/components/ui/Table.svelte';
+import { t } from '$lib/i18n';
+import { formatDate } from '$lib/utils/format';
 import { criticalityLabel, deviceTypeName, stateLabel } from '$lib/utils/labels';
 
 export interface DeviceColumnDef {
 	key: string;
 	label: string;
-	group: 'Allgemein' | 'Netzwerk' | 'Status' | 'Sicherheit' | 'Zeit' | 'Custom Fields';
+	/** heading in the column chooser (UI language) */
+	group: string;
 	sort?: string;
 	sortDesc?: boolean;
 	align?: 'left' | 'right' | 'center';
@@ -18,57 +21,65 @@ export interface DeviceColumnDef {
 	cfType?: string;
 }
 
+const G = {
+	general: t('Allgemein'),
+	network: t('Netzwerk'),
+	status: 'Status',
+	security: t('Sicherheit'),
+	time: t('Zeit')
+};
+
 export const DEVICE_COLUMNS: DeviceColumnDef[] = [
-	{ key: 'status', label: 'Online', group: 'Status', sort: 'online', width: '4rem' },
-	{ key: 'name', label: 'Name', group: 'Allgemein', sort: 'name' },
-	{ key: 'ip', label: 'IP', group: 'Netzwerk', sort: 'ip' },
-	{ key: 'ips', label: 'Alle IPs', group: 'Netzwerk', text: (d) => (d.ips ?? []).join(', ') },
-	{ key: 'mac', label: 'MAC', group: 'Netzwerk', sort: 'mac', hideBelow: 'md' },
-	{ key: 'macs', label: 'Alle MACs', group: 'Netzwerk', text: (d) => (d.macs ?? []).join(', ') },
-	{ key: 'hostname', label: 'Hostname', group: 'Netzwerk', text: (d) => d.hostname },
-	{ key: 'hostnameSource', label: 'Hostname-Quelle', group: 'Netzwerk', text: (d) => d.hostnameSource },
-	{ key: 'vendor', label: 'Hersteller', group: 'Allgemein', sort: 'vendor', hideBelow: 'lg' },
-	{ key: 'model', label: 'Modell', group: 'Allgemein', sort: 'model', text: (d) => d.model },
-	{ key: 'type', label: 'Typ', group: 'Allgemein', sort: 'type', text: (d) => deviceTypeName(d.type) },
-	{ key: 'os', label: 'Betriebssystem', group: 'Allgemein', sort: 'os', hideBelow: 'lg' },
-	{ key: 'osSource', label: 'OS-Quelle', group: 'Allgemein', text: (d) => d.osSource },
-	{ key: 'location', label: 'Aufstellort', group: 'Allgemein', sort: 'location', text: (d) => d.location },
-	{ key: 'site', label: 'Standort (Verbund)', group: 'Allgemein', text: (d) => d.site ?? '' },
-	{ key: 'owner', label: 'Besitzer', group: 'Allgemein', sort: 'owner', text: (d) => d.owner },
-	{ key: 'parent', label: 'Eltern-Gerät', group: 'Allgemein', text: (d) => d.parentName ?? '' },
-	{ key: 'ports', label: 'Ports', group: 'Netzwerk', sort: 'ports', sortDesc: true, hideBelow: 'md' },
-	{ key: 'cve', label: 'CVE', group: 'Sicherheit', sort: 'cve', sortDesc: true, hideBelow: 'md' },
-	{ key: 'certExpiry', label: 'Zertifikat', group: 'Sicherheit', sort: 'certExpiry' },
-	{ key: 'healthState', label: 'Health', group: 'Status' },
+	{ key: 'status', label: 'Online', group: G.status, sort: 'online', width: '4rem' },
+	{ key: 'name', label: 'Name', group: G.general, sort: 'name' },
+	{ key: 'ip', label: 'IP', group: G.network, sort: 'ip' },
+	{ key: 'ips', label: t('Alle IPs'), group: G.network, text: (d) => (d.ips ?? []).join(', ') },
+	{ key: 'mac', label: 'MAC', group: G.network, sort: 'mac', hideBelow: 'md' },
+	{ key: 'macs', label: t('Alle MACs'), group: G.network, text: (d) => (d.macs ?? []).join(', ') },
+	{ key: 'hostname', label: 'Hostname', group: G.network, text: (d) => d.hostname },
+	{ key: 'hostnameSource', label: t('Hostname-Quelle'), group: G.network, text: (d) => d.hostnameSource },
+	{ key: 'vendor', label: t('Hersteller'), group: G.general, sort: 'vendor', hideBelow: 'lg' },
+	{ key: 'model', label: t('Modell'), group: G.general, sort: 'model', text: (d) => d.model },
+	{ key: 'type', label: t('Typ'), group: G.general, sort: 'type', text: (d) => deviceTypeName(d.type) },
+	{ key: 'os', label: t('Betriebssystem'), group: G.general, sort: 'os', hideBelow: 'lg' },
+	{ key: 'osSource', label: t('OS-Quelle'), group: G.general, text: (d) => d.osSource },
+	{ key: 'location', label: t('Aufstellort'), group: G.general, sort: 'location', text: (d) => d.location },
+	{ key: 'site', label: t('Standort (Verbund)'), group: G.general, text: (d) => d.site ?? '' },
+	{ key: 'owner', label: t('Besitzer'), group: G.general, sort: 'owner', text: (d) => d.owner },
+	{ key: 'parent', label: t('Eltern-Gerät'), group: G.general, text: (d) => d.parentName ?? '' },
+	{ key: 'ports', label: 'Ports', group: G.network, sort: 'ports', sortDesc: true, hideBelow: 'md' },
+	{ key: 'cve', label: 'CVE', group: G.security, sort: 'cve', sortDesc: true, hideBelow: 'md' },
+	{ key: 'certExpiry', label: t('Zertifikat'), group: G.security, sort: 'certExpiry' },
+	{ key: 'healthState', label: 'Health', group: G.status },
 	{
 		key: 'state',
-		label: 'Zustand',
-		group: 'Status',
+		label: t('Zustand'),
+		group: G.status,
 		sort: 'state',
 		text: (d) => stateLabel[d.state] ?? d.state
 	},
 	{
 		key: 'criticality',
-		label: 'Kritikalität',
-		group: 'Status',
+		label: t('Kritikalität'),
+		group: G.status,
 		sort: 'criticality',
 		text: (d) => criticalityLabel[d.criticality] ?? d.criticality
 	},
-	{ key: 'tags', label: 'Tags', group: 'Allgemein', hideBelow: 'lg' },
-	{ key: 'groups', label: 'Gruppen', group: 'Allgemein' },
-	{ key: 'notes', label: 'Notiz', group: 'Allgemein', width: '4rem' },
-	{ key: 'firstSeen', label: 'Erstsichtung', group: 'Zeit', sort: 'firstSeen', sortDesc: true },
+	{ key: 'tags', label: 'Tags', group: G.general, hideBelow: 'lg' },
+	{ key: 'groups', label: t('Gruppen'), group: G.general },
+	{ key: 'notes', label: t('Notiz'), group: G.general, width: '4rem' },
+	{ key: 'firstSeen', label: t('Erstsichtung'), group: G.time, sort: 'firstSeen', sortDesc: true },
 	{
 		key: 'lastSeen',
-		label: 'Zuletzt gesehen',
-		group: 'Zeit',
+		label: t('Zuletzt gesehen'),
+		group: G.time,
 		sort: 'lastSeen',
 		sortDesc: true,
 		hideBelow: 'sm'
 	},
-	{ key: 'onlineChangedAt', label: 'Status seit', group: 'Zeit' },
-	{ key: 'createdSource', label: 'Entdeckt durch', group: 'Allgemein', text: (d) => d.createdSource },
-	{ key: 'id', label: 'ID', group: 'Allgemein', sort: 'id', align: 'right', text: (d) => String(d.id) }
+	{ key: 'onlineChangedAt', label: t('Status seit'), group: G.time },
+	{ key: 'createdSource', label: t('Entdeckt durch'), group: G.general, text: (d) => d.createdSource },
+	{ key: 'id', label: 'ID', group: G.general, sort: 'id', align: 'right', text: (d) => String(d.id) }
 ];
 
 export const DEFAULT_COLUMNS = [
@@ -102,10 +113,10 @@ export function allColumns(custom: CustomField[]): DeviceColumnDef[] {
 
 export function formatCustom(v: unknown, type: string): string {
 	if (v === null || v === undefined || v === '') return '';
-	if (type === 'bool') return v === true || v === 'true' ? 'Ja' : 'Nein';
+	if (type === 'bool') return v === true || v === 'true' ? t('Ja') : t('Nein');
 	if (type === 'date' && typeof v === 'string') {
 		const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
-		if (m) return `${m[3]}.${m[2]}.${m[1]}`;
+		if (m) return formatDate(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
 	}
 	return String(v);
 }

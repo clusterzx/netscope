@@ -12,6 +12,7 @@ import (
 	"netscope/internal/db"
 	"netscope/internal/events"
 	"netscope/internal/federation"
+	"netscope/internal/i18n"
 	"netscope/internal/inventory"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
@@ -127,7 +128,7 @@ func (s *Server) handleInventoryReport(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 	case "pdf":
-		if err := reports.InventoryPDF(&buf, devs, s.Config.Location); err != nil {
+		if err := reports.InventoryPDF(&buf, devs, requestLocale(r), s.Config.Location); err != nil {
 			s.fail(w, r, err)
 			return
 		}
@@ -136,7 +137,11 @@ func (s *Server) handleInventoryReport(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, fmt.Errorf("unbekanntes Format %q (csv, json, pdf)", format))
 		return
 	}
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="netscope-inventar-%s.%s"`, stamp, format))
+	name := "netscope-inventar"
+	if requestLocale(r) == i18n.EN {
+		name = "netscope-inventory"
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.%s"`, name, stamp, format))
 	_, _ = w.Write(buf.Bytes())
 }
 
@@ -178,7 +183,8 @@ func (s *Server) handleChangeReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := s.Settings.System().PublicURL
-	b, ctype, err := rep.ToBytes(format, s.Config.Location, base)
+	lang := requestLocale(r)
+	b, ctype, err := rep.ToBytes(format, lang, s.Config.Location, base)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -187,8 +193,12 @@ func (s *Server) handleChangeReport(w http.ResponseWriter, r *http.Request) {
 	if ext == "markdown" {
 		ext = "md"
 	}
+	name := "netscope-aenderungen"
+	if lang == i18n.EN {
+		name = "netscope-changes"
+	}
 	w.Header().Set("Content-Type", ctype)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="netscope-aenderungen-%s-%s.%s"`,
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s-%s.%s"`, name,
 		from.In(s.Config.Location).Format("20060102"), to.In(s.Config.Location).Format("20060102"), ext))
 	_, _ = w.Write(b)
 }
@@ -231,9 +241,13 @@ func (s *Server) handleSendReport(w http.ResponseWriter, r *http.Request) {
 	if base != "" {
 		base += "/reports"
 	}
-	title := fmt.Sprintf("NetScope Änderungsbericht %s–%s", from.In(s.Config.Location).Format("02.01."), to.In(s.Config.Location).Format("02.01.2006"))
-	body := rep.Markdown(s.Config.Location, base)
-	extra, err := rep.NotificationExtra(s.Config.Location, s.Settings.System().PublicURL)
+	// sent through publishers: in the language of the notifications (system setting), not
+	// in the language of the user who triggered it
+	lang := s.Settings.System().Lang()
+	title := i18n.Sprintf(lang, "NetScope Änderungsbericht %s–%s", from.In(s.Config.Location).Format(reports.DateLayout(lang, "02.01.")),
+		to.In(s.Config.Location).Format(reports.DateLayout(lang, "02.01.2006")))
+	body := rep.Markdown(lang, s.Config.Location, base)
+	extra, err := rep.NotificationExtra(lang, s.Config.Location, s.Settings.System().PublicURL)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -284,15 +298,17 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	loc := requestLocale(r)
 	views, err := s.Host.Views(ctx)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	for _, v := range views {
-		ps := pluginStatus{ID: v.Info.ID, Name: v.Info.Name, Kind: v.Info.Kind, Enabled: v.Config.Enabled, Running: v.Running != nil, NextRun: v.NextRun}
+		ps := pluginStatus{ID: v.Info.ID, Name: i18n.T(loc, v.Info.Name), Kind: v.Info.Kind, Enabled: v.Config.Enabled, Running: v.Running != nil,
+			NextRun: v.NextRun}
 		if v.LastRun != nil {
-			ps.LastStatus, ps.LastRunAt, ps.LastError = v.LastRun.Status, v.LastRun.FinishedAt, v.LastRun.Error
+			ps.LastStatus, ps.LastRunAt, ps.LastError = v.LastRun.Status, v.LastRun.FinishedAt, i18n.Err(loc, v.LastRun.Error)
 			if v.Config.Enabled && (v.LastRun.Status == "failed" || v.LastRun.Status == "timeout") {
 				d.PluginsFailed++
 			}
@@ -377,5 +393,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	d.CriticalEvents = localizeEvents(d.CriticalEvents, loc)
+	d.ActiveRuns = localizeRuns(d.ActiveRuns, loc)
+	d.Sites = localizeSites(d.Sites, loc)
 	writeJSON(w, http.StatusOK, d)
 }

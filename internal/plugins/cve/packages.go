@@ -61,7 +61,7 @@ var packageRules = []pkgRule{
 	{names: []string{"slapd", "openldap", "libldap-2.5-0", "libldap2", "openldap-servers"}, part: "a", vendor: "openldap", product: "openldap"},
 	{names: []string{"libxml2"}, part: "a", vendor: "xmlsoft", product: "libxml2"},
 	{names: []string{"libgnutls30", "libgnutls30t64", "gnutls"}, part: "a", vendor: "gnu", product: "gnutls"},
-	{names: []string{"libkrb5-3", "krb5-libs", "krb5-user", "krb5"}, part: "a", vendor: "mit", product: "kerberos_5"},
+	{names: []string{"libkrb5-3", "krb5-libs", "krb5-user", "krb5"}, part: "a", vendor: "mit", product: "kerberos_5"}, // i18n:ignore (vendor MIT)
 	{names: []string{"cups", "cups-daemon", "libcups2", "libcups2t64"}, part: "a", vendor: "openprinting", product: "cups"},
 	{names: []string{"cups-browsed"}, part: "a", vendor: "openprinting", product: "cups-browsed"},
 	{names: []string{"avahi-daemon", "avahi"}, part: "a", vendor: "avahi", product: "avahi"},

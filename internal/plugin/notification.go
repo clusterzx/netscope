@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"netscope/internal/i18n"
 )
 
 // Priority of a notification.
@@ -77,6 +79,10 @@ type Notification struct {
 	// stays the complete Markdown fallback. Not part of JSON payloads (size).
 	HTML        string       `json:"-"` // email-safe HTML fragment for the message body
 	Attachments []Attachment `json:"-"` // files, e.g. the report as PDF
+
+	// Lang is the language the texts are in (set by the host from the system setting);
+	// publishers write their own texts (labels, "Rule:" …) in it.
+	Lang i18n.Locale `json:"-"`
 }
 
 // Attachment is a file sent along with a notification.
@@ -103,7 +109,7 @@ func (n *Notification) PlainText() string {
 		b.WriteString("\n")
 	}
 	for _, e := range n.Events {
-		fmt.Fprintf(&b, "\n[%s] %s", e.Severity.Label(), e.Title)
+		fmt.Fprintf(&b, "\n[%s] %s", e.Severity.LabelIn(n.Lang), e.Title)
 		if e.DeviceName != "" && !strings.Contains(e.Title, e.DeviceName) {
 			fmt.Fprintf(&b, " – %s", e.DeviceName)
 		}
@@ -111,7 +117,7 @@ func (n *Notification) PlainText() string {
 			fmt.Fprintf(&b, " (%s)", e.DeviceIP)
 		}
 		if e.Site != "" {
-			fmt.Fprintf(&b, " · Standort %s", e.Site)
+			b.WriteString(" · " + i18n.Sprintf(n.Lang, "Standort %s", e.Site))
 		}
 		if e.Message != "" {
 			fmt.Fprintf(&b, "\n  %s", e.Message)

@@ -4,6 +4,7 @@
 	import { api } from '$lib/api';
 	import type { AuthOIDCConfig, AuthOIDCTest } from '$lib/api/generated';
 	import { Alert, Button, Card, CopyButton, Input, Textarea, Toggle } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { apiErrors } from '../system';
 	import Provisioning from './Provisioning.svelte';
@@ -34,6 +35,8 @@
 	let test = $state<AuthOIDCTest | null>(null);
 
 	const callback = $derived(form.redirectUrl?.trim() || redirectUrl);
+	const issuerHint =
+		'Authentik: …/application/o/<slug>/ · Keycloak: …/realms/<realm> · Entra ID: https://login.microsoftonline.com/<tenant>/v2.0'; // i18n-ignore: URL patterns
 
 	function body(): AuthOIDCConfig {
 		return { ...$state.snapshot(form), scopes: scopes.split(/[\s,]+/).filter(Boolean) } as AuthOIDCConfig;
@@ -51,7 +54,7 @@
 			form = structuredClone(saved);
 			scopes = saved.scopes.join(' ');
 			onsaved(saved);
-			toast.success('OIDC-Anmeldung gespeichert');
+			toast.success(t('OIDC-Anmeldung gespeichert'));
 		} catch (e) {
 			({ errors, general } = apiErrors(e, [
 				...FIELDS,
@@ -84,64 +87,68 @@
 >
 	<Card
 		title="OpenID Connect (SSO)"
-		description="Anmeldung über einen Identity Provider wie Authentik, Keycloak, Authelia oder Entra ID"
+		description={t('Anmeldung über einen Identity Provider wie Authentik, Keycloak, Authelia oder Entra ID')}
 		icon="key"
 	>
 		<div class="flex flex-col gap-5">
-			{#if general}<Alert tone="danger" title="Speichern fehlgeschlagen">{general}</Alert>{/if}
+			{#if general}<Alert tone="danger" title={t('Speichern fehlgeschlagen')}>{general}</Alert>{/if}
 			<Toggle
 				bind:checked={form.enabled}
-				label="OIDC-Anmeldung aktiv"
-				description="Die Login-Seite zeigt dann „Anmelden mit {form.name || 'Single Sign-on'}“."
+				label={t('OIDC-Anmeldung aktiv')}
+				description={t('Die Login-Seite zeigt dann „Anmelden mit {provider}“.', {
+					provider: form.name || 'Single Sign-on'
+				})}
 			/>
 
 			<div class="flex flex-col gap-1.5 rounded-md border border-border bg-surface-2 p-3">
 				<p class="text-xs font-medium text-fg-muted">
-					Redirect-URI – beim Identity Provider für diese Anwendung eintragen
+					{t('Redirect-URI – beim Identity Provider für diese Anwendung eintragen')}
 				</p>
 				<div class="flex items-center gap-2">
 					<code class="mono min-w-0 flex-1 text-sm break-all text-fg">{callback}</code>
-					<CopyButton text={callback} label="Redirect-URI kopieren" size="sm" />
+					<CopyButton text={callback} label={t('Redirect-URI kopieren')} size="sm" />
 				</div>
 				{#if callback.startsWith('http://') && !callback.includes('localhost')}
 					<p class="text-xs text-warn">
-						Ohne HTTPS verlangen viele Identity Provider eine Ausnahme; für den Betrieb NetScope hinter einem
-						HTTPS-Proxy betreiben.
+						{t(
+							'Ohne HTTPS verlangen viele Identity Provider eine Ausnahme; für den Betrieb NetScope hinter einem HTTPS-Proxy betreiben.'
+						)}
 					</p>
 				{/if}
 			</div>
 
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 				<Input
-					label="Issuer-URL"
+					label={t('Issuer-URL')}
 					type="url"
 					bind:value={form.issuer}
 					placeholder="https://auth.example.org/application/o/netscope/"
-					hint="Authentik: …/application/o/<slug>/ · Keycloak: …/realms/<realm> · Entra ID: https://login.microsoftonline.com/<tenant>/v2.0"
+					hint={issuerHint}
 					error={errors.issuer}
 					class="md:col-span-2"
 					required
 				/>
-				<Input label="Client-ID" bind:value={form.clientId} error={errors.clientId} mono required />
+				<Input label={t('Client-ID')} bind:value={form.clientId} error={errors.clientId} mono required />
 				<div class="flex flex-col gap-1.5">
 					<Input
-						label="Client-Secret"
+						label={t('Client-Secret')}
 						type="password"
 						bind:value={secret}
 						autocomplete="new-password"
 						placeholder={form.hasSecret
-							? 'gespeichert – leer lassen zum Beibehalten'
-							: 'leer bei öffentlichem Client'}
+							? t('gespeichert – leer lassen zum Beibehalten')
+							: t('leer bei öffentlichem Client')}
 						disabled={removeSecret}
 					/>
 					{#if form.hasSecret}
 						<label class="flex items-center gap-2 text-xs text-fg-muted">
-							<input type="checkbox" bind:checked={removeSecret} /> Gespeichertes Secret entfernen
+							<input type="checkbox" bind:checked={removeSecret} />
+							{t('Gespeichertes Secret entfernen')}
 						</label>
 					{/if}
 				</div>
 				<Input
-					label="Name auf der Login-Seite"
+					label={t('Name auf der Login-Seite')}
 					bind:value={form.name}
 					placeholder="Authentik"
 					error={errors.name}
@@ -149,21 +156,23 @@
 				<Input
 					label="Scopes"
 					bind:value={scopes}
-					hint="Zusätzlich zu openid, durch Leerzeichen getrennt"
+					hint={t('Zusätzlich zu openid, durch Leerzeichen getrennt')}
 					mono
 				/>
 				<Input
-					label="Claim für den Benutzernamen"
+					label={t('Claim für den Benutzernamen')}
 					bind:value={form.usernameClaim}
 					placeholder="preferred_username"
-					hint="Fällt auf email und sub zurück"
+					hint={t('Fällt auf email und sub zurück')}
 					mono
 				/>
 				<Input
-					label="Claim für Gruppen"
+					label={t('Claim für Gruppen')}
 					bind:value={form.groupsClaim}
 					placeholder="groups"
-					hint="Auch als Pfad, z. B. realm_access.roles (Keycloak); fehlt er im ID-Token, fragt NetScope Userinfo"
+					hint={t(
+						'Auch als Pfad, z. B. realm_access.roles (Keycloak); fehlt er im ID-Token, fragt NetScope Userinfo'
+					)}
 					mono
 				/>
 			</div>
@@ -173,37 +182,41 @@
 				bind:defaultRoleId={form.defaultRoleId}
 				bind:syncRole={form.syncRole}
 				{roles}
-				groupHint="Verglichen wird der Wert im Gruppen-Claim (Groß-/Kleinschreibung egal); Entra ID liefert dort Objekt-IDs."
+				groupHint={t(
+					'Verglichen wird der Wert im Gruppen-Claim (Groß-/Kleinschreibung egal); Entra ID liefert dort Objekt-IDs.'
+				)}
 				groupPlaceholder="netscope-admins"
 				{errors}
 			/>
 
 			<details class="group rounded-md border border-border">
 				<summary class="cursor-pointer px-3 py-2 text-sm font-medium text-fg-muted hover:text-fg">
-					Erweitert: Redirect-URI, eigene Zertifizierungsstelle
+					{t('Erweitert: Redirect-URI, eigene Zertifizierungsstelle')}
 				</summary>
 				<div class="flex flex-col gap-4 border-t border-border p-3">
 					<Input
-						label="Redirect-URI festlegen"
+						label={t('Redirect-URI festlegen')}
 						type="url"
 						bind:value={form.redirectUrl}
 						placeholder={redirectUrl}
-						hint="Nur nötig, wenn NetScope hinter einem Proxy unter einer anderen Adresse erreichbar ist"
+						hint={t('Nur nötig, wenn NetScope hinter einem Proxy unter einer anderen Adresse erreichbar ist')}
 						error={errors.redirectUrl}
 					/>
 					<Textarea
-						label="CA-Zertifikat (PEM)"
+						label={t('CA-Zertifikat (PEM)')}
 						bind:value={form.ca}
 						rows={4}
 						mono
 						placeholder="-----BEGIN CERTIFICATE-----"
-						hint="Für Identity Provider mit Zertifikat einer eigenen Zertifizierungsstelle"
+						hint={t('Für Identity Provider mit Zertifikat einer eigenen Zertifizierungsstelle')}
 						error={errors.ca}
 					/>
 					<Toggle
 						bind:checked={form.insecureSkipVerify}
-						label="Zertifikat nicht prüfen"
-						description="Nur zum Testen – ohne Prüfung kann sich jeder im Netz als Identity Provider ausgeben."
+						label={t('Zertifikat nicht prüfen')}
+						description={t(
+							'Nur zum Testen – ohne Prüfung kann sich jeder im Netz als Identity Provider ausgeben.'
+						)}
 					/>
 				</div>
 			</details>
@@ -211,12 +224,15 @@
 			{#if test}
 				<div class="flex flex-col gap-2 rounded-md border border-border p-3">
 					<p class="text-sm font-medium {test.ok ? 'text-ok' : 'text-danger'}">
-						{test.ok ? 'Identity Provider erreichbar' : 'Prüfung fehlgeschlagen'}
+						{test.ok ? t('Identity Provider erreichbar') : t('Prüfung fehlgeschlagen')}
 					</p>
 					<TestSteps steps={test.steps} />
 					{#if test.ok}
 						<p class="text-xs text-fg-muted">
-							Signaturschlüssel: {test.keys} · Algorithmen: {(test.signingAlgorithms ?? []).join(', ') || '–'}
+							{t('Signaturschlüssel: {keys} · Algorithmen: {algorithms}', {
+								keys: test.keys,
+								algorithms: (test.signingAlgorithms ?? []).join(', ') || '–'
+							})}
 						</p>
 					{/if}
 				</div>
@@ -225,9 +241,9 @@
 		{#snippet footer()}
 			<div class="flex flex-wrap items-center justify-end gap-2">
 				<Button icon="zap" loading={testing} disabled={!form.issuer.trim()} onclick={check}
-					>Verbindung prüfen</Button
+					>{t('Verbindung prüfen')}</Button
 				>
-				<Button type="submit" variant="primary" icon="save" loading={saving}>Speichern</Button>
+				<Button type="submit" variant="primary" icon="save" loading={saving}>{t('Speichern')}</Button>
 			</div>
 		{/snippet}
 	</Card>

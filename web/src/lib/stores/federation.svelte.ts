@@ -10,6 +10,7 @@ import { api } from '$lib/api/client';
 import type { FederationView, SiteRef } from '$lib/api';
 import { Resource } from './resource.svelte';
 import { live } from './live.svelte';
+import { t } from '$lib/i18n';
 
 const STORAGE_KEY = 'ns.site';
 
@@ -32,7 +33,7 @@ class FederationStore {
 	}
 	/** Name of this instance among the sites. */
 	get localName(): string {
-		return this.#res.value?.localName || 'Zentrale';
+		return this.#res.value?.localName || t('Zentrale');
 	}
 	site(id: number | undefined): SiteRef | undefined {
 		return id ? this.sites.find((s) => s.id === id) : undefined;
@@ -89,7 +90,7 @@ class SiteFilter {
 	/** Label of the current selection. */
 	get label(): string {
 		const v = this.value;
-		if (v === '') return 'Alle Standorte';
+		if (v === '') return t('Alle Standorte');
 		if (v === 'local') return federation.localName;
 		return federation.sites.find((s) => s.slug === v)?.name ?? v;
 	}

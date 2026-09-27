@@ -23,13 +23,14 @@
 		RelativeTime,
 		Skeleton
 	} from '$lib/components/ui';
+	import { t, tn } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { federation, siteFilter } from '$lib/stores/federation.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatDateTime, formatNumber, plural } from '$lib/utils/format';
+	import { formatDateTime, formatNumber } from '$lib/utils/format';
 
 	const list = new AsyncData<Site[]>();
 	$effect(() => {
@@ -48,6 +49,9 @@
 	const isCentral = $derived(federation.role === 'central');
 	const canManage = $derived(auth.can('sites.manage'));
 	const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+	// "Die Rolle wird unter <link> festgelegt."
+	const [roleBefore, roleAfter] = t('Die Rolle wird unter {link} festgelegt.').split('{link}');
 
 	function failedPlugins(s: Site) {
 		return (s.status?.plugins ?? []).filter((p) => p.status === 'failed' || p.status === 'timeout');
@@ -86,13 +90,13 @@
 	async function save() {
 		general = null;
 		const e: Record<string, string> = {};
-		if (!name.trim()) e.name = 'Name erforderlich';
+		if (!name.trim()) e.name = t('Name erforderlich');
 		if (url.trim()) {
 			try {
 				const u = new URL(url.trim());
 				if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.host) throw new Error();
 			} catch {
-				e.url = 'Gültige http(s)-URL erwartet';
+				e.url = t('Gültige http(s)-URL erwartet');
 			}
 		}
 		errors = e;
@@ -102,7 +106,7 @@
 			const body = { name: name.trim(), url: url.trim() };
 			if (editing) {
 				await api.patch('/api/v1/sites/{id}', { path: { id: editing.id }, body });
-				toast.success(`Standort „${body.name}“ gespeichert`);
+				toast.success(t('Standort „{name}“ gespeichert', { name: body.name }));
 				editOpen = false;
 			} else {
 				created = await api.post('/api/v1/sites', { body });
@@ -123,10 +127,11 @@
 
 	async function rotate(s: Site) {
 		const ok = await confirm({
-			title: `Neues Token für „${s.name}“?`,
-			message:
-				'Das bisherige Token gilt sofort nicht mehr. Bis das neue Token am Standort eingetragen ist, puffert der Standort seine Daten.',
-			confirmLabel: 'Neues Token erzeugen',
+			title: t('Neues Token für „{name}“?', { name: s.name }),
+			message: t(
+				'Das bisherige Token gilt sofort nicht mehr. Bis das neue Token am Standort eingetragen ist, puffert der Standort seine Daten.'
+			),
+			confirmLabel: t('Neues Token erzeugen'),
 			danger: true
 		});
 		if (!ok) return;
@@ -151,7 +156,7 @@
 		deleteBusy = true;
 		try {
 			await api.delete('/api/v1/sites/{id}', { path: { id: deleting.id } });
-			toast.success(`Standort „${deleting.name}“ entfernt`);
+			toast.success(t('Standort „{name}“ entfernt', { name: deleting.name }));
 			if (siteFilter.value === deleting.slug) siteFilter.value = '';
 			deleteOpen = false;
 			list.reload();
@@ -169,20 +174,24 @@
 </script>
 
 <PageHeader
-	title="Standorte"
-	description="NetScope-Instanzen, die ihre Netze an diese Zentrale liefern. Die Zentrale liest nur – gescannt und konfiguriert wird am Standort."
+	title={t('Standorte')}
+	description={t(
+		'NetScope-Instanzen, die ihre Netze an diese Zentrale liefern. Die Zentrale liest nur – gescannt und konfiguriert wird am Standort.'
+	)}
 >
 	{#snippet actions()}
 		{#if isCentral && canManage}
-			<Button variant="primary" icon="plus" onclick={openCreate}>Standort anlegen</Button>
+			<Button variant="primary" icon="plus" onclick={openCreate}>{t('Standort anlegen')}</Button>
 		{/if}
 	{/snippet}
 </PageHeader>
 
 {#if !isCentral}
-	<Alert tone="info" title="Diese Instanz ist keine Zentrale">
-		Standorte können nur an einer Zentrale angelegt werden. Die Rolle wird unter
-		<a href="/system?tab=federation" class="text-accent hover:underline">System → Verbund</a> festgelegt.
+	<Alert tone="info" title={t('Diese Instanz ist keine Zentrale')}>
+		{t('Standorte können nur an einer Zentrale angelegt werden.')}
+		{roleBefore}<a href="/system?tab=federation" class="text-accent hover:underline"
+			>{t('System → Verbund')}</a
+		>{roleAfter}
 	</Alert>
 {:else if list.error && !list.data}
 	<ErrorState error={list.error} onretry={() => list.reload()} />
@@ -190,13 +199,15 @@
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-2"><Card><Skeleton lines={6} /></Card></div>
 {:else if list.data.length === 0}
 	{#snippet create()}
-		<Button variant="primary" icon="plus" onclick={openCreate}>Standort anlegen</Button>
+		<Button variant="primary" icon="plus" onclick={openCreate}>{t('Standort anlegen')}</Button>
 	{/snippet}
 	<Card>
 		<EmptyState
 			icon="globe"
-			title="Noch keine Standorte"
-			description="Einen Standort anlegen, das Token am Standort unter System → Verbund eintragen – ab dann liefert er seine Geräte, Events und Zustände hierher."
+			title={t('Noch keine Standorte')}
+			description={t(
+				'Einen Standort anlegen, das Token am Standort unter System → Verbund eintragen – ab dann liefert er seine Geräte, Events und Zustände hierher.'
+			)}
 			actions={canManage ? create : undefined}
 		/>
 	</Card>
@@ -211,13 +222,13 @@
 							<h2 class="flex flex-wrap items-center gap-2 text-base font-semibold text-fg">
 								{s.name}
 								{#if s.connected}
-									<Badge tone="ok" dot>verbunden</Badge>
+									<Badge tone="ok" dot>{t('verbunden')}</Badge>
 								{:else if s.lastContact}
-									<Badge tone="danger" dot>meldet sich nicht</Badge>
+									<Badge tone="danger" dot>{t('meldet sich nicht')}</Badge>
 								{:else}
-									<Badge tone="neutral">wartet auf erste Meldung</Badge>
+									<Badge tone="neutral">{t('wartet auf erste Meldung')}</Badge>
 								{/if}
-								{#if s.status?.syncing}<Badge tone="info">Abgleich</Badge>{/if}
+								{#if s.status?.syncing}<Badge tone="info">{t('Abgleich läuft')}</Badge>{/if}
 							</h2>
 							<p class="mono text-xs text-fg-subtle">site:{s.slug} · Token {s.tokenPrefix}…</p>
 						</div>
@@ -227,23 +238,24 @@
 								target="_blank"
 								rel="noopener"
 								class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-medium text-fg-muted hover:bg-surface-3 hover:text-fg"
-								title="Oberfläche des Standorts öffnen"><Icon name="external" size={14} />Öffnen</a
+								title={t('Oberfläche des Standorts öffnen')}
+								><Icon name="external" size={14} />{t('Öffnen')}</a
 							>
 						{/if}
 						<Menu
-							label="Aktionen für {s.name}"
+							label={t('Aktionen für {name}', { name: s.name })}
 							items={canManage
 								? [
-										{ label: 'Bearbeiten', icon: 'edit', onclick: () => openEdit(s) },
+										{ label: t('Bearbeiten'), icon: 'edit', onclick: () => openEdit(s) },
 										{
-											label: 'Geräte anzeigen',
+											label: t('Geräte anzeigen'),
 											icon: 'devices',
 											href: `/devices?q=${encodeURIComponent('site:' + s.slug)}`
 										},
-										{ label: 'Neues Token', icon: 'key', onclick: () => rotate(s) },
+										{ label: t('Neues Token'), icon: 'key', onclick: () => rotate(s) },
 										{ separator: true },
 										{
-											label: 'Entfernen …',
+											label: t('Entfernen …'),
 											icon: 'trash',
 											danger: true,
 											onclick: () => {
@@ -254,7 +266,7 @@
 									]
 								: [
 										{
-											label: 'Geräte anzeigen',
+											label: t('Geräte anzeigen'),
 											icon: 'devices',
 											href: `/devices?q=${encodeURIComponent('site:' + s.slug)}`
 										}
@@ -263,26 +275,29 @@
 					</div>
 				{/snippet}
 				<DescList cols={3}>
-					<DescItem label="Letzte Meldung">
+					<DescItem label={t('Letzte Meldung')}>
 						{#if s.lastContact}<RelativeTime value={s.lastContact} />{:else}<span class="text-fg-subtle"
-								>nie</span
+								>{t('nie')}</span
 							>{/if}
 					</DescItem>
-					<DescItem label="Geräte hier" hint={s.devices ? `${formatNumber(s.online)} online` : undefined}>
+					<DescItem
+						label={t('Geräte hier')}
+						hint={s.devices ? `${formatNumber(s.online)} online` : undefined}
+					>
 						<span class="tabular">{formatNumber(s.devices)}</span>
 					</DescItem>
-					<DescItem label="Im Puffer des Standorts">
+					<DescItem label={t('Im Puffer des Standorts')}>
 						<span class="tabular {s.status?.buffered ? 'text-warn' : ''}"
 							>{formatNumber(s.status?.buffered ?? 0)}</span
 						>
 					</DescItem>
 					<DescItem label="Version" value={s.instance?.version} mono />
 					<DescItem label="Host" value={s.instance?.hostname} mono />
-					<DescItem label="Adresse" value={s.lastIp} mono />
+					<DescItem label={t('Adresse')} value={s.lastIp} mono />
 				</DescList>
 				{#if s.status?.subnets?.length}
 					<div class="mt-4">
-						<p class="mb-1 text-xs text-fg-subtle">Subnetze am Standort</p>
+						<p class="mb-1 text-xs text-fg-subtle">{t('Subnetze am Standort')}</p>
 						<div class="flex flex-wrap gap-1.5">
 							{#each s.status.subnets as sn (sn.cidr)}
 								<Badge variant="outline" title={sn.name || undefined}
@@ -297,7 +312,7 @@
 					<Alert
 						tone="warn"
 						class="mt-4"
-						title={plural(failed.length, 'Plugin mit Fehler', 'Plugins mit Fehlern')}
+						title={tn(failed.length, '{n} Plugin mit Fehler', '{n} Plugins mit Fehlern')}
 					>
 						<ul class="flex flex-col gap-1">
 							{#each failed as p (p.id)}
@@ -318,10 +333,10 @@
 <Modal
 	bind:open={editOpen}
 	title={created
-		? 'Standort angelegt'
+		? t('Standort angelegt')
 		: editing
-			? `Standort „${editing.name}“ bearbeiten`
-			: 'Standort anlegen'}
+			? t('Standort „{name}“ bearbeiten', { name: editing.name })
+			: t('Standort anlegen')}
 	size="md"
 	as="form"
 	onsubmit={() => (created ? (editOpen = false) : save())}
@@ -329,22 +344,26 @@
 >
 	{#if created}
 		<div class="flex flex-col gap-3 text-sm">
-			<Alert tone="warn" title="Token nur jetzt sichtbar">
-				Das Token am Standort unter System → Verbund eintragen (Rolle „Standort“, Adresse dieser Zentrale). Es
-				wird hier nicht noch einmal angezeigt.
+			<Alert tone="warn" title={t('Token nur jetzt sichtbar')}>
+				{t(
+					'Das Token am Standort unter System → Verbund eintragen (Rolle „Standort“, Adresse dieser Zentrale). Es wird hier nicht noch einmal angezeigt.'
+				)}
 			</Alert>
 			<div class="flex items-center gap-2 rounded-md border border-border bg-surface-2 py-1.5 pr-1.5 pl-3">
-				<code class="mono min-w-0 flex-1 text-[0.8rem] break-all select-all" aria-label="Token des Standorts"
-					>{created.token}</code
+				<code
+					class="mono min-w-0 flex-1 text-[0.8rem] break-all select-all"
+					aria-label={t('Token des Standorts')}>{created.token}</code
 				>
-				<CopyButton text={created.token} label="Token kopieren" size="sm" />
+				<CopyButton text={created.token} label={t('Token kopieren')} size="sm" />
 			</div>
 			<DescList cols={2}>
-				<DescItem label="Adresse der Zentrale" value={origin} mono />
+				<DescItem label={t('Adresse der Zentrale')} value={origin} mono />
 				<DescItem label="Filter" value={created.site ? `site:${created.site.slug}` : ''} mono />
 			</DescList>
 			<p class="text-fg-muted">
-				Ein Standort ohne Oberfläche (reiner Sammler) wird stattdessen per Umgebungsvariablen angebunden:
+				{t(
+					'Ein Standort ohne Oberfläche (reiner Sammler) wird stattdessen per Umgebungsvariablen angebunden:'
+				)}
 			</p>
 			<pre
 				class="mono rounded-md bg-surface-2 px-3 py-2 text-xs break-all whitespace-pre-wrap text-fg-muted">{setupText(
@@ -360,57 +379,59 @@ NETSCOPE_UI=false</pre>
 				bind:value={name}
 				required
 				maxlength={64}
-				placeholder="z. B. Colo oder Büro Süd"
-				hint="Erscheint in der Standort-Auswahl, an Geräten und in Benachrichtigungen."
+				placeholder={t('z. B. Colo oder Büro Süd')}
+				hint={t('Erscheint in der Standort-Auswahl, an Geräten und in Benachrichtigungen.')}
 				error={errors.name}
 			/>
 			<Input
-				label="Adresse der Oberfläche (optional)"
+				label={t('Adresse der Oberfläche (optional)')}
 				type="url"
 				bind:value={url}
 				placeholder="https://colo-netscope.example.org"
-				hint="Für Direktlinks. Leer lassen, um die vom Standort gemeldete öffentliche URL zu nutzen."
+				hint={t('Für Direktlinks. Leer lassen, um die vom Standort gemeldete öffentliche URL zu nutzen.')}
 				error={errors.url}
 			/>
 		</div>
 	{/if}
 	{#snippet footer()}
 		{#if created}
-			<Button type="submit" variant="primary">Fertig</Button>
+			<Button type="submit" variant="primary">{t('Fertig')}</Button>
 		{:else}
-			<Button onclick={() => (editOpen = false)} disabled={saving}>Abbrechen</Button>
+			<Button onclick={() => (editOpen = false)} disabled={saving}>{t('Abbrechen')}</Button>
 			<Button type="submit" variant="primary" icon={editing ? 'save' : 'plus'} loading={saving}
-				>{editing ? 'Speichern' : 'Anlegen'}</Button
+				>{editing ? t('Speichern') : t('Anlegen')}</Button
 			>
 		{/if}
 	{/snippet}
 </Modal>
 
-<Modal bind:open={tokenOpen} title="Neues Token für „{tokenFor?.name}“" size="md">
+<Modal bind:open={tokenOpen} title={t('Neues Token für „{name}“', { name: tokenFor?.name ?? '' })} size="md">
 	<div class="flex flex-col gap-3 text-sm">
-		<Alert tone="warn" title="Nur jetzt sichtbar">
-			Am Standort unter System → Verbund eintragen. Das alte Token gilt nicht mehr.
+		<Alert tone="warn" title={t('Nur jetzt sichtbar')}>
+			{t('Am Standort unter System → Verbund eintragen. Das alte Token gilt nicht mehr.')}
 		</Alert>
 		<div class="flex items-center gap-2 rounded-md border border-border bg-surface-2 py-1.5 pr-1.5 pl-3">
 			<code class="mono min-w-0 flex-1 text-[0.8rem] break-all select-all">{newToken}</code>
-			<CopyButton text={newToken} label="Token kopieren" size="sm" />
+			<CopyButton text={newToken} label={t('Token kopieren')} size="sm" />
 		</div>
 	</div>
 	{#snippet footer()}
-		<Button variant="primary" onclick={() => (tokenOpen = false)}>Fertig</Button>
+		<Button variant="primary" onclick={() => (tokenOpen = false)}>{t('Fertig')}</Button>
 	{/snippet}
 </Modal>
 
 <StrongConfirm
 	bind:open={deleteOpen}
-	title="Standort „{deleting?.name}“ entfernen?"
+	title={t('Standort „{name}“ entfernen?', { name: deleting?.name ?? '' })}
 	word={deleting?.name ?? ''}
-	confirmLabel="Entfernen"
+	confirmLabel={t('Entfernen')}
 	busy={deleteBusy}
 	onconfirm={remove}
 >
 	<p>
-		Entfernt den Standort mit {plural(deleting?.devices ?? 0, 'geliefertem Gerät', 'gelieferten Geräten')} und seinen
-		Events aus dieser Zentrale. Am Standort selbst wird nichts gelöscht; er kann danach nichts mehr einliefern.
+		{t(
+			'Entfernt den Standort mit {devices} und seinen Events aus dieser Zentrale. Am Standort selbst wird nichts gelöscht; er kann danach nichts mehr einliefern.',
+			{ devices: tn(deleting?.devices ?? 0, '{n} geliefertem Gerät', '{n} gelieferten Geräten') }
+		)}
 	</p>
 </StrongConfirm>

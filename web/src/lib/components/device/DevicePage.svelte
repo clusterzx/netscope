@@ -42,6 +42,7 @@
 	import { runs } from '$lib/stores/runs.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatNumber } from '$lib/utils/format';
+	import { t } from '$lib/i18n';
 	import {
 		criticalityLabel,
 		criticalityTone,
@@ -95,7 +96,7 @@
 
 	const d = $derived(dev.data);
 	const notFound = $derived(!validId || (dev.error instanceof ApiError && dev.error.status === 404));
-	const title = $derived(d ? d.name || d.ip || d.mac || `Gerät ${d.id}` : 'Gerät');
+	const title = $derived(d ? d.name || d.ip || d.mac || t('Gerät {id}', { id: d.id }) : t('Gerät'));
 
 	/** bumped on live updates; tabs refetch their data when it changes */
 	let version = $state(0);
@@ -116,11 +117,12 @@
 			gone = { target: null };
 			return;
 		}
-		gone = { target: { id: mergedInto, name: `Gerät #${mergedInto}` } };
+		gone = { target: { id: mergedInto, name: t('Gerät #{id}', { id: mergedInto }) } };
 		try {
 			const res = await api.get('/api/v1/devices', { query: { q: `id:${mergedInto}`, limit: 1 } });
-			const t = res.items?.[0];
-			if (t && gone?.target?.id === t.id) gone = { target: { id: t.id, name: t.name || t.ip || t.mac } };
+			const found = res.items?.[0];
+			if (found && gone?.target?.id === found.id)
+				gone = { target: { id: found.id, name: found.name || found.ip || found.mac } };
 		} catch {
 			// keep the id as name
 		}
@@ -152,8 +154,8 @@
 		visited.add(tab);
 	});
 
-	function selectTab(t: string) {
-		setParams({ tab: t === 'overview' ? null : t });
+	function selectTab(next: string) {
+		setParams({ tab: next === 'overview' ? null : next });
 	}
 
 	const counts = $derived(d?.counts ?? {});
@@ -171,18 +173,18 @@
 	$effect(() => live.on<{ id: number }>('agent', () => agentData.reload()));
 	const agent = $derived(agentData.data ?? null);
 	const tabs = $derived<TabItem[]>([
-		{ id: 'overview', label: 'Überblick' },
-		{ id: 'ports', label: 'Ports & Dienste', count: counts.ports ?? null },
+		{ id: 'overview', label: t('Überblick') },
+		{ id: 'ports', label: t('Ports & Dienste'), count: counts.ports ?? null },
 		{ id: 'software', label: 'Software', count: counts.packages || null },
 		{ id: 'containers', label: 'Container', count: counts.containers ?? null },
-		{ id: 'certificates', label: 'Zertifikate', count: counts.certificates ?? null },
+		{ id: 'certificates', label: t('Zertifikate'), count: counts.certificates ?? null },
 		{ id: 'cves', label: 'CVEs', count: counts.cves ?? null },
 		{ id: 'health', label: 'Health', count: counts.health ?? null },
-		...(agent ? [{ id: 'usage', label: 'Auslastung' }] : []),
+		...(agent ? [{ id: 'usage', label: t('Auslastung') }] : []),
 		...(counts.interfaces ? [{ id: 'traffic', label: 'Traffic', count: counts.interfaces }] : []),
-		{ id: 'history', label: 'Historie', count: counts.events ?? null },
-		{ id: 'relations', label: 'Beziehungen', count: counts.relations ?? null },
-		{ id: 'raw', label: 'Rohdaten' }
+		{ id: 'history', label: t('Historie'), count: counts.events ?? null },
+		{ id: 'relations', label: t('Beziehungen'), count: counts.relations ?? null },
+		{ id: 'raw', label: t('Rohdaten') }
 	]);
 
 	// ---------------------------------------------------------------- scans
@@ -266,7 +268,7 @@
 			paramsOpen = true;
 			return;
 		}
-		if (a.confirm && !(await confirm({ title: a.label, message: a.confirm, confirmLabel: 'Ausführen' })))
+		if (a.confirm && !(await confirm({ title: a.label, message: a.confirm, confirmLabel: t('Ausführen') })))
 			return;
 		try {
 			await runAction(a);
@@ -282,18 +284,23 @@
 
 	async function remove() {
 		const ok = await confirm({
-			title: `„${title}“ löschen?`,
+			title: t('„{name}“ löschen?', { name: title }),
 			message: site
-				? `Das Gerät wird nur in dieser Zentrale gelöscht. Solange der Standort ${site.name} es kennt, liefert er es mit der nächsten Beobachtung erneut.`
-				: 'Alle Daten des Geräts (Ports, Zertifikate, Pakete, Historie …) werden gelöscht. Events bleiben erhalten. Ist das Gerät weiter im Netz aktiv, legt der nächste Scan es neu an.',
-			confirmLabel: 'Löschen',
+				? t(
+						'Das Gerät wird nur in dieser Zentrale gelöscht. Solange der Standort {site} es kennt, liefert er es mit der nächsten Beobachtung erneut.',
+						{ site: site.name }
+					)
+				: t(
+						'Alle Daten des Geräts (Ports, Zertifikate, Pakete, Historie …) werden gelöscht. Events bleiben erhalten. Ist das Gerät weiter im Netz aktiv, legt der nächste Scan es neu an.'
+					),
+			confirmLabel: t('Löschen'),
 			danger: true
 		});
 		if (!ok) return;
 		deleting = true;
 		try {
 			await api.delete('/api/v1/devices/{id}', { path: { id } });
-			toast.success(`„${title}“ gelöscht`);
+			toast.success(t('„{name}“ gelöscht', { name: title }));
 			goto('/devices');
 		} catch (e) {
 			deleting = false;
@@ -304,18 +311,24 @@
 	const deviceItems = $derived<MenuItem[]>([
 		...(site || !canHealth
 			? []
-			: [{ label: 'Health-Check anlegen …', icon: 'activity' as const, onclick: () => (healthOpen = true) }]),
-		...(canEdit ? [{ label: 'Notiz bearbeiten', icon: 'note' as const, onclick: editNotes }] : []),
+			: [
+					{
+						label: t('Health-Check anlegen …'),
+						icon: 'activity' as const,
+						onclick: () => (healthOpen = true)
+					}
+				]),
+		...(canEdit ? [{ label: t('Notiz bearbeiten'), icon: 'note' as const, onclick: editNotes }] : []),
 		...(canDelete
 			? [
 					{
-						label: 'MAC-Adressen abspalten …',
+						label: t('MAC-Adressen abspalten …'),
 						icon: 'split' as const,
 						disabled: (d?.macs?.length ?? 0) < 2,
-						hint: (d?.macs?.length ?? 0) < 2 ? 'nur eine MAC' : undefined,
+						hint: (d?.macs?.length ?? 0) < 2 ? t('nur eine MAC') : undefined,
 						onclick: () => (splitOpen = true)
 					},
-					{ label: 'Löschen …', icon: 'trash' as const, danger: true, onclick: remove }
+					{ label: t('Löschen …'), icon: 'trash' as const, danger: true, onclick: remove }
 				]
 			: [])
 	]);
@@ -323,7 +336,7 @@
 	const menuItems = $derived<MenuItem[]>([
 		...(deviceActions.length
 			? [
-					{ separator: true as const, label: 'Plugin-Aktionen' },
+					{ separator: true as const, label: t('Plugin-Aktionen') },
 					...deviceActions.map((a): MenuItem => ({
 						label: a.label + (a.params?.length ? ' …' : ''),
 						icon: a.plugin === 'wol' ? 'zap' : 'play',
@@ -333,8 +346,16 @@
 					}))
 				]
 			: []),
-		...(deviceItems.length ? [{ separator: true as const, label: 'Gerät' }, ...deviceItems] : [])
+		...(deviceItems.length ? [{ separator: true as const, label: t('Gerät') }, ...deviceItems] : [])
 	]);
+
+	// sentences with a link or a bold name inside: split at the placeholder
+	const mergedText = t(
+		'Es wurde mit {device} zusammengeführt. Die angezeigten Daten sind nicht mehr aktuell.'
+	).split('{device}');
+	const siteText = t(
+		'Dieses Gerät liefert der Standort {site}. Scans, Aktionen und Health-Checks laufen dort; hier gepflegte Angaben (Name, Tags, Notizen …) gelten nur für die Zentrale.'
+	).split('{site}');
 
 	function onChanged(next?: DeviceDetail) {
 		if (next) dev.set(next);
@@ -344,21 +365,23 @@
 </script>
 
 {#if notFound}
-	<PageHeader title="Gerät nicht gefunden">
-		{#snippet breadcrumb()}<a href="/devices" class="hover:text-fg hover:underline">Geräte</a>{/snippet}
+	<PageHeader title={t('Gerät nicht gefunden')}>
+		{#snippet breadcrumb()}<a href="/devices" class="hover:text-fg hover:underline">{t('Geräte')}</a
+			>{/snippet}
 	</PageHeader>
 	<EmptyState
 		icon="devices"
-		title="Dieses Gerät gibt es nicht (mehr)"
-		description="Es wurde gelöscht, mit einem anderen Gerät zusammengeführt oder die Adresse ist falsch."
+		title={t('Dieses Gerät gibt es nicht (mehr)')}
+		description={t('Es wurde gelöscht, mit einem anderen Gerät zusammengeführt oder die Adresse ist falsch.')}
 	>
 		{#snippet actions()}
-			<Button href="/devices" icon="arrow-left">Zur Geräteliste</Button>
+			<Button href="/devices" icon="arrow-left">{t('Zur Geräteliste')}</Button>
 		{/snippet}
 	</EmptyState>
 {:else if !d && dev.error}
-	<PageHeader title="Gerät">
-		{#snippet breadcrumb()}<a href="/devices" class="hover:text-fg hover:underline">Geräte</a>{/snippet}
+	<PageHeader title={t('Gerät')}>
+		{#snippet breadcrumb()}<a href="/devices" class="hover:text-fg hover:underline">{t('Geräte')}</a
+			>{/snippet}
 	</PageHeader>
 	<ErrorState error={dev.error} onretry={() => dev.reload()} />
 {:else if !d}
@@ -371,7 +394,7 @@
 {:else}
 	<PageHeader {title}>
 		{#snippet breadcrumb()}
-			<a href="/devices" class="hover:text-fg hover:underline">Geräte</a>
+			<a href="/devices" class="hover:text-fg hover:underline">{t('Geräte')}</a>
 			<span aria-hidden="true"> / </span><span class="mono">#{d.id}</span>
 		{/snippet}
 		{#snippet meta()}
@@ -381,19 +404,19 @@
 				>
 				<span class="text-fg">{d.online ? 'Online' : 'Offline'}</span>
 				{#if d.onlineChangedAt}
-					<span class="text-fg-subtle">seit <RelativeTime value={d.onlineChangedAt} /></span>
+					<span class="text-fg-subtle">{t('seit')} <RelativeTime value={d.onlineChangedAt} /></span>
 				{/if}
 			</span>
-			<Badge tone={stateTone(d.state)} title="Zustand">{stateLabel[d.state] ?? d.state}</Badge>
-			<Badge tone={criticalityTone(d.criticality)} title="Kritikalität">
-				Kritikalität: {criticalityLabel[d.criticality] ?? d.criticality}
+			<Badge tone={stateTone(d.state)} title={t('Zustand')}>{stateLabel[d.state] ?? d.state}</Badge>
+			<Badge tone={criticalityTone(d.criticality)} title={t('Kritikalität')}>
+				{t('Kritikalität: {value}', { value: criticalityLabel[d.criticality] ?? d.criticality })}
 			</Badge>
-			{#if site}<Badge tone="accent" title="Geliefert vom NetScope-Standort {site.name}"
-					>Standort {site.name}</Badge
+			{#if site}<Badge tone="accent" title={t('Geliefert vom NetScope-Standort {site}', { site: site.name })}
+					>{t('Standort {site}', { site: site.name })}</Badge
 				>{/if}
-			{#if d.type}<Badge variant="outline" title="Gerätetyp">{deviceTypeName(d.type)}</Badge>{/if}
+			{#if d.type}<Badge variant="outline" title={t('Gerätetyp')}>{deviceTypeName(d.type)}</Badge>{/if}
 			{#if d.healthState}
-				<Badge tone={healthTone(d.healthState)} dot title="Health-Checks">
+				<Badge tone={healthTone(d.healthState)} dot title={t('Health-Checks')}>
 					Health: {healthStateLabel[d.healthState] ?? d.healthState}
 				</Badge>
 			{/if}
@@ -402,20 +425,20 @@
 					type="button"
 					class="inline-flex items-center gap-1 rounded hover:underline"
 					onclick={() => selectTab('cves')}
-					title="CVEs anzeigen"
+					title={t('CVEs anzeigen')}
 				>
 					<SeverityBadge cvss={d.maxCvss ?? 0} />
 					<span class="text-xs">{formatNumber(d.cveCount)} CVEs</span>
 				</button>
 			{/if}
-			{#each d.tags ?? [] as t (t)}
+			{#each d.tags ?? [] as tag (tag)}
 				<a
-					href={devicesHref('tag:' + t)}
-					class="rounded bg-accent-soft px-1.5 text-xs leading-5 text-accent hover:underline">#{t}</a
+					href={devicesHref('tag:' + tag)}
+					class="rounded bg-accent-soft px-1.5 text-xs leading-5 text-accent hover:underline">#{tag}</a
 				>
 			{/each}
 			{#each d.groups ?? [] as g (g.id)}
-				<a href={devicesHref(groupQuery(g.name))} class="hover:underline" title="Gruppe">
+				<a href={devicesHref(groupQuery(g.name))} class="hover:underline" title={t('Gruppe')}>
 					<Badge variant="outline">{g.name}</Badge>
 				</a>
 			{/each}
@@ -429,13 +452,15 @@
 						>
 					{/if}
 					{#if canEdit}
-						<Button icon="edit" label="Manuelle Daten bearbeiten" onclick={() => (editOpen = true)}
-							><span class="hidden sm:inline">Bearbeiten</span></Button
+						<Button icon="edit" label={t('Manuelle Daten bearbeiten')} onclick={() => (editOpen = true)}
+							><span class="hidden sm:inline">{t('Bearbeiten')}</span></Button
 						>
 					{/if}
 					{#if !site}
 						{#if canScan}
-							<Button variant="primary" icon="radar" onclick={() => (scanOpen = true)}>Scan jetzt</Button>
+							<Button variant="primary" icon="radar" onclick={() => (scanOpen = true)}
+								>{t('Scan jetzt')}</Button
+							>
 						{/if}
 					{:else if siteLink}
 						<a
@@ -443,12 +468,12 @@
 							target="_blank"
 							rel="noopener"
 							class="inline-flex h-8.5 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-accent-fg shadow-sm hover:bg-accent-hover"
-							><Icon name="external" size={16} />Am Standort öffnen</a
+							><Icon name="external" size={16} />{t('Am Standort öffnen')}</a
 						>
 					{/if}
 					{#if menuItems.length}
 						<Menu
-							label="Weitere Aktionen"
+							label={t('Weitere Aktionen')}
 							icon="more-vertical"
 							variant="secondary"
 							size="md"
@@ -461,24 +486,22 @@
 	</PageHeader>
 
 	{#if gone}
-		<Alert tone="danger" title="Dieses Gerät existiert nicht mehr" class="mb-4">
+		<Alert tone="danger" title={t('Dieses Gerät existiert nicht mehr')} class="mb-4">
 			{#if gone.target}
-				Es wurde mit
-				<a href="/devices/{gone.target.id}" class="link font-medium">{gone.target.name}</a>
-				zusammengeführt. Die angezeigten Daten sind nicht mehr aktuell.
+				{mergedText[0]}<a href="/devices/{gone.target.id}" class="link font-medium">{gone.target.name}</a
+				>{mergedText[1] ?? ''}
 			{:else}
-				Es wurde gelöscht. Die angezeigten Daten sind nicht mehr aktuell.
+				{t('Es wurde gelöscht. Die angezeigten Daten sind nicht mehr aktuell.')}
 			{/if}
 			{#snippet actions()}
-				<Button size="sm" href="/devices">Zur Geräteliste</Button>
+				<Button size="sm" href="/devices">{t('Zur Geräteliste')}</Button>
 			{/snippet}
 		</Alert>
 	{/if}
 
 	{#if site && !gone}
 		<Alert tone="info" class="mb-4">
-			Dieses Gerät liefert der Standort <strong>{site.name}</strong>. Scans, Aktionen und Health-Checks laufen
-			dort; hier gepflegte Angaben (Name, Tags, Notizen …) gelten nur für die Zentrale.
+			{siteText[0]}<strong>{site.name}</strong>{siteText[1] ?? ''}
 		</Alert>
 	{/if}
 
@@ -489,12 +512,12 @@
 	<div class={gone ? 'pointer-events-none opacity-60' : ''} inert={!!gone}>
 		<DeviceSummary device={d} class="mb-4" />
 
-		<Tabs items={tabs} active={tab} onchange={selectTab} label="Gerätedetails" class="mb-4" />
+		<Tabs items={tabs} active={tab} onchange={selectTab} label={t('Gerätedetails')} class="mb-4" />
 
-		{#each tabs as t (t.id)}
-			{#if visited.has(t.id as DeviceTab)}
-				<div role="tabpanel" id="panel-{t.id}" aria-labelledby="tab-{t.id}" hidden={tab !== t.id}>
-					{#if t.id === 'overview'}
+		{#each tabs as tb (tb.id)}
+			{#if visited.has(tb.id as DeviceTab)}
+				<div role="tabpanel" id="panel-{tb.id}" aria-labelledby="tab-{tb.id}" hidden={tab !== tb.id}>
+					{#if tb.id === 'overview'}
 						<OverviewTab
 							device={d}
 							{version}
@@ -504,17 +527,17 @@
 							onshowrelations={() => selectTab('relations')}
 							onedit={() => (editOpen = true)}
 						/>
-					{:else if t.id === 'ports'}
+					{:else if tb.id === 'ports'}
 						<PortsTab deviceId={id} {version} active={tab === 'ports'} />
-					{:else if t.id === 'software'}
+					{:else if tb.id === 'software'}
 						<SoftwareTab deviceId={id} {version} active={tab === 'software'} />
-					{:else if t.id === 'containers'}
+					{:else if tb.id === 'containers'}
 						<ContainersTab deviceId={id} {version} active={tab === 'containers'} />
-					{:else if t.id === 'certificates'}
+					{:else if tb.id === 'certificates'}
 						<CertificatesTab deviceId={id} {version} active={tab === 'certificates'} />
-					{:else if t.id === 'cves'}
+					{:else if tb.id === 'cves'}
 						<CvesTab deviceId={id} {version} active={tab === 'cves'} onchanged={() => onChanged()} />
-					{:else if t.id === 'health'}
+					{:else if tb.id === 'health'}
 						<HealthTab
 							deviceId={id}
 							deviceIp={d.ip}
@@ -522,15 +545,15 @@
 							active={tab === 'health'}
 							oncreate={site ? undefined : () => (healthOpen = true)}
 						/>
-					{:else if t.id === 'usage' && agent}
+					{:else if tb.id === 'usage' && agent}
 						<AgentUsage deviceId={id} {agent} {version} active={tab === 'usage'} />
-					{:else if t.id === 'traffic'}
+					{:else if tb.id === 'traffic'}
 						<InterfaceTraffic deviceId={id} {version} active={tab === 'traffic'} />
-					{:else if t.id === 'history'}
+					{:else if tb.id === 'history'}
 						<HistoryTab deviceId={id} {version} active={tab === 'history'} />
-					{:else if t.id === 'relations'}
+					{:else if tb.id === 'relations'}
 						<RelationsTab device={d} {version} active={tab === 'relations'} onchanged={() => onChanged()} />
-					{:else if t.id === 'raw'}
+					{:else if tb.id === 'raw'}
 						<RawTab deviceId={id} {version} active={tab === 'raw'} />
 					{/if}
 				</div>

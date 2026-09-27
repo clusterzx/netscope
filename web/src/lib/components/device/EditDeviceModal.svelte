@@ -16,6 +16,7 @@
 	import { customFields, meta, tags } from '$lib/stores/catalog.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { CRITICALITIES, criticalityLabel, deviceTypeName, stateLabel } from '$lib/utils/labels';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		open: boolean;
@@ -102,8 +103,11 @@
 	}
 
 	const typeOptions = $derived([
-		{ value: '', label: `Automatisch${autoValue('type') ? ` (${autoValue('type')})` : ''}` },
-		...(meta.value?.deviceTypes ?? []).map((t) => ({ value: t, label: deviceTypeName(t) })),
+		{
+			value: '',
+			label: autoValue('type') ? t('Automatisch ({value})', { value: autoValue('type') }) : t('Automatisch')
+		},
+		...(meta.value?.deviceTypes ?? []).map((dt) => ({ value: dt, label: deviceTypeName(dt) })),
 		...(manual.type && !(meta.value?.deviceTypes ?? []).includes(manual.type)
 			? [{ value: manual.type, label: manual.type }]
 			: [])
@@ -115,13 +119,13 @@
 			const v = custom[def.key];
 			if (v === null || v === '') continue;
 			if (def.type === 'number' && (typeof v !== 'number' || !isFinite(v)))
-				e['cf.' + def.key] = 'Zahl erwartet';
+				e['cf.' + def.key] = t('Zahl erwartet');
 			if (def.type === 'url' && typeof v === 'string' && !/^https?:\/\/\S+$/i.test(v.trim()))
-				e['cf.' + def.key] = 'URL mit http:// oder https://';
+				e['cf.' + def.key] = t('URL mit http:// oder https://');
 			if (def.type === 'date' && typeof v === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(v))
-				e['cf.' + def.key] = 'Datum erwartet';
+				e['cf.' + def.key] = t('Datum erwartet');
 		}
-		for (const t of tagList) if (t.length > 64) e.tags = 'Tags höchstens 64 Zeichen';
+		for (const tag of tagList) if (tag.length > 64) e.tags = t('Tags höchstens 64 Zeichen');
 		errors = e;
 		return !Object.keys(e).length;
 	}
@@ -155,8 +159,9 @@
 	}
 
 	function mapServerError(msg: string): Record<string, string> {
-		if (/^Kritikalität/.test(msg)) return { criticality: msg };
-		if (/^Zustand/.test(msg)) return { state: msg };
+		// the server answers in the UI language: "Kritikalität: …" / "Criticality: …"
+		if (msg.startsWith(t('Kritikalität') + ':')) return { criticality: msg };
+		if (msg.startsWith(t('Zustand') + ':')) return { state: msg };
 		for (const def of defs) if (msg.startsWith(def.label + ':')) return { ['cf.' + def.key]: msg };
 		return {};
 	}
@@ -172,7 +177,7 @@
 		error = '';
 		try {
 			const next = await api.patch('/api/v1/devices/{id}', { path: { id: device.id }, body });
-			toast.success('Gerät gespeichert');
+			toast.success(t('Gerät gespeichert'));
 			if (body.tags) tags.refresh().catch(() => {});
 			open = false;
 			onsaved(next);
@@ -188,17 +193,17 @@
 
 	const labels: Record<Override, string> = {
 		hostname: 'Hostname',
-		vendor: 'Hersteller',
-		model: 'Modell',
-		type: 'Typ',
-		os: 'Betriebssystem'
+		vendor: t('Hersteller'),
+		model: t('Modell'),
+		type: t('Typ'),
+		os: t('Betriebssystem')
 	};
 </script>
 
 <Modal
 	bind:open
-	title="Gerät bearbeiten"
-	description="Manuelle Angaben haben Vorrang vor allen Scannern und überleben jeden Scan und Import."
+	title={t('Gerät bearbeiten')}
+	description={t('Manuelle Angaben haben Vorrang vor allen Scannern und überleben jeden Scan und Import.')}
 	size="lg"
 	as="form"
 	onsubmit={submit}
@@ -208,60 +213,69 @@
 		{#if error}<Alert tone="danger">{error}</Alert>{/if}
 
 		<fieldset class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-			<legend class="mb-2 text-xs font-semibold tracking-wider text-fg-subtle uppercase">Identität</legend>
+			<legend class="mb-2 text-xs font-semibold tracking-wider text-fg-subtle uppercase"
+				>{t('Identität')}</legend
+			>
 			<Input
-				label="Anzeigename"
+				label={t('Anzeigename')}
 				bind:value={displayName}
 				maxlength={120}
 				placeholder={device.hostname || device.ip || ''}
-				hint="Leer = Hostname bzw. IP"
+				hint={t('Leer = Hostname bzw. IP')}
 				class="sm:col-span-2"
 			/>
 			{#each OVERRIDES as k (k)}
 				{#if k === 'type'}
 					<Select
-						label="{labels[k]} (manuell)"
+						label={t('{label} (manuell)', { label: labels[k] })}
 						bind:value={manual.type}
 						options={typeOptions}
 						error={errors.type}
 					/>
 				{:else}
 					<Input
-						label="{labels[k]} (manuell)"
+						label={t('{label} (manuell)', { label: labels[k] })}
 						bind:value={manual[k]}
 						error={errors[k]}
 						maxlength={200}
 						mono={k === 'hostname'}
-						placeholder={autoValue(k) ? `automatisch: ${autoValue(k)}` : 'automatisch'}
+						placeholder={autoValue(k) ? t('automatisch: {value}', { value: autoValue(k) }) : t('automatisch')}
 					/>
 				{/if}
 			{/each}
 		</fieldset>
 
 		<fieldset class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-			<legend class="mb-2 text-xs font-semibold tracking-wider text-fg-subtle uppercase">Einordnung</legend>
-			<Input label="Aufstellort" bind:value={location} maxlength={200} placeholder="z. B. Keller, Rack 1" />
-			<Input label="Besitzer" bind:value={owner} maxlength={200} />
+			<legend class="mb-2 text-xs font-semibold tracking-wider text-fg-subtle uppercase"
+				>{t('Einordnung')}</legend
+			>
+			<Input
+				label={t('Aufstellort')}
+				bind:value={location}
+				maxlength={200}
+				placeholder={t('z. B. Keller, Rack 1')}
+			/>
+			<Input label={t('Besitzer')} bind:value={owner} maxlength={200} />
 			<Select
-				label="Kritikalität"
+				label={t('Kritikalität')}
 				bind:value={criticality}
 				error={errors.criticality}
 				options={CRITICALITIES.map((c) => ({ value: c, label: criticalityLabel[c] }))}
 			/>
 			<Select
-				label="Zustand"
+				label={t('Zustand')}
 				bind:value={devState}
 				error={errors.state}
 				options={['known', 'unknown', 'ignored'].map((s) => ({ value: s, label: stateLabel[s] }))}
-				hint="„Ignoriert“ blendet das Gerät in Regeln und Übersichten aus"
+				hint={t('„Ignoriert“ blendet das Gerät in Regeln und Übersichten aus')}
 			/>
 			<TagInput
 				label="Tags"
 				bind:value={tagList}
-				suggestions={(tags.value ?? []).map((t) => t.tag)}
+				suggestions={(tags.value ?? []).map((x) => x.tag)}
 				normalize={(s) => s.trim().toLowerCase()}
 				error={errors.tags}
-				hint="Enter oder Komma trennt Tags"
+				hint={t('Enter oder Komma trennt Tags')}
 				class="sm:col-span-2"
 			/>
 		</fieldset>
@@ -281,8 +295,8 @@
 							error={errors['cf.' + def.key]}
 							options={[
 								{ value: '', label: '–' },
-								{ value: 'true', label: 'Ja' },
-								{ value: 'false', label: 'Nein' }
+								{ value: 'true', label: t('Ja') },
+								{ value: 'false', label: t('Nein') }
 							]}
 						/>
 					{:else}
@@ -307,7 +321,7 @@
 		{/if}
 	</div>
 	{#snippet footer()}
-		<Button onclick={() => (open = false)} disabled={busy}>Abbrechen</Button>
-		<Button type="submit" variant="primary" icon="save" loading={busy}>Speichern</Button>
+		<Button onclick={() => (open = false)} disabled={busy}>{t('Abbrechen')}</Button>
+		<Button type="submit" variant="primary" icon="save" loading={busy}>{t('Speichern')}</Button>
 	{/snippet}
 </Modal>

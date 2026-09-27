@@ -8,6 +8,7 @@
 	import type { DeviceRow } from '$lib/api';
 	import { Button, FormField, Icon, Spinner, StatusDot } from '$lib/components/ui';
 	import { debounce } from '$lib/utils/url';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		value?: number;
@@ -22,7 +23,7 @@
 	let {
 		value = $bindable(0),
 		name = $bindable(''),
-		label = 'Gerät',
+		label = t('Gerät'),
 		hint,
 		error,
 		id,
@@ -131,9 +132,9 @@
 					href="/devices/{value}"
 					class="link min-w-0 flex-1 truncate"
 					id={fid}
-					aria-describedby={describedby}>{name || `Gerät #${value}`}</a
+					aria-describedby={describedby}>{name || t('Gerät #{id}', { id: value })}</a
 				>
-				<Button variant="ghost" size="xs" icon="x" label="Gerät entfernen" onclick={clear} />
+				<Button variant="ghost" size="xs" icon="x" label={t('Gerät entfernen')} onclick={clear} />
 			</div>
 		{:else}
 			<div class="relative">
@@ -153,7 +154,7 @@
 					aria-describedby={describedby}
 					aria-invalid={error ? 'true' : undefined}
 					aria-activedescendant={open && active >= 0 ? `${uid}-opt-${active}` : undefined}
-					placeholder="Name, IP oder MAC suchen …"
+					placeholder={t('Name, IP oder MAC suchen …')}
 					oninput={onInput}
 					onclick={openList}
 					onkeydown={onKey}
@@ -166,14 +167,14 @@
 					<ul
 						id="{uid}-list"
 						role="listbox"
-						aria-label="Gefundene Geräte"
+						aria-label={t('Gefundene Geräte')}
 						class="absolute z-40 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-surface py-1 shadow-lg"
 					>
 						{#if searchError}
 							<li class="px-3 py-2 text-sm text-danger" role="presentation">{searchError}</li>
 						{:else if results.length === 0}
 							<li class="px-3 py-2 text-sm text-fg-subtle" role="presentation">
-								{loading ? 'Suche …' : 'Keine Geräte gefunden'}
+								{loading ? t('Suche …') : t('Keine Geräte gefunden')}
 							</li>
 						{/if}
 						{#each results as d, i (d.id)}
