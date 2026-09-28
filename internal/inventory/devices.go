@@ -171,7 +171,7 @@ func queryIDs(ctx context.Context, q db.Querier, query string, args ...any) ([]i
 const deviceSelect = `SELECT d.id, d.display_name, d.hostname, d.hostname_source, d.primary_ip, d.primary_mac, d.vendor, d.model, d.type,
 	d.os, d.os_source, d.location, d.owner, d.state, d.criticality, d.online, d.online_changed_at, d.first_seen, d.last_seen,
 	d.custom, d.notes <> '', d.created_source,
-	(SELECT COUNT(*) FROM ports p WHERE p.device_id = d.id AND p.gone_at IS NULL) AS port_count,
+	(SELECT COUNT(DISTINCT p.proto || '/' || p.port) FROM ports p WHERE p.device_id = d.id AND p.gone_at IS NULL) AS port_count,
 	(` + activeCVE + `) AS max_cvss,
 	(SELECT COUNT(*) FROM device_cves c WHERE c.device_id = d.id AND c.gone_at IS NULL
 		AND NOT EXISTS (SELECT 1 FROM cve_ignores i WHERE i.device_id = c.device_id AND i.cve_id = c.cve_id)) AS cve_count,
@@ -184,7 +184,7 @@ const deviceSelect = `SELECT d.id, d.display_name, d.hostname, d.hostname_source
 	FROM devices d`
 
 // portCountSQL is the port count column of deviceSelect.
-const portCountSQL = "(SELECT COUNT(*) FROM ports p WHERE p.device_id = d.id AND p.gone_at IS NULL) AS port_count"
+const portCountSQL = "(SELECT COUNT(DISTINCT p.proto || '/' || p.port) FROM ports p WHERE p.device_id = d.id AND p.gone_at IS NULL) AS port_count"
 
 // deviceSelectNoPortCount skips the per-device port count; List fills it from the
 // loaded port lists instead (cheaper when all ports are loaded anyway).
@@ -295,19 +295,26 @@ func (s *Store) List(ctx context.Context, opts ListOptions) (*ListResult, error)
 	return &ListResult{Total: total, Items: items}, nil
 }
 
-// sortPortList orders "port/proto" entries by protocol, then numerically by port.
+// sortPortList orders "port/proto" entries by protocol, then numerically by port, and
+// drops duplicates (a port open on several addresses of the device is listed once).
 func sortPortList(list []string) []string {
 	type entry struct {
 		proto string
 		port  int
 		s     string
 	}
-	es := make([]entry, len(list))
-	for i, s := range list {
+	seen := make(map[string]bool, len(list))
+	es := make([]entry, 0, len(list))
+	for _, s := range list {
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
 		p, proto, _ := strings.Cut(s, "/")
 		n, _ := strconv.Atoi(p)
-		es[i] = entry{proto, n, s}
+		es = append(es, entry{proto, n, s})
 	}
+	list = list[:len(es)]
 	sort.Slice(es, func(i, j int) bool {
 		if es[i].proto != es[j].proto {
 			return es[i].proto < es[j].proto
@@ -375,7 +382,7 @@ func (s *Store) enrich(ctx context.Context, items []DeviceRow, withPorts bool) e
 		if withPorts {
 			// one row per device (group_concat) is several times faster than one row per
 			// port; the per-device lists are sorted in Go
-			if err := load("SELECT device_id, group_concat(port || '/' || proto, ',') FROM ports WHERE gone_at IS NULL AND device_id IN ("+in+") GROUP BY device_id",
+			if err := load("SELECT device_id, group_concat(DISTINCT port || '/' || proto) FROM ports WHERE gone_at IS NULL AND device_id IN ("+in+") GROUP BY device_id",
 				func(r *DeviceRow, v string) { r.Ports = sortPortList(strings.Split(v, ",")) }); err != nil {
 				return err
 			}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -474,5 +475,33 @@ func TestSameHostname(t *testing.T) {
 		if got := sameHostname(c.a, c.b); got != c.same {
 			t.Errorf("sameHostname(%q, %q) = %v", c.a, c.b, got)
 		}
+	}
+}
+
+// A port open on two addresses of one device (e.g. LAN and VPN) is listed and counted once;
+// the web UI keys its port chips by value and breaks on duplicates.
+func TestPortListPerDeviceUnique(t *testing.T) {
+	ctx := context.Background()
+	store, _ := newTestStore(t)
+	mac := []string{"aa:00:00:00:04:01"}
+	id, err := store.Observe(ctx, "nmap", 1, &plugin.Observation{MACs: mac, IP: "192.168.8.80", Present: true, Ports: tcp(22, 445)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Observe(ctx, "nmap", 2, &plugin.Observation{DeviceID: id, IP: "10.10.10.2", Present: true, Ports: tcp(445, 3389)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, sort := range []string{"name", "-ports"} {
+		res, err := store.List(ctx, ListOptions{Sort: sort, WithPorts: true})
+		if err != nil || len(res.Items) != 1 {
+			t.Fatalf("%s: %v %+v", sort, err, res)
+		}
+		d := res.Items[0]
+		if !slices.Equal(d.Ports, []string{"22/tcp", "445/tcp", "3389/tcp"}) || d.PortCount != 3 {
+			t.Errorf("%s: ports %v count %d", sort, d.Ports, d.PortCount)
+		}
+	}
+	if got := sortPortList([]string{"53/udp", "80/tcp", "53/udp", "22/tcp", "80/tcp"}); !slices.Equal(got, []string{"22/tcp", "80/tcp", "53/udp"}) {
+		t.Errorf("sortPortList %v", got)
 	}
 }

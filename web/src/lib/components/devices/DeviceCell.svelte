@@ -31,6 +31,8 @@
 		d.certExpiry ? Math.floor((new Date(d.certExpiry).getTime() - Date.now()) / 86400000) : null
 	);
 	const title = $derived(d.name || d.ip || d.mac || t('Gerät {id}', { id: d.id }));
+	// each port once, even if it is open on several addresses: the chips are keyed by value
+	const ports = $derived([...new Set(d.ports ?? [])]);
 </script>
 
 {#if colKey === 'status'}
@@ -78,14 +80,14 @@
 {:else if colKey === 'ports'}
 	{#if d.portCount === 0}
 		<span class="text-fg-subtle">–</span>
-	{:else if d.ports?.length}
-		<span class="flex items-center gap-1 whitespace-nowrap" title={d.ports.join(', ')}>
-			{#each d.ports.slice(0, 4) as p (p)}
+	{:else if ports.length}
+		<span class="flex items-center gap-1 whitespace-nowrap" title={ports.join(', ')}>
+			{#each ports.slice(0, 4) as p (p)}
 				<span class="mono rounded bg-surface-3 px-1 text-[0.72rem] text-fg-muted"
 					>{p.replace('/tcp', '')}</span
 				>
 			{/each}
-			{#if d.ports.length > 4}<span class="text-xs text-fg-subtle">+{d.ports.length - 4}</span>{/if}
+			{#if ports.length > 4}<span class="text-xs text-fg-subtle">+{ports.length - 4}</span>{/if}
 		</span>
 	{:else}
 		<span class="tabular">{d.portCount}</span>

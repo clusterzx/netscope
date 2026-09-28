@@ -61,9 +61,9 @@
 	let busy = $state(false);
 
 	const devName = $derived(device.name || device.ip || t('Gerät {id}', { id: device.id }));
-	const openPorts = $derived(
-		(device.ports ?? []).filter((p) => p.endsWith('/tcp')).map((p) => Number(p.split('/')[0]))
-	);
+	const openPorts = $derived([
+		...new Set((device.ports ?? []).filter((p) => p.endsWith('/tcp')).map((p) => Number(p.split('/')[0])))
+	]);
 
 	function defaultPort(ct: CheckType): number | null {
 		const has = (p: number) => openPorts.includes(p);
