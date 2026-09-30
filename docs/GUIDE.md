@@ -91,7 +91,7 @@ sofort, ohne Neustart.
 | `arpscan` | Scanner | alle 5 min | Anwesenheit per ARP (arp-scan), mehrere Subnetze/Interfaces |
 | `icmp` | Scanner | alle 5 min | Ping-Latenz und Paketverlust als Zeitreihe (min/avg/max) |
 | `oui` | Scanner | alle 6 h | Hersteller aus lokaler OUI-Datei; Aktion „OUI-Datei aktualisieren“ lädt die IEEE-Listen |
-| `dns` | Scanner | stündlich | Reverse-Lookup gegen konfigurierbaren Resolver (Standard 192.168.8.1) |
+| `dns` | Scanner | stündlich | Reverse-Lookup gegen konfigurierbaren Resolver (Standard: DNS-Server des Systems) |
 | `mdns` | Scanner | alle 30 min | Bonjour/mDNS: Namen, Dienste, Modell-Hinweise |
 | `netbios` | Scanner | stündlich | NetBIOS-Namen und Arbeitsgruppe |
 | `upnp` | Scanner | alle 30 min | SSDP: Friendly Name, Hersteller, Modell |

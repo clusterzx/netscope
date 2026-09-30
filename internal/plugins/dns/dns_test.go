@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
 
@@ -98,6 +99,12 @@ func TestResolverAddr(t *testing.T) {
 	p := &Plugin{}
 	if err := p.ValidateSettings(plugin.NewSettings(map[string]any{"resolver": "x y"})); err == nil {
 		t.Error("ValidateSettings accepted invalid resolver")
+	}
+	if err := p.ValidateSettings(plugin.NewSettings(map[string]any{"resolver": " "})); err != nil {
+		t.Errorf("empty resolver (system DNS) rejected: %v", err)
+	}
+	if r := newResolver("", time.Second); r.Dial != nil {
+		t.Error("empty resolver does not use the system DNS servers")
 	}
 }
 

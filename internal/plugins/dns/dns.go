@@ -42,9 +42,8 @@ func (p *Plugin) Info() plugin.Info {
 // Schema implements plugin.Plugin.
 func (p *Plugin) Schema() plugin.Schema {
 	return plugin.Schema{Fields: []plugin.Field{
-		{Key: "resolver", Type: plugin.FieldString, Label: "DNS-Server", Default: "192.168.8.1", Required: true,
-			Placeholder: "192.168.8.1 oder dns.lan:53",
-			Description: "Hostname oder IP des DNS-Servers, optional mit Port (Standard 53). Meist der Router, der die DHCP-Namen kennt."},
+		{Key: "resolver", Type: plugin.FieldString, Label: "DNS-Server", Placeholder: "System-DNS",
+			Description: "Hostname oder IP des DNS-Servers, optional mit Port (Standard 53). Meist der Router, der die DHCP-Namen kennt. Leer: die DNS-Server des Systems (/etc/resolv.conf)."},
 		{Key: "timeout", Type: plugin.FieldDuration, Label: "Timeout pro Abfrage", Default: "2s",
 			Description: "Maximale Wartezeit auf eine Antwort je Adresse.",
 			Validation:  &plugin.Validation{Min: plugin.Int64(1), Max: plugin.Int64(60)}},
@@ -55,6 +54,9 @@ func (p *Plugin) Schema() plugin.Schema {
 
 // ValidateSettings implements plugin.SettingsValidator.
 func (p *Plugin) ValidateSettings(s plugin.Settings) error {
+	if strings.TrimSpace(s.String("resolver")) == "" {
+		return nil // system resolver
+	}
 	if _, err := resolverAddr(s.String("resolver")); err != nil {
 		return &plugin.ValidationError{Errors: []plugin.FieldError{{Field: "resolver", Message: err.Error()}}}
 	}
@@ -83,8 +85,12 @@ func resolverAddr(s string) (string, error) {
 	return net.JoinHostPort(s, "53"), nil
 }
 
-// newResolver returns a pure Go resolver that sends every query to addr.
+// newResolver returns a pure Go resolver that sends every query to addr, or to the
+// system's DNS servers (/etc/resolv.conf) if addr is empty.
 func newResolver(addr string, timeout time.Duration) *net.Resolver {
+	if addr == "" {
+		return &net.Resolver{PreferGo: true}
+	}
 	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
@@ -161,9 +167,12 @@ func addresses(d plugin.DeviceInfo, all bool) []string {
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
-	addr, err := resolverAddr(rc.Settings.String("resolver"))
-	if err != nil {
-		return err
+	var addr string // empty: system resolver
+	var err error
+	if raw := rc.Settings.String("resolver"); strings.TrimSpace(raw) != "" {
+		if addr, err = resolverAddr(raw); err != nil {
+			return err
+		}
 	}
 	timeout := rc.Settings.Duration("timeout")
 	if timeout <= 0 {
@@ -208,6 +217,9 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		return err
 	}
 	if n := failed.Load(); n > 0 && answered.Load() == 0 {
+		if addr == "" {
+			return fmt.Errorf("System-DNS hat auf keine der %d Abfragen geantwortet", n)
+		}
 		return fmt.Errorf("DNS-Server %s hat auf keine der %d Abfragen geantwortet", addr, n)
 	}
 	return nil
