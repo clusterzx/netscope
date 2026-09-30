@@ -8,12 +8,27 @@ import (
 	"time"
 
 	"netscope/internal/auth"
+	"netscope/internal/i18n"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
 )
 
 type runRequest struct {
 	Scope *plugin.Scope `json:"scope,omitempty"`
+}
+
+// connectionTestRequest are the settings to test (from the form, not yet saved).
+type connectionTestRequest struct {
+	// Settings replaces the stored settings for the test (omitted: the stored ones).
+	Settings map[string]any `json:"settings,omitempty"`
+	// Target is the address to test for plugins that work on devices (SSH, SNMP).
+	Target string `json:"target,omitempty"`
+}
+
+// connectionTestResponse is the outcome per system; OK when every system passed.
+type connectionTestResponse struct {
+	OK      bool                      `json:"ok"`
+	Results []plugin.ConnectionResult `json:"results"`
 }
 
 type runList struct {
@@ -36,6 +51,9 @@ func (s *Server) registerPlugins() {
 		Body: actionRequest{}, Resp: pluginhost.ActionOutcome{}, Perm: auth.PermPluginsManage, handler: s.handlePluginAction})
 	s.add(&route{Method: "POST", Path: "/api/v1/plugins/{id}/test", Tag: "Plugins", Summary: "Testnachricht über einen Publisher senden",
 		Scope: scopeWrite, Resp: okResponse{}, Perm: auth.PermPluginsManage, handler: s.handleTestPublisher})
+	s.add(&route{Method: "POST", Path: "/api/v1/plugins/{id}/connection-test", Tag: "Plugins",
+		Summary: "Verbindung und Anmeldung prüfen, ohne etwas zu speichern (mit ungespeicherten Einstellungen aus dem Formular)",
+		Scope:   scopeWrite, Body: connectionTestRequest{}, Resp: connectionTestResponse{}, Perm: auth.PermPluginsManage, handler: s.handleConnectionTest})
 	s.add(&route{Method: "GET", Path: "/api/v1/runs", Tag: "Läufe", Summary: "Laufhistorie", Scope: scopeRead,
 		Params: []param{{Name: "plugin"}, {Name: "status", Desc: "kommagetrennt"}, {Name: "kind"},
 			{Name: "scope", Desc: "full = nur Läufe über ganze Subnetze (keine Einzelgeräte)"}, {Name: "before", Type: "integer", Desc: "nur Läufe mit kleinerer ID, z. B. ?plugin=nmap&status=success&before=123&limit=1 = Vorgängerlauf"}, {Name: "limit", Type: "integer"},
@@ -189,4 +207,31 @@ func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
 	}
 	s.record(r, "run.cancel", "run", strconv.FormatInt(id, 10), fmt.Sprintf("Lauf %d abgebrochen", id), nil, nil)
 	writeJSON(w, http.StatusOK, okResponse{OK: true})
+}
+
+func (s *Server) handleConnectionTest(w http.ResponseWriter, r *http.Request) {
+	var req connectionTestRequest
+	if r.ContentLength != 0 {
+		if err := decode(r, &req); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+	}
+	s.connectionTest(w, r, r.PathValue("id"), req)
+}
+
+// connectionTest runs a connection test and answers in the language of the request.
+func (s *Server) connectionTest(w http.ResponseWriter, r *http.Request, id string, req connectionTestRequest) {
+	res, err := s.Host.TestConnection(r.Context(), id, req.Settings, req.Target)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	loc := requestLocale(r)
+	out := connectionTestResponse{OK: len(res) > 0, Results: res}
+	for i := range res {
+		out.OK = out.OK && res[i].OK
+		res[i].Message = i18n.Err(loc, res[i].Message)
+	}
+	writeJSON(w, http.StatusOK, out)
 }

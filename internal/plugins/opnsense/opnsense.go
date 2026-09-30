@@ -35,6 +35,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest DHCP-Leases (Kea, Dnsmasq, ISC), Reservierungen und die ARP-Tabelle von OPNsense-Firewalls über die REST-API " +
 			"und füllt damit Namen, Adressen und Hersteller – auch für Netze hinter der Firewall.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryRouters,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
 		DefaultTimeout:     2 * time.Minute,
@@ -72,11 +73,23 @@ func (p *Plugin) Endpoints(s plugin.Settings) []string { return netsrc.Endpoints
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	o, fetch := p.sources(rc)
+	return netsrc.Run(ctx, rc, o, fetch)
+}
+
+// TestConnection implements plugin.ConnectionTester.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	o, fetch := p.sources(rc)
+	return netsrc.Test(ctx, rc, o, fetch)
+}
+
+// sources describes the configured systems and how one is read.
+func (p *Plugin) sources(rc *plugin.RunContext) (netsrc.Options, netsrc.Fetch) {
 	s := rc.Settings
-	return netsrc.Run(ctx, rc, netsrc.Options{PluginID: "opnsense", Sources: s.StringList(netsrc.KeySources), Label: "Firewall",
-		Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
-		return p.fetch(ctx, rc, src)
-	})
+	return netsrc.Options{PluginID: "opnsense", Sources: s.StringList(netsrc.KeySources), Label: "Firewall",
+			Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
+			return p.fetch(ctx, rc, src)
+		}
 }
 
 func (p *Plugin) clock() time.Time {

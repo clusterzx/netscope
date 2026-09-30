@@ -28,6 +28,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "TLS-Zertifikate",
 		Description:        "Erfasst Zertifikate (CN/SAN, Aussteller, Gültigkeit, selbstsigniert) und die TLS-Konfiguration je Port. SSLv3 kann nicht geprüft werden.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadMedium,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "45 3 * * *",
 		DefaultTimeout:     30 * time.Minute,

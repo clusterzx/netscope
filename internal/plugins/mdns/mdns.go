@@ -43,6 +43,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "mDNS / Bonjour",
 		Description:        "Findet Geräte und Dienste per Multicast-DNS (Bonjour/Avahi): Hostnamen, Dienste, Modell-Hinweise und Gerätetyp.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "*/30 * * * *",
 		DefaultTimeout:     5 * time.Minute,

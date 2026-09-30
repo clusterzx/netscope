@@ -56,7 +56,7 @@ func newHarness(t *testing.T, version string) *harness {
 	}
 	ev := events.New(d, b, inv)
 	host := pluginhost.New(pluginhost.Deps{DB: d, Bus: b, Log: log, Inventory: inv, Vault: v, Events: ev, Settings: st,
-		DataDir: dir, Location: time.UTC, Version: "test"})
+		DataDir: dir, Version: "test"})
 	if err := host.Init(ctx); err != nil {
 		t.Fatal(err)
 	}

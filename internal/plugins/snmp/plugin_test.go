@@ -293,3 +293,37 @@ func reflect2(a, b []string) bool {
 	}
 	return true
 }
+
+// closedUDP returns the address of a UDP port nobody listens on (a wrong address).
+func closedUDP(t *testing.T) string {
+	t.Helper()
+	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := conn.LocalAddr().String()
+	conn.Close()
+	return addr
+}
+
+// The connection test asks the test address for its system group, but stores nothing; a
+// wrong community (no answer) and a wrong address fail.
+func TestSNMPConnectionTest(t *testing.T) {
+	agent := newFakeAgent(t, "geheim", loadSnmprec(t, "netsnmp-alpine.snmprec"))
+	settings := map[string]any{"timeout": "1s", "retries": 0}
+	target := "127.0.0.1:" + itoa(agent.port())
+	p := &Plugin{}
+	res, err := plugintest.ConnectionTest(t, p, settings, plugintest.Creds{1: v2c(1, "richtig", "geheim")}, target)
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != target || res[0].Message != "Antwort von ns-snmp-fixture (SNMP 2c, richtig)" {
+		t.Fatalf("valid community: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, settings, plugintest.Creds{1: v2c(1, "falsch", "public")}, target)
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "keine SNMP-Antwort") || agent.dropped.Load() == 0 {
+		t.Fatalf("wrong community: %+v, %v (dropped %d)", res, err, agent.dropped.Load())
+	}
+	closed := closedUDP(t)
+	res, err = plugintest.ConnectionTest(t, p, settings, plugintest.Creds{1: v2c(1, "richtig", "geheim")}, closed)
+	if err != nil || len(res) != 1 || res[0].OK || res[0].Target != closed || !strings.Contains(res[0].Message, "keine SNMP-Antwort") {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+}

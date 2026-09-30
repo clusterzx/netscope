@@ -406,3 +406,30 @@ func TestGuestAddresses(t *testing.T) {
 		t.Errorf("guestAddresses = %v", got)
 	}
 }
+
+// The connection test signs in and counts nodes and guests, but stores nothing and reads
+// no guest details; it reports a wrong secret and a wrong address per API URL.
+func TestProxmoxConnectionTest(t *testing.T) {
+	srv := newPVE(t)
+	token := func(secret string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Name: "pve", Type: plugin.CredAPIToken,
+			Public: map[string]string{"token_id": testTokenID}, Secret: map[string]string{"token": secret}}}
+	}
+	p := &Plugin{}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"urls": []any{srv.URL}, "credentials": []any{1}}, token(testSecret), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != srv.URL || res[0].Message != "Verbunden – 2 Nodes und 5 VMs/Container sichtbar" {
+		t.Fatalf("valid token: %+v, %v", res, err)
+	}
+	if srv.requested("/api2/json/nodes/pve1/qemu/100/config") || srv.requested("/api2/json/nodes/pve1/status") {
+		t.Error("the connection test must not read guest or node details")
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"urls": []any{srv.URL}, "credentials": []any{1}}, token("wrong-secret"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung an der Proxmox-API fehlgeschlagen") {
+		t.Fatalf("wrong token: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "https")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"urls": []any{srv.URL, closed}, "credentials": []any{1}}, token(testSecret), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || !strings.Contains(res[1].Message, "nicht erreichbar") {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+}

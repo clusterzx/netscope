@@ -45,6 +45,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:        "Proxmox VE",
 		Description: "Importiert Nodes, VMs und LXC-Container aus der Proxmox-VE-API (Name, VMID, Status, MACs, Ressourcen) und verknüpft sie per MAC mit gescannten Geräten inklusive „läuft auf Node X“. Optional auch die Docker-Container in LXCs.",
 		Version:     "1.1.0",
+		Category:    plugin.CategoryVirtualization,
 
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/15 * * * *",
@@ -742,4 +743,78 @@ func (im *importer) guestAddrs(ctx context.Context, r resource, base string, cfg
 		return guestAddresses(res, macs)
 	}
 	return nil
+}
+
+// TestConnection implements plugin.ConnectionTester: per API URL it signs in with the
+// applicable tokens and reads the nodes and guests the token may see, without storing
+// anything.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	s := rc.Settings
+	urls := s.StringList("urls")
+	if len(urls) == 0 {
+		return nil, errors.New("keine Proxmox-API-URL konfiguriert")
+	}
+	picker := &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredAPIToken}, Allowed: s.CredentialIDs("credentials"), Log: rc.Log}
+	out := make([]plugin.ConnectionResult, 0, len(urls))
+	for _, u := range urls {
+		start := time.Now()
+		res := plugin.ConnectionResult{Target: u}
+		nodes, guests, err := testURL(ctx, picker, u, s.Bool("verify_tls"))
+		if err != nil {
+			res.Message = err.Error()
+		} else {
+			res.OK = true
+			res.Message = fmt.Sprintf("Verbunden – %d Nodes und %d VMs/Container sichtbar", nodes, guests)
+		}
+		res.DurationMs = time.Since(start).Milliseconds()
+		out = append(out, res)
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+	}
+	return out, nil
+}
+
+// testURL signs in at one API endpoint (trying the applicable tokens) and counts nodes and
+// guests.
+func testURL(ctx context.Context, picker *plugin.CredentialPicker, rawURL string, verifyTLS bool) (nodes, guests int, err error) {
+	if _, err := baseURL(rawURL); err != nil {
+		return 0, 0, err
+	}
+	tokens, err := picker.For(ctx, plugin.CredentialTarget{IP: hostIP(ctx, rawURL)})
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(tokens) == 0 {
+		return 0, 0, fmt.Errorf("kein API-Token passt zu %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w", rawURL, plugin.ErrNoCredential)
+	}
+	for i, cred := range tokens {
+		c, cerr := newClient(rawURL, cred.Get("token_id"), cred.Get("token"), verifyTLS, requestTimeout)
+		if cerr != nil {
+			err = fmt.Errorf("%s: %w", cred.Name, cerr)
+			continue
+		}
+		nodes, guests, err = countGuests(ctx, c)
+		c.close()
+		if errors.Is(err, errTokenRejected) && i < len(tokens)-1 {
+			continue
+		}
+		return nodes, guests, err
+	}
+	return 0, 0, err
+}
+
+func countGuests(ctx context.Context, c *client) (int, int, error) {
+	var nodes []nodeEntry
+	if err := c.get(ctx, "/nodes", &nodes); err != nil {
+		return 0, 0, wrapFatal("Node-Liste", err)
+	}
+	if len(nodes) == 0 {
+		return 0, 0, &rejectedError{"die Proxmox-API liefert keine Nodes – dem Token fehlen Leserechte (z. B. Rolle PVEAuditor auf /; bei Privilege Separation muss das Token selbst berechtigt sein)"}
+	}
+	var resources []resource
+	if err := c.get(ctx, "/cluster/resources?type=vm", &resources); err != nil {
+		return len(nodes), 0, wrapFatal("Gäste", err)
+	}
+	return len(nodes), len(resources), nil
 }

@@ -30,6 +30,9 @@ type Options struct {
 	// KnownHosts is the known_hosts file used for host key pinning. Unknown hosts are
 	// added (TOFU). Empty disables host key checking (not recommended).
 	KnownHosts string
+	// DryRun checks known host keys but does not add unknown ones (connection tests store
+	// nothing).
+	DryRun bool
 }
 
 // Client is an SSH connection.
@@ -43,9 +46,31 @@ var khMu sync.Mutex
 // ErrHostKeyChanged is returned when a pinned host key does not match.
 var ErrHostKeyChanged = errors.New("SSH-Hostschlüssel hat sich geändert (möglicher Man-in-the-Middle) – Eintrag in known_hosts prüfen")
 
-func hostKeyCallback(file string) (ssh.HostKeyCallback, error) {
+func hostKeyCallback(file string, dryRun bool) (ssh.HostKeyCallback, error) {
 	if file == "" {
 		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec // explicitly configured
+	}
+	if dryRun {
+		return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			khMu.Lock()
+			defer khMu.Unlock()
+			if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
+				return nil // nothing pinned yet: the first real run learns the key
+			}
+			cb, err := knownhosts.New(file)
+			if err != nil {
+				return err
+			}
+			err = cb(hostname, remote, key)
+			var ke *knownhosts.KeyError
+			if errors.As(err, &ke) {
+				if len(ke.Want) > 0 {
+					return fmt.Errorf("%w: %s", ErrHostKeyChanged, hostname)
+				}
+				return nil
+			}
+			return err
+		}, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
 		return nil, err
@@ -140,7 +165,7 @@ func Dial(ctx context.Context, host string, cred *plugin.Credential, opt Options
 	if opt.Timeout == 0 {
 		opt.Timeout = 10 * time.Second
 	}
-	hk, err := hostKeyCallback(opt.KnownHosts)
+	hk, err := hostKeyCallback(opt.KnownHosts, opt.DryRun)
 	if err != nil {
 		return nil, err
 	}

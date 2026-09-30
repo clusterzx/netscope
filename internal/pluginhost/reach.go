@@ -102,3 +102,36 @@ func onlyIn(d plugin.DeviceInfo, prefixes []netip.Prefix) bool {
 	}
 	return known
 }
+
+// applyExclusions hands the scan exclusions (system setting) to the run and removes
+// excluded addresses from the target devices; a device without other addresses is
+// dropped. Subnet scanners skip the excluded addresses themselves (Targets.Exclude).
+func (h *Host) applyExclusions(t *plugin.Targets) {
+	excl := h.Settings.System().Exclusions()
+	if len(excl) == 0 {
+		return
+	}
+	t.Exclude = excl
+	devices := make([]plugin.DeviceInfo, 0, len(t.Devices))
+	for _, d := range t.Devices {
+		keep := func(ip string) bool {
+			a, err := netip.ParseAddr(ip)
+			return err != nil || !t.Excluded(a)
+		}
+		ips := slices.DeleteFunc(slices.Clone(d.IPs), func(ip string) bool { return !keep(ip) })
+		primary := d.PrimaryIP
+		if primary != "" && !keep(primary) {
+			primary = ""
+			if len(ips) > 0 {
+				primary = ips[0]
+			}
+		}
+		if primary == "" && len(ips) == 0 && (d.PrimaryIP != "" || len(d.IPs) > 0) {
+			continue
+		}
+		d.PrimaryIP, d.IPs = primary, ips
+		d.Ports = slices.DeleteFunc(slices.Clone(d.Ports), func(p plugin.PortRef) bool { return !keep(p.IP) })
+		devices = append(devices, d)
+	}
+	t.Devices = devices
+}

@@ -175,5 +175,6 @@ func init() {
 		"Eine Rolle mit diesem Namen gibt es bereits":        "A role with this name already exists",
 		"Die Rolle Administrator kann nicht gelöscht werden": "The Administrator role cannot be deleted",
 		"Die Rolle ist noch %d Benutzer(n) zugewiesen":       "The role is still assigned to %d user(s)",
+		"Es gibt bereits einen Benutzer – das Konto des Einrichtungsassistenten ist schon angelegt": "A user exists already – the account of the setup wizard has been created",
 	})
 }

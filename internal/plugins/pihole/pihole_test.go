@@ -148,3 +148,28 @@ func TestParseHost(t *testing.T) {
 		t.Error("reservation without MAC accepted")
 	}
 }
+
+// The connection test signs in and reads like a run (and closes its session again), but
+// stores nothing; it reports a wrong password and a wrong address per Pi-hole.
+func TestPiholeConnectionTest(t *testing.T) {
+	f := &fakePihole{password: "app-pw", dhcp: true}
+	srv := httptest.NewServer(f.handler(t))
+	t.Cleanup(srv.Close)
+	p := &Plugin{now: func() time.Time { return now }}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, appPassword("app-pw"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != srv.URL || !strings.Contains(res[0].Message, "4 Clients") {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	if f.sessions != 1 || f.loggedOut != 1 {
+		t.Errorf("sessions %d, logged out %d", f.sessions, f.loggedOut)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, appPassword("nope"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "http")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL, closed}}, appPassword("app-pw"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || res[1].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+}

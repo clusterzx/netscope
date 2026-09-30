@@ -131,7 +131,7 @@ func newHost(t *testing.T) (*Host, *events.Store, *inventory.Store) {
 		t.Fatal(err)
 	}
 	ev := events.New(d, b, inv)
-	h := New(Deps{DB: d, Bus: b, Log: log, Inventory: inv, Vault: v, Events: ev, Settings: st, DataDir: t.TempDir(), Location: time.UTC, Version: "test"})
+	h := New(Deps{DB: d, Bus: b, Log: log, Inventory: inv, Vault: v, Events: ev, Settings: st, DataDir: t.TempDir(), Version: "test"})
 	if err := h.Init(ctx); err != nil {
 		t.Fatal(err)
 	}

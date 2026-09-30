@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,8 +15,10 @@ import (
 
 var now = time.Unix(1790500000, 0).UTC()
 
-func TestFortiGate(t *testing.T) {
-	vdoms := map[string]int{}
+// fortiGate serves FortiOS monitor answers; the token "tok" is accepted. vdoms counts the
+// vdom parameter of the requests.
+func fortiGate(t *testing.T, vdoms map[string]int) *httptest.Server {
+	t.Helper()
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer tok" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -43,7 +46,13 @@ func TestFortiGate(t *testing.T) {
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestFortiGate(t *testing.T) {
+	vdoms := map[string]int{}
+	srv := fortiGate(t, vdoms)
 	p := &Plugin{now: func() time.Time { return now }}
 	rc, sink, _ := plugintest.RunContext(t, p, map[string]any{"hosts": []any{srv.URL}, "vdoms": []any{"root"}})
 	rc.Creds = plugintest.Creds{1: {ID: 1, Type: plugin.CredAPIToken, Secret: map[string]string{"token": "tok"}}}
@@ -73,5 +82,28 @@ func TestFortiGate(t *testing.T) {
 	if dc.Hostname != "DC01" || dc.OS == nil || dc.OS.Name != "Windows Server 2022" || dinv.Uplink != "FSW-Core" || dinv.Port != "port12" ||
 		dinv.VLAN != 20 || !*dinv.Online || dc.Vendor != "Dell" || !dinv.LastSeen.Equal(time.Unix(1790499970, 0).UTC()) {
 		t.Errorf("detected device %+v %+v", dc, dinv)
+	}
+}
+
+// The connection test reads like a run, but stores nothing; it reports a wrong token and
+// a wrong address per FortiGate.
+func TestFortiGateConnectionTest(t *testing.T) {
+	srv := fortiGate(t, map[string]int{})
+	token := func(tok string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Type: plugin.CredAPIToken, Secret: map[string]string{"token": tok}}}
+	}
+	p := &Plugin{now: func() time.Time { return now }}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, token("tok"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != srv.URL || !strings.Contains(res[0].Message, "3 Clients") {
+		t.Fatalf("valid token: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, token("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong token: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "https")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL, closed}}, token("tok"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || res[1].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
 	}
 }

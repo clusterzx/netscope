@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"netscope/internal/db"
 	"netscope/internal/i18n"
@@ -36,6 +38,55 @@ type System struct {
 	// Language of notifications and scheduled reports: de | en (the web UI follows each
 	// user's own choice).
 	Language string `json:"language"`
+	// Timezone (IANA name) of schedules, reports and dates NetScope writes. The bootstrap
+	// value (NETSCOPE_TIMEZONE) is only the start value on the first start.
+	Timezone string `json:"timezone"`
+	// ScanExclusions are addresses (or ranges) no scanner probes, e.g. sensitive devices.
+	ScanExclusions []string `json:"scanExclusions"`
+}
+
+// DefaultTimezone is used until a time zone is stored.
+const DefaultTimezone = "Europe/Berlin"
+
+// Location returns the configured time zone.
+func (s System) Location() *time.Location {
+	if loc, err := time.LoadLocation(s.Timezone); err == nil && s.Timezone != "" {
+		return loc
+	}
+	loc, err := time.LoadLocation(DefaultTimezone)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
+// Exclusions returns the scan exclusions as prefixes (single addresses as /32 or /128).
+func (s System) Exclusions() []netip.Prefix {
+	var out []netip.Prefix
+	for _, e := range s.ScanExclusions {
+		if p, err := ParseExclusion(e); err == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// ParseExclusion parses an address or CIDR range.
+func ParseExclusion(v string) (netip.Prefix, error) {
+	v = strings.TrimSpace(v)
+	if !strings.Contains(v, "/") {
+		a, err := netip.ParseAddr(v)
+		if err != nil {
+			return netip.Prefix{}, fmt.Errorf("%q ist weder IP-Adresse noch CIDR", v)
+		}
+		a = a.Unmap()
+		return netip.PrefixFrom(a, a.BitLen()), nil
+	}
+	p, err := netip.ParsePrefix(v)
+	if err != nil {
+		return netip.Prefix{}, fmt.Errorf("%q ist weder IP-Adresse noch CIDR", v)
+	}
+	return p.Masked(), nil
 }
 
 // Lang returns the language for notifications and scheduled reports.
@@ -59,6 +110,8 @@ func DefaultSystem() System {
 			"smart-home", "iot", "game-console", "ups", "other"},
 		ObservationRawMaxKB: 256,
 		Language:            string(i18n.Default),
+		Timezone:            DefaultTimezone,
+		ScanExclusions:      []string{},
 	}
 }
 
@@ -88,6 +141,27 @@ func (s *System) Validate() error {
 	} else {
 		return plugin.FieldErr("language", "de oder en erwartet")
 	}
+	if s.Timezone == "" {
+		s.Timezone = DefaultTimezone
+	}
+	if _, err := time.LoadLocation(s.Timezone); err != nil || strings.EqualFold(s.Timezone, "Local") {
+		return plugin.FieldErr("timezone", fmt.Sprintf("unbekannte Zeitzone %q", s.Timezone))
+	}
+	var excl []string
+	for i, e := range s.ScanExclusions {
+		if strings.TrimSpace(e) == "" {
+			continue
+		}
+		p, err := ParseExclusion(e)
+		if err != nil {
+			return plugin.FieldErr(fmt.Sprintf("scanExclusions.%d", i), err.Error())
+		}
+		if p.Bits() == p.Addr().BitLen() {
+			excl = append(excl, p.Addr().String())
+		} else {
+			excl = append(excl, p.String())
+		}
+	}
 	clean := func(in []string) []string {
 		seen := map[string]bool{}
 		var out []string
@@ -102,6 +176,10 @@ func (s *System) Validate() error {
 	}
 	s.HostnamePriority = clean(s.HostnamePriority)
 	s.DeviceTypes = clean(s.DeviceTypes)
+	s.ScanExclusions = clean(excl)
+	if s.ScanExclusions == nil {
+		s.ScanExclusions = []string{}
+	}
 	return nil
 }
 
@@ -113,6 +191,8 @@ type Store struct {
 	mu        sync.RWMutex
 	system    System
 	listeners []func(System)
+	// hasTimezone: the stored settings name a time zone (else the bootstrap value applies)
+	hasTimezone bool
 }
 
 // Load reads the settings from the database.
@@ -122,9 +202,11 @@ func Load(ctx context.Context, d *db.DB) (*Store, error) {
 	err := d.R.QueryRowContext(ctx, "SELECT value FROM settings WHERE key = ?", systemKey).Scan(&raw)
 	if err == nil {
 		sys := DefaultSystem()
+		sys.Timezone = ""
 		if err := json.Unmarshal([]byte(raw), &sys); err != nil {
 			return nil, fmt.Errorf("settings: %w", err)
 		}
+		s.hasTimezone = sys.Timezone != ""
 		if err := sys.Validate(); err != nil {
 			sys = DefaultSystem()
 		}
@@ -142,7 +224,30 @@ func (s *Store) System() System {
 	c := s.system
 	c.HostnamePriority = append([]string(nil), s.system.HostnamePriority...)
 	c.DeviceTypes = append([]string(nil), s.system.DeviceTypes...)
+	c.ScanExclusions = append([]string{}, s.system.ScanExclusions...)
 	return c
+}
+
+// Location returns the configured time zone (schedules, reports, dates).
+func (s *Store) Location() *time.Location {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.system.Location()
+}
+
+// InitTimezone stores the bootstrap time zone (config.yaml, NETSCOPE_TIMEZONE) as the
+// setting unless one is stored already: on the first start and once for installations
+// from before the setting existed. Afterwards only the setting counts.
+func (s *Store) InitTimezone(ctx context.Context, name string) error {
+	s.mu.RLock()
+	has := s.hasTimezone
+	sys := s.system
+	s.mu.RUnlock()
+	if has || name == "" {
+		return nil
+	}
+	sys.Timezone = name
+	return s.SetSystem(ctx, sys)
 }
 
 // SetSystem validates and stores the system settings.
@@ -157,6 +262,7 @@ func (s *Store) SetSystem(ctx context.Context, sys System) error {
 	}
 	s.mu.Lock()
 	s.system = sys
+	s.hasTimezone = true
 	ls := append([]func(System){}, s.listeners...)
 	s.mu.Unlock()
 	for _, l := range ls {

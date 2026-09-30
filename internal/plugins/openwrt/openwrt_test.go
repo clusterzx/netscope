@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -555,5 +556,51 @@ func TestRunCredentialFallbackAndSeveralRouters(t *testing.T) {
 	rc.Creds = plugintest.Creds{}
 	if err := p.Run(context.Background(), rc); !errors.Is(err, plugin.ErrNoCredential) {
 		t.Errorf("err = %v, want ErrNoCredential", err)
+	}
+}
+
+// The connection test reads the DHCP data like a run (SSH host keys are checked but not
+// learned), but stores nothing; it reports a wrong password and a wrong address per router.
+func TestOpenWrtConnectionTest(t *testing.T) {
+	creds := func(pw string) plugintest.Creds {
+		c := *rootPassword
+		c.Secret = map[string]string{"password": pw}
+		return plugintest.Creds{1: &c}
+	}
+	const want = "Verbunden – 7 Leases und 5 statische Leases gelesen"
+	closed := plugintest.ClosedURL(t, "http")
+	p := &Plugin{}
+
+	// SSH with the default host key policy (tofu): nothing lands in known_hosts
+	srv := startSSH(t, "goodpass", routerReplies(t))
+	viaSSH := map[string]any{"hosts": []any{"127.0.0.1"}, "port": srv.port}
+	res, err := plugintest.ConnectionTest(t, p, viaSSH, creds("goodpass"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != "127.0.0.1" || res[0].Message != want {
+		t.Fatalf("ssh, valid password: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, viaSSH, creds("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("ssh, wrong password: %+v, %v", res, err)
+	}
+	u, _ := url.Parse(closed)
+	viaSSH["port"], _ = strconv.Atoi(u.Port())
+	res, err = plugintest.ConnectionTest(t, p, viaSSH, creds("goodpass"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "SSH-Verbindung zu 127.0.0.1 fehlgeschlagen") {
+		t.Fatalf("ssh, wrong address: %+v, %v", res, err)
+	}
+
+	// LuCI
+	ubus := startUbus(t, "ubus-login.json")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"method": "luci", "hosts": []any{ubus.URL}}, creds("goodpass"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != ubus.URL || res[0].Message != want {
+		t.Fatalf("luci, valid password: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"method": "luci", "hosts": []any{ubus.URL}}, creds("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "LuCI-Anmeldung") {
+		t.Fatalf("luci, wrong password: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"method": "luci", "hosts": []any{ubus.URL, closed}}, creds("goodpass"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || res[1].Message == "" {
+		t.Fatalf("luci, wrong address: %+v, %v", res, err)
 	}
 }

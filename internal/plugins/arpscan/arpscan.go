@@ -37,6 +37,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "ARP-Scan",
 		Description:        "Findet aktive Geräte per ARP (arp-scan) in direkt angeschlossenen Netzen und bestimmt ihre Anwesenheit.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "*/5 * * * *",
 		DefaultTimeout:     5 * time.Minute,
@@ -200,9 +201,39 @@ func buildJobs(t plugin.Targets, routed []netip.Prefix, ifaceFor func(netip.Addr
 			errs = append(errs, fmt.Errorf("Subnetz %s: kein lokales Interface gefunden – arp-scan erreicht nur direkt angeschlossene Netze (Interface eintragen oder das Subnetz als „über Router“ erreichbar markieren)", p))
 			continue
 		}
-		jobs = append(jobs, job{label: p.String(), iface: iface, targets: []string{p.String()}, prefix: p})
+		targets := []string{p.String()}
+		if hosts, ok := withoutExcluded(p, t); ok {
+			targets = hosts
+		}
+		jobs = append(jobs, job{label: p.String(), iface: iface, targets: targets, prefix: p})
 	}
 	return jobs, errs, skipped
+}
+
+// maxExpand bounds the subnets that are split into single addresses to leave out excluded
+// ones (a /20); larger subnets are scanned whole and replies of excluded addresses dropped.
+const maxExpand = 4096
+
+// withoutExcluded lists the addresses of a subnet without the excluded ones; ok is false
+// when no exclusion lies in the subnet or it is too large to list.
+func withoutExcluded(p netip.Prefix, t plugin.Targets) ([]string, bool) {
+	hit := false
+	for _, e := range t.Exclude {
+		if p.Overlaps(e) {
+			hit = true
+			break
+		}
+	}
+	if !hit || p.Addr().BitLen()-p.Bits() > 12 {
+		return nil, false
+	}
+	var out []string
+	for a := p.Addr(); p.Contains(a) && len(out) <= maxExpand; a = a.Next() {
+		if !t.Excluded(a) {
+			out = append(out, a.String())
+		}
+	}
+	return out, true
 }
 
 // localTargets returns the directly attached networks as targets (used when no subnet
@@ -321,6 +352,9 @@ func scan(ctx context.Context, rc *plugin.RunContext, j job, cfg config) (int, e
 				continue
 			}
 			first[rep.IP] = rep.MAC
+			if rc.Targets.Excluded(rep.IP) {
+				continue // excluded from scanning (system setting)
+			}
 			if cfg.ignore[rep.MAC] {
 				rc.Log.Debug("MAC-Adresse wird ignoriert", "ip", rep.IP.String(), "mac", rep.MAC)
 				continue

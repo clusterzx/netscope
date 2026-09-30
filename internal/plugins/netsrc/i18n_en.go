@@ -35,5 +35,8 @@ func init() {
 		"quelle":          "source",
 		"ziel":            "target",
 		"netzwerkgeraete": "network devices",
+		"Verbunden – %d Clients und %d Netzwerkgeräte gelesen": "Connected – read %d clients and %d network devices",
+		"Verbunden – %d Clients gelesen":                       "Connected – read %d clients",
+		"%w (HTTP %d)":                                         "%w (HTTP %d)",
 	})
 }

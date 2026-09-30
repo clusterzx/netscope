@@ -7,14 +7,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"netscope/internal/hostscript"
+	"netscope/internal/netutil"
 	"netscope/internal/plugin"
 	"netscope/internal/sshx"
 )
@@ -33,6 +36,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest per SSH Betriebssystem, Hardware, Netzwerk, Pakete, Dienste, lauschende Sockets und " +
 			"Docker-Container von Linux-Hosts aus – ausschließlich mit fest definierten Lesekommandos.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryServers,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "0 5 * * *",
 		DefaultTimeout:     30 * time.Minute,
@@ -210,6 +214,62 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		return fmt.Errorf("für keines der %d Geräte gibt es passende Zugangsdaten: %w", noCred.Load(), plugin.ErrNoCredential)
 	}
 	return nil
+}
+
+// TestConnection implements plugin.ConnectionTester: it signs in at the test address
+// (rc.Params["target"]) with the applicable credentials – the host key is checked but not
+// learned – and runs "uname -sr".
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	host, port, err := plugin.TestTarget(rc)
+	if err != nil {
+		return nil, err
+	}
+	cfg := loadConfig(rc.Settings, rc.DataDir)
+	if port == 0 {
+		port = cfg.ports.port
+		if o, ok := cfg.ports.override(host); ok {
+			port = o
+		}
+	}
+	start := time.Now()
+	res := plugin.ConnectionResult{Target: net.JoinHostPort(host, strconv.Itoa(port))}
+	msg, err := testLogin(ctx, rc, cfg, host, port)
+	if err != nil {
+		res.Message = err.Error()
+	} else {
+		res.OK, res.Message = true, msg
+	}
+	res.DurationMs = time.Since(start).Milliseconds()
+	return []plugin.ConnectionResult{res}, nil
+}
+
+func testLogin(ctx context.Context, rc *plugin.RunContext, cfg config, host string, port int) (string, error) {
+	picker := &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredSSH, plugin.CredPassword}, Allowed: cfg.credIDs, Log: rc.Log,
+		Check: func(c *plugin.Credential) error { _, _, err := sshx.AuthMethods(c); return err }}
+	ip, _ := netutil.ResolveHost(ctx, host)
+	creds, err := picker.For(ctx, plugin.CredentialTarget{IP: ip})
+	if err != nil {
+		return "", err
+	}
+	if len(creds) == 0 {
+		return "", fmt.Errorf("keine passenden Zugangsdaten für %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w", host, plugin.ErrNoCredential)
+	}
+	client, used, err := sshx.DialFirst(ctx, host, creds, sshx.Options{Port: port, Timeout: cfg.commandTimeout, KnownHosts: cfg.knownHosts, DryRun: true})
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+	runCtx, cancel := context.WithTimeout(ctx, cfg.commandTimeout)
+	defer cancel()
+	out, err := client.Run(runCtx, "uname -sr", 4096)
+	if err != nil {
+		return "", fmt.Errorf("Kommando: %w", err)
+	}
+	system := strings.TrimSpace(string(out.Stdout))
+	if system == "" {
+		system = "?"
+	}
+	return fmt.Sprintf("Angemeldet als %s (%s) – %s", used.Get("username"), used.Name, system), nil
 }
 
 // errNoCredential marks a device without applicable credential (skipped, not failed).

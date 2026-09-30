@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/netip"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -503,5 +504,38 @@ func TestPortListPerDeviceUnique(t *testing.T) {
 	}
 	if got := sortPortList([]string{"53/udp", "80/tcp", "53/udp", "22/tcp", "80/tcp"}); !slices.Equal(got, []string{"22/tcp", "80/tcp", "53/udp"}) {
 		t.Errorf("sortPortList %v", got)
+	}
+}
+
+// A device reachable only at an excluded address is not scanned, so a subnet scan does not
+// count it as missed; other devices are counted as before.
+func TestPresenceSkipsExcludedAddresses(t *testing.T) {
+	ctx := context.Background()
+	store, r := newTestStore(t)
+	subs, _ := store.Subnets(ctx)
+	targets := plugin.Targets{Subnets: []plugin.SubnetTarget{subs[0]}, Exclude: []netip.Prefix{netip.MustParsePrefix("192.168.8.50/32")}}
+	for _, o := range []struct{ mac, ip string }{{"aa:00:00:00:00:51", "192.168.8.50"}, {"aa:00:00:00:00:52", "192.168.8.51"}} {
+		if _, err := store.Observe(ctx, "arpscan", 1, &plugin.Observation{MACs: []string{o.mac}, IP: o.ip, Present: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r.take()
+	for run := int64(2); run <= 4; run++ {
+		if err := store.RunFinished(ctx, plugin.RunSummary{RunID: run, PluginID: "arpscan", Status: "success", Presence: true, Targets: targets}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	online := func(mac string) bool {
+		var on bool
+		if err := store.db.R.QueryRow("SELECT online FROM devices WHERE id = (SELECT device_id FROM device_macs WHERE mac = ?)", mac).Scan(&on); err != nil {
+			t.Fatal(err)
+		}
+		return on
+	}
+	if !online("aa:00:00:00:00:51") {
+		t.Error("device at an excluded address went offline")
+	}
+	if online("aa:00:00:00:00:52") {
+		t.Error("device at a scanned address must go offline after missed runs")
 	}
 }

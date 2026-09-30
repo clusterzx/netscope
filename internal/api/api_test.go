@@ -57,6 +57,7 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	st, _ := settings.Load(ctx, d)
+	_ = st.InitTimezone(ctx, "UTC")
 	b := bus.New()
 	ring := logging.NewRing(100)
 	level := new(slog.LevelVar)
@@ -69,11 +70,11 @@ func newHarness(t *testing.T) *harness {
 	inv, _ := inventory.New(ctx, d, b, st, log)
 	ev := events.New(d, b, inv)
 	host := pluginhost.New(pluginhost.Deps{DB: d, Bus: b, Log: log, Inventory: inv, Vault: v, Events: ev, Settings: st,
-		DataDir: dir, Location: time.UTC, Version: "test"})
+		DataDir: dir, Version: "test"})
 	if err := host.Init(ctx); err != nil {
 		t.Fatal(err)
 	}
-	engine := rules.New(d, b, log, ev, inv, host, st, time.UTC)
+	engine := rules.New(d, b, log, ev, inv, host, st)
 	fed, err := federation.New(ctx, federation.Deps{DB: d, Bus: b, Log: log, Vault: v, Inventory: inv, Events: ev, Settings: st,
 		Host: host, Version: "test", StartedAt: time.Now()})
 	if err != nil {

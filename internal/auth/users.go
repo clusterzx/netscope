@@ -550,3 +550,74 @@ func hashPassword(pw string) (string, error) {
 	h, err := bcrypt.GenerateFromPassword([]byte(pw), bcryptCost)
 	return string(h), err
 }
+
+// ErrUsersExist is returned when the first administrator is created a second time.
+var ErrUsersExist = errors.New("Es gibt bereits einen Benutzer – das Konto des Einrichtungsassistenten ist schon angelegt")
+
+// FirstAdminInput is the account the setup wizard creates.
+type FirstAdminInput struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	Password    string `json:"password"`
+	// Locale is the language of the web interface ("de" or "en").
+	Locale string `json:"locale"`
+}
+
+// CreateFirstAdmin creates the first user (role administrator) chosen in the setup
+// wizard. It fails once any user exists.
+func (s *Service) CreateFirstAdmin(ctx context.Context, in FirstAdminInput) (*User, error) {
+	u := UserInput{Username: in.Username, DisplayName: in.DisplayName, RoleID: 1, Locale: &in.Locale}
+	if err := u.normalize(); err != nil {
+		return nil, err
+	}
+	if len(in.Password) < MinPasswordLength {
+		return nil, plugin.FieldErr("password", fmt.Sprintf("mindestens %d Zeichen", MinPasswordLength))
+	}
+	hash, err := hashPassword(in.Password)
+	if err != nil {
+		return nil, err
+	}
+	var id int64
+	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
+		var n int
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrUsersExist
+		}
+		now := db.Now()
+		res, err := tx.ExecContext(ctx, `INSERT INTO users(username, password_hash, display_name, role_id, created_at, updated_at, locale)
+			VALUES (?, ?, ?, (SELECT id FROM roles WHERE builtin = 'admin'), ?, ?, ?)`, u.Username, hash, u.DisplayName, now, now, *u.Locale)
+		if err != nil {
+			return err
+		}
+		id, _ = res.LastInsertId()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.User(ctx, id)
+}
+
+// StartSession signs a user in without a password (the account the setup wizard just
+// created) and returns the session cookie token.
+func (s *Service) StartSession(ctx context.Context, userID int64, ip, userAgent string) (*LoginResult, error) {
+	return s.startSession(ctx, userID, ip, userAgent)
+}
+
+// Limit applies the rate limit of the login to another secret a client presents (the
+// setup code): ErrRateLimited while the client address is blocked, otherwise ok is counted
+// as success or failure of that address.
+func (s *Service) Limit(ip string, ok bool) error {
+	if !s.limiter.allow(ip) {
+		return ErrRateLimited
+	}
+	if ok {
+		s.limiter.success(ip)
+	} else {
+		s.limiter.fail(ip)
+	}
+	return nil
+}

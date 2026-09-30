@@ -64,12 +64,14 @@ func init() {
 		"Diese Testnachricht wurde von %s ausgelöst. Ist sie angekommen, ist der Publisher korrekt eingerichtet.": "This test message was triggered by %s. If it arrived, the publisher is set up correctly.",
 
 		// metrics
-		"Plugin-Läufe nach Status":               "Plugin runs by status",
-		"Summierte Laufzeit der Plugin-Läufe":    "Total duration of plugin runs",
-		"Dauer des letzten Laufs":                "Duration of the last run",
-		"Zugestellte Benachrichtigungen":         "Delivered notifications",
-		"Von Processorn verarbeitete Änderungen": "Changes handled by processors",
-		"Aktuell laufende Plugin-Läufe":          "Plugin runs currently running",
-		"Ausstehende Änderungen je Processor":    "Pending changes per processor",
+		"Plugin-Läufe nach Status":                                                   "Plugin runs by status",
+		"Summierte Laufzeit der Plugin-Läufe":                                        "Total duration of plugin runs",
+		"Dauer des letzten Laufs":                                                    "Duration of the last run",
+		"Zugestellte Benachrichtigungen":                                             "Delivered notifications",
+		"Von Processorn verarbeitete Änderungen":                                     "Changes handled by processors",
+		"Aktuell laufende Plugin-Läufe":                                              "Plugin runs currently running",
+		"Ausstehende Änderungen je Processor":                                        "Pending changes per processor",
+		"Dieses Plugin hat keinen Verbindungstest":                                   "This plugin has no connection test",
+		"Die Einrichtung ist noch nicht abgeschlossen – bis dahin läuft kein Plugin": "The setup is not finished yet – until then no plugin runs",
 	})
 }

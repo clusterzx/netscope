@@ -51,7 +51,6 @@ type Engine struct {
 	inv      *inventory.Store
 	pub      Publisher
 	settings *settings.Store
-	loc      *time.Location
 
 	mu    sync.Mutex
 	queue []events.Event
@@ -64,8 +63,8 @@ type Engine struct {
 }
 
 // New creates the engine.
-func New(d *db.DB, b *bus.Bus, log *slog.Logger, ev *events.Store, inv *inventory.Store, pub Publisher, st *settings.Store, loc *time.Location) *Engine {
-	return &Engine{db: d, bus: b, log: log, events: ev, inv: inv, pub: pub, settings: st, loc: loc,
+func New(d *db.DB, b *bus.Bus, log *slog.Logger, ev *events.Store, inv *inventory.Store, pub Publisher, st *settings.Store) *Engine {
+	return &Engine{db: d, bus: b, log: log, events: ev, inv: inv, pub: pub, settings: st,
 		sig: make(chan struct{}, 1), kick: make(chan struct{}, 1), nowFn: time.Now}
 }
 
@@ -226,7 +225,7 @@ func quietEnd(now time.Time, from, to int) time.Time {
 
 // plan computes (and unless dryRun stores) the notification for one rule action.
 func (e *Engine) plan(ctx context.Context, r *Rule, idx int, a Action, ev EventInput, dryRun bool) (*ActionPlan, error) {
-	now := e.nowFn().In(e.loc)
+	now := e.nowFn().In(e.settings.Location())
 	p := &ActionPlan{Publisher: a.Publisher, Priority: a.Priority, Mode: a.Mode}
 	if pl, ok := e.pub.Plugin(a.Publisher); ok {
 		p.PublisherName = pl.Info().Name

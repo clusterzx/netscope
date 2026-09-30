@@ -182,45 +182,13 @@ func normFingerprint(v string) string {
 
 // Update validates and stores new settings.
 func (s *Service) Update(ctx context.Context, in SettingsInput) (SettingsView, error) {
-	cfg := in.Settings
-	cfg.LocalName = strings.TrimSpace(cfg.LocalName)
-	if len([]rune(cfg.LocalName)) > 64 {
-		return SettingsView{}, plugin.FieldErr("localName", "höchstens 64 Zeichen")
+	cfg, token, err := s.Check(in)
+	if err != nil {
+		return SettingsView{}, err
 	}
-	cfg.CentralURL = strings.TrimRight(strings.TrimSpace(cfg.CentralURL), "/")
-	cfg.Fingerprint = normFingerprint(cfg.Fingerprint)
 	s.mu.RLock()
 	oldCfg, oldToken := s.cfg, s.token
 	s.mu.RUnlock()
-	if s.managed() && (cfg.Role != RoleSite || cfg.CentralURL != oldCfg.CentralURL || cfg.Fingerprint != oldCfg.Fingerprint || in.Token != nil) {
-		return SettingsView{}, plugin.FieldErr("role", "Die Anbindung an die Zentrale ist über Umgebungsvariablen festgelegt (NETSCOPE_CENTRAL_URL)")
-	}
-	token := oldToken
-	if in.Token != nil {
-		token = strings.TrimSpace(*in.Token)
-	}
-	switch cfg.Role {
-	case RoleStandalone, RoleCentral:
-	case RoleSite:
-		u, err := url.Parse(cfg.CentralURL)
-		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-			return SettingsView{}, plugin.FieldErr("centralUrl", "http(s)-URL der Zentrale erwartet, z. B. https://netscope.example.org")
-		}
-		if u.Path != "" && u.Path != "/" {
-			cfg.CentralURL = strings.TrimRight(u.Scheme+"://"+u.Host+u.Path, "/")
-		}
-		if token == "" {
-			return SettingsView{}, plugin.FieldErr("token", "Token des Standorts erforderlich (wird in der Zentrale beim Anlegen des Standorts angezeigt)")
-		}
-		if !strings.HasPrefix(token, wire.TokenPrefix) {
-			return SettingsView{}, plugin.FieldErr("token", "Standort-Tokens beginnen mit "+wire.TokenPrefix)
-		}
-		if cfg.Fingerprint != "" && !isHex64(cfg.Fingerprint) {
-			return SettingsView{}, plugin.FieldErr("fingerprint", "SHA-256-Fingerprint als 64 Hex-Zeichen erwartet")
-		}
-	default:
-		return SettingsView{}, plugin.FieldErr("role", fmt.Sprintf("unbekannte Rolle %q", cfg.Role))
-	}
 	if !s.managed() {
 		if err := settings.SetJSON(ctx, s.DB.W, keySettings, cfg); err != nil {
 			return SettingsView{}, err
@@ -253,6 +221,55 @@ func (s *Service) Update(ctx context.Context, in SettingsInput) (SettingsView, e
 	s.Bus.Publish(bus.TopicSystem, "federation", map[string]any{"role": cfg.Role})
 	return s.Current(), nil
 }
+
+// Check validates and normalizes changed settings without applying them. It returns the
+// settings and the token they would use (a nil Token keeps the stored one).
+func (s *Service) Check(in SettingsInput) (Settings, string, error) {
+	cfg := in.Settings
+	cfg.LocalName = strings.TrimSpace(cfg.LocalName)
+	if len([]rune(cfg.LocalName)) > 64 {
+		return Settings{}, "", plugin.FieldErr("localName", "höchstens 64 Zeichen")
+	}
+	cfg.CentralURL = strings.TrimRight(strings.TrimSpace(cfg.CentralURL), "/")
+	cfg.Fingerprint = normFingerprint(cfg.Fingerprint)
+	s.mu.RLock()
+	oldCfg, oldToken := s.cfg, s.token
+	s.mu.RUnlock()
+	if s.managed() && (cfg.Role != RoleSite || cfg.CentralURL != oldCfg.CentralURL || cfg.Fingerprint != oldCfg.Fingerprint || in.Token != nil) {
+		return Settings{}, "", plugin.FieldErr("role", "Die Anbindung an die Zentrale ist über Umgebungsvariablen festgelegt (NETSCOPE_CENTRAL_URL)")
+	}
+	token := oldToken
+	if in.Token != nil {
+		token = strings.TrimSpace(*in.Token)
+	}
+	switch cfg.Role {
+	case RoleStandalone, RoleCentral:
+	case RoleSite:
+		u, err := url.Parse(cfg.CentralURL)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			return Settings{}, "", plugin.FieldErr("centralUrl", "http(s)-URL der Zentrale erwartet, z. B. https://netscope.example.org")
+		}
+		if u.Path != "" && u.Path != "/" {
+			cfg.CentralURL = strings.TrimRight(u.Scheme+"://"+u.Host+u.Path, "/")
+		}
+		if token == "" {
+			return Settings{}, "", plugin.FieldErr("token", "Token des Standorts erforderlich (wird in der Zentrale beim Anlegen des Standorts angezeigt)")
+		}
+		if !strings.HasPrefix(token, wire.TokenPrefix) {
+			return Settings{}, "", plugin.FieldErr("token", "Standort-Tokens beginnen mit "+wire.TokenPrefix)
+		}
+		if cfg.Fingerprint != "" && !isHex64(cfg.Fingerprint) {
+			return Settings{}, "", plugin.FieldErr("fingerprint", "SHA-256-Fingerprint als 64 Hex-Zeichen erwartet")
+		}
+	default:
+		return Settings{}, "", plugin.FieldErr("role", fmt.Sprintf("unbekannte Rolle %q", cfg.Role))
+	}
+	return cfg, token, nil
+}
+
+// Managed reports whether the connection to the central instance comes from environment
+// variables (NETSCOPE_CENTRAL_URL) and cannot be changed.
+func (s *Service) Managed() bool { return s.managed() }
 
 func isHex64(s string) bool {
 	if len(s) != 64 {

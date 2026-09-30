@@ -32,6 +32,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "Nmap (TCP)",
 		Description:        "Scannt TCP-Ports, erkennt Dienste, Versionen und Betriebssystem und liest CPE-Kennungen aus.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadHigh,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "0 3 * * *",
 		DefaultTimeout:     3 * time.Hour,
@@ -107,7 +108,7 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	serviceDet := rc.Settings.Bool("service_detection")
 	osDet := rc.Settings.Bool("os_detection")
 	hostTimeout := durationArg(rc.Settings.Duration("host_timeout"))
-	excludes := rc.Settings.Prefixes("exclude")
+	excludes := append(rc.Settings.Prefixes("exclude"), rc.Targets.Exclude...)
 
 	privileged := hasRawSocketPrivilege()
 	if !privileged {

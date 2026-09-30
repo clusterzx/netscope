@@ -37,6 +37,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest DHCP-Leases und Reservierungen sowie die Netzwerk-Tabelle (Geräte mit Namen aus DNS-Anfragen) " +
 			"von Pi-hole v6 über die REST-API.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryDNS,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
 		DefaultTimeout:     2 * time.Minute,
@@ -76,11 +77,23 @@ func (p *Plugin) Endpoints(s plugin.Settings) []string { return netsrc.Endpoints
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	o, fetch := p.sources(rc)
+	return netsrc.Run(ctx, rc, o, fetch)
+}
+
+// TestConnection implements plugin.ConnectionTester.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	o, fetch := p.sources(rc)
+	return netsrc.Test(ctx, rc, o, fetch)
+}
+
+// sources describes the configured systems and how one is read.
+func (p *Plugin) sources(rc *plugin.RunContext) (netsrc.Options, netsrc.Fetch) {
 	s := rc.Settings
-	return netsrc.Run(ctx, rc, netsrc.Options{PluginID: "pihole", Sources: s.StringList(netsrc.KeySources), Label: "Pi-hole",
-		Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
-		return p.fetch(ctx, rc, src)
-	})
+	return netsrc.Options{PluginID: "pihole", Sources: s.StringList(netsrc.KeySources), Label: "Pi-hole",
+			Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
+			return p.fetch(ctx, rc, src)
+		}
 }
 
 func (p *Plugin) clock() time.Time {

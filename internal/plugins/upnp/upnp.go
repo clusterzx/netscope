@@ -46,6 +46,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "UPnP / SSDP",
 		Description:        "Findet UPnP-Geräte per SSDP und liest ihre Gerätebeschreibung: Name, Hersteller, Modell und Gerätetyp.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "*/30 * * * *",
 		DefaultTimeout:     5 * time.Minute,

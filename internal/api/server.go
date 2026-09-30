@@ -32,6 +32,7 @@ import (
 	"netscope/internal/pluginhost"
 	"netscope/internal/rules"
 	"netscope/internal/settings"
+	"netscope/internal/setup"
 	"netscope/internal/tunnel"
 	"netscope/internal/vault"
 )
@@ -55,7 +56,9 @@ type Deps struct {
 	// Federation joins this instance with a central instance or sites (nil in tests).
 	Federation *federation.Service
 	// Agents manages NetScope agents (nil in tests without agents).
-	Agents    *agent.Service
+	Agents *agent.Service
+	// Setup is the state of the setup wizard.
+	Setup     *setup.Service
 	Audit     *audit.Log
 	Version   string
 	StartedAt time.Time
@@ -129,6 +132,7 @@ func New(d Deps) *Server {
 	s.registerDashboard()
 	s.registerUsers()
 	s.registerAgents()
+	s.registerSetup()
 	s.mux.HandleFunc("GET /api/v1/stream", s.withAuth(&route{Scope: scopeRead, handler: s.handleStream}))
 	s.mux.HandleFunc("GET /metrics", s.handleMetrics)
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)
@@ -472,6 +476,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusTooManyRequests, "rate_limited", err.Error(), nil)
 	case errors.Is(err, auth.ErrUnauthenticated):
 		writeError(w, r, http.StatusUnauthorized, "unauthenticated", err.Error(), nil)
+	case errors.Is(err, pluginhost.ErrSetupPending):
+		writeError(w, r, http.StatusConflict, "setup_pending", err.Error(), nil)
 	case errors.Is(err, pluginhost.ErrAlreadyQueued):
 		writeError(w, r, http.StatusConflict, "conflict", err.Error(), nil)
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
@@ -550,10 +556,10 @@ func (s *Server) qTime(r *http.Request, name string) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339, v); err == nil {
 		return t, nil
 	}
-	if t, err := time.ParseInLocation("2006-01-02T15:04", v, s.Config.Location); err == nil {
+	if t, err := time.ParseInLocation("2006-01-02T15:04", v, s.Settings.Location()); err == nil {
 		return t, nil
 	}
-	if t, err := time.ParseInLocation("2006-01-02", v, s.Config.Location); err == nil {
+	if t, err := time.ParseInLocation("2006-01-02", v, s.Settings.Location()); err == nil {
 		return t, nil
 	}
 	if ms, err := strconv.ParseInt(v, 10, 64); err == nil {

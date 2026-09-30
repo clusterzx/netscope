@@ -34,6 +34,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest die DHCP-Reservierungen (Name, MAC, IP, Schnittstelle) von Sophos Firewalls über die XML-API. " +
 			"Aktuelle Leases und die ARP-Tabelle stellt SFOS über die API nicht bereit.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryRouters,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "0 * * * *",
 		DefaultTimeout:     time.Minute,
@@ -70,11 +71,23 @@ func (p *Plugin) Endpoints(s plugin.Settings) []string { return netsrc.Endpoints
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	o, fetch := p.sources(rc)
+	return netsrc.Run(ctx, rc, o, fetch)
+}
+
+// TestConnection implements plugin.ConnectionTester.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	o, fetch := p.sources(rc)
+	return netsrc.Test(ctx, rc, o, fetch)
+}
+
+// sources describes the configured systems and how one is read.
+func (p *Plugin) sources(rc *plugin.RunContext) (netsrc.Options, netsrc.Fetch) {
 	s := rc.Settings
-	return netsrc.Run(ctx, rc, netsrc.Options{PluginID: "sophos", Sources: s.StringList(netsrc.KeySources), Label: "Firewall",
-		Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
-		return fetch(ctx, rc, src)
-	})
+	return netsrc.Options{PluginID: "sophos", Sources: s.StringList(netsrc.KeySources), Label: "Firewall",
+			Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
+			return fetch(ctx, rc, src)
+		}
 }
 
 type response struct {

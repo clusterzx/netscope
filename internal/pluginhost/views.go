@@ -97,6 +97,9 @@ func capabilities(p plugin.Plugin) []string {
 	if _, ok := p.(plugin.ActionProvider); ok {
 		out = append(out, "actions")
 	}
+	if _, ok := p.(plugin.ConnectionTester); ok {
+		out = append(out, "connectionTest")
+	}
 	return out
 }
 

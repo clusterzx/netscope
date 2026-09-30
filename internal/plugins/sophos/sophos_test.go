@@ -76,3 +76,27 @@ func TestSophos(t *testing.T) {
 		t.Errorf("ip not allowed: %v", err)
 	}
 }
+
+// The connection test signs in and reads the reservations like a run, but stores nothing;
+// it reports a wrong password and a wrong address per firewall.
+func TestSophosConnectionTest(t *testing.T) {
+	srv := firewall(t)
+	t.Cleanup(srv.Close)
+	creds := func(pw string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Type: plugin.CredPassword, Public: map[string]string{"username": "api"}, Secret: map[string]string{"password": pw}}}
+	}
+	p := &Plugin{}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("pw&<x"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != srv.URL || !strings.Contains(res[0].Message, "2 Clients") {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "https")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL, closed}}, creds("pw&<x"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || res[1].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+}

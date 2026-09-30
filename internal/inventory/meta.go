@@ -47,6 +47,9 @@ type Subnet struct {
 // Routed reports whether the subnet is reached through a router or tunnel.
 func (s *Subnet) Routed() bool { return s.Access == AccessRouted || s.Access == AccessWireGuard }
 
+// Validate checks and normalizes a subnet without storing it.
+func (s *Subnet) Validate() error { return s.validate() }
+
 func (s *Subnet) validate() error {
 	p, err := netip.ParsePrefix(strings.TrimSpace(s.CIDR))
 	if err != nil {
@@ -215,24 +218,37 @@ func (s *Store) SeedSubnets(ctx context.Context) ([]string, error) {
 	if n > 0 {
 		return nil, nil
 	}
-	local, err := netutil.LocalSubnets()
+	detected, err := DetectSubnets()
 	if err != nil {
 		return nil, err
 	}
-	gateways := netutil.DefaultGateways()
 	var added []string
-	for _, l := range local {
-		sn := &Subnet{CIDR: l.Prefix.String(), Name: l.Interface, Interface: l.Interface, Enabled: true,
-			Notes: "automatisch beim ersten Start erkannt"}
-		if gw, ok := gateways[l.Interface]; ok && l.Prefix.Contains(gw) {
-			sn.Gateway = gw.String()
-		}
-		if err := s.SaveSubnet(ctx, sn); err != nil {
+	for _, sn := range detected {
+		sn.Notes = "automatisch beim ersten Start erkannt"
+		if err := s.SaveSubnet(ctx, &sn); err != nil {
 			continue
 		}
 		added = append(added, sn.CIDR)
 	}
 	return added, nil
+}
+
+// DetectSubnets returns the locally attached networks with their gateway (not stored).
+func DetectSubnets() ([]Subnet, error) {
+	local, err := netutil.LocalSubnets()
+	if err != nil {
+		return nil, err
+	}
+	gateways := netutil.DefaultGateways()
+	out := []Subnet{}
+	for _, l := range local {
+		sn := Subnet{CIDR: l.Prefix.String(), Name: l.Interface, Interface: l.Interface, Enabled: true, Access: AccessDirect}
+		if gw, ok := gateways[l.Interface]; ok && l.Prefix.Contains(gw) {
+			sn.Gateway = gw.String()
+		}
+		out = append(out, sn)
+	}
+	return out, nil
 }
 
 // FillGateways sets the gateway of subnets that have none from the host's default routes

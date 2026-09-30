@@ -105,3 +105,26 @@ func TestParseDuration(t *testing.T) {
 		}
 	}
 }
+
+// The connection test reads like a run, but stores nothing; it reports a wrong password
+// and a wrong address per router.
+func TestMikroTikConnectionTest(t *testing.T) {
+	srv, _ := router(t)
+	creds := func(pw string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Type: plugin.CredPassword, Public: map[string]string{"username": "netscope"}, Secret: map[string]string{"password": pw}}}
+	}
+	p := &Plugin{now: func() time.Time { return now }}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("pw"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != srv.URL || !strings.Contains(res[0].Message, "4 Clients") {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "https")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL, closed}}, creds("pw"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || res[1].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+}
