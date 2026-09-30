@@ -368,6 +368,10 @@ func describeHost(ctx context.Context, rc *plugin.RunContext, client *http.Clien
 		raws  []string
 	)
 	locs := r.locations()
+	if rc.Targets.Excluded(r.ip) {
+		// excluded from scanning: keep what it announced, but do not contact it
+		locs = nil
+	}
 	if len(locs) > maxLocationsPerHost {
 		locs = locs[:maxLocationsPerHost]
 	}

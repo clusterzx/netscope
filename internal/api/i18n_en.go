@@ -468,5 +468,6 @@ func init() {
 		"im Einrichtungsassistenten übernommen":                                 "taken over in the setup wizard",
 		"Einrichtung abgeschlossen":                                             "Setup finished",
 		"Einrichtung abgeschlossen – Plugins laufen":                            "Setup finished – plugins are running",
+		"Einrichtungscode-Datei bitte von Hand löschen":                         "Please delete the setup code file by hand",
 	})
 }

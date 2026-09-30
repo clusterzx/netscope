@@ -468,7 +468,9 @@ func (s *Server) handleSetupComplete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.Setup.Complete(ctx, setup.ModeWizard); err != nil {
+	if err := s.Setup.Complete(ctx, setup.ModeWizard); setup.Warning(err) {
+		s.Log.Warn("Einrichtungscode-Datei bitte von Hand löschen", "file", s.Setup.CodePath(), "err", err)
+	} else if err != nil {
 		s.fail(w, r, err)
 		return
 	}

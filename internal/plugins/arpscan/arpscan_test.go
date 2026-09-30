@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -24,6 +25,13 @@ func TestMain(m *testing.M) {
 	if out := os.Getenv("ARPSCAN_FAKE_OUTPUT"); out != "" {
 		if f := os.Getenv("ARPSCAN_FAKE_ARGS"); f != "" {
 			_ = os.WriteFile(f, []byte(strings.Join(os.Args[1:], "\n")), 0o600)
+			// the target file is removed after the run: keep a copy next to the arguments
+			for _, a := range os.Args[1:] {
+				if name, ok := strings.CutPrefix(a, "--file="); ok {
+					b, _ := os.ReadFile(name)
+					_ = os.WriteFile(f+".hosts", b, 0o600)
+				}
+			}
 		}
 		b, err := os.ReadFile(out)
 		if err != nil {
@@ -284,4 +292,43 @@ func TestLocalHost(t *testing.T) {
 		return
 	}
 	t.Skip("no loopback interface with IPv4")
+}
+
+// Excluded addresses get no ARP request: the remaining addresses of the subnet go to
+// arp-scan as a file – also for large subnets – and replies of excluded ones are dropped.
+func TestScanExclusions(t *testing.T) {
+	argsFile := fakeArpScan(t, "arp-scan-devices.txt", "")
+	p := &Plugin{}
+	rc, sink, _ := plugintest.RunContext(t, p, map[string]any{})
+	rc.Targets = plugin.Targets{Subnets: []plugin.SubnetTarget{{CIDR: netip.MustParsePrefix("192.168.8.0/24"), Interface: "nsfake0"}},
+		Exclude: []netip.Prefix{netip.MustParsePrefix("192.168.8.1/32"), netip.MustParsePrefix("192.168.8.128/25")}}
+	if err := p.Run(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+	args, _ := os.ReadFile(argsFile)
+	if strings.Contains(string(args), "192.168.8.0/24") || !strings.Contains(string(args), "--file=") {
+		t.Fatalf("arp-scan got the whole subnet: %s", args)
+	}
+	hosts, _ := os.ReadFile(argsFile + ".hosts")
+	list := strings.Fields(string(hosts))
+	if len(list) != 127 || slices.Contains(list, "192.168.8.1") || slices.Contains(list, "192.168.8.200") || !slices.Contains(list, "192.168.8.2") {
+		t.Fatalf("host file: %d entries %v…", len(list), list[:min(len(list), 3)])
+	}
+	for _, o := range sink.All() {
+		if o.IP == "192.168.8.1" {
+			t.Fatal("reply of an excluded address observed")
+		}
+	}
+	// a /16 is listed completely, not scanned whole
+	jobs, _, _ := buildJobs(plugin.Targets{Subnets: []plugin.SubnetTarget{{CIDR: netip.MustParsePrefix("10.1.0.0/16"), Interface: "eth0"}},
+		Exclude: []netip.Prefix{netip.MustParsePrefix("10.1.200.7/32")}}, nil, func(netip.Addr) string { return "eth0" })
+	if len(jobs) != 1 || len(jobs[0].hosts) != 65535 || slices.Contains(jobs[0].hosts, "10.1.200.7") {
+		t.Fatalf("/16 with exclusion: %d jobs, %d hosts", len(jobs), len(jobs[0].hosts))
+	}
+	// without exclusions the CIDR goes to arp-scan as before
+	jobs, _, _ = buildJobs(plugin.Targets{Subnets: []plugin.SubnetTarget{{CIDR: netip.MustParsePrefix("10.1.0.0/16"), Interface: "eth0"}}},
+		nil, func(netip.Addr) string { return "eth0" })
+	if jobs[0].hosts != nil || jobs[0].targets[0] != "10.1.0.0/16" {
+		t.Fatalf("without exclusion: %+v", jobs[0].targets)
+	}
 }

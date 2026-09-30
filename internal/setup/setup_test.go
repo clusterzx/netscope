@@ -103,3 +103,31 @@ func TestMigrationMarksExistingInstallations(t *testing.T) {
 		t.Fatalf("existing installation must count as set up: %+v", s.State())
 	}
 }
+
+// A code file that cannot be removed leaves the setup completed (only a warning).
+func TestCompleteWithCodeFileLeft(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	d, err := db.Open(ctx, filepath.Join(dir, "s.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	s, _ := Load(ctx, d, dir)
+	code, _ := s.PrepareCode()
+	// a non-empty directory in place of the file cannot be removed
+	path := filepath.Join(dir, CodeFile)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(path, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	err = s.Complete(ctx, ModeWizard)
+	if !Warning(err) {
+		t.Fatalf("want a warning, got %v", err)
+	}
+	if s.Pending() || s.CheckCode(code) {
+		t.Fatal("setup must be completed and the code invalid")
+	}
+}

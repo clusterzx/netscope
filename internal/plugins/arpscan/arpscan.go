@@ -94,9 +94,12 @@ func loadConfig(s plugin.Settings) config {
 type job struct {
 	label   string
 	iface   string
-	targets []string            // arguments for arp-scan: one CIDR or single addresses
-	prefix  netip.Prefix        // subnet mode: scanned network
-	addrs   map[netip.Addr]bool // device mode: scanned addresses
+	targets []string // arguments for arp-scan: one CIDR or single addresses
+	// hosts replaces targets when addresses of the subnet are excluded from scanning: the
+	// remaining addresses, handed to arp-scan as a file (--file)
+	hosts  []string
+	prefix netip.Prefix        // subnet mode: scanned network
+	addrs  map[netip.Addr]bool // device mode: scanned addresses
 }
 
 // inScope reports whether a local address belongs to the scanned targets.
@@ -201,22 +204,16 @@ func buildJobs(t plugin.Targets, routed []netip.Prefix, ifaceFor func(netip.Addr
 			errs = append(errs, fmt.Errorf("Subnetz %s: kein lokales Interface gefunden – arp-scan erreicht nur direkt angeschlossene Netze (Interface eintragen oder das Subnetz als „über Router“ erreichbar markieren)", p))
 			continue
 		}
-		targets := []string{p.String()}
-		if hosts, ok := withoutExcluded(p, t); ok {
-			targets = hosts
-		}
-		jobs = append(jobs, job{label: p.String(), iface: iface, targets: targets, prefix: p})
+		jobs = append(jobs, job{label: p.String(), iface: iface, targets: []string{p.String()}, prefix: p,
+			hosts: withoutExcluded(p, t)})
 	}
 	return jobs, errs, skipped
 }
 
-// maxExpand bounds the subnets that are split into single addresses to leave out excluded
-// ones (a /20); larger subnets are scanned whole and replies of excluded addresses dropped.
-const maxExpand = 4096
-
-// withoutExcluded lists the addresses of a subnet without the excluded ones; ok is false
-// when no exclusion lies in the subnet or it is too large to list.
-func withoutExcluded(p netip.Prefix, t plugin.Targets) ([]string, bool) {
+// withoutExcluded lists the addresses of a subnet (at most a /16, see buildJobs) without
+// the excluded ones, so that excluded hosts get no ARP request at all; nil when no
+// exclusion lies in the subnet (arp-scan then gets the CIDR).
+func withoutExcluded(p netip.Prefix, t plugin.Targets) []string {
 	hit := false
 	for _, e := range t.Exclude {
 		if p.Overlaps(e) {
@@ -224,16 +221,30 @@ func withoutExcluded(p netip.Prefix, t plugin.Targets) ([]string, bool) {
 			break
 		}
 	}
-	if !hit || p.Addr().BitLen()-p.Bits() > 12 {
-		return nil, false
+	if !hit {
+		return nil
 	}
-	var out []string
-	for a := p.Addr(); p.Contains(a) && len(out) <= maxExpand; a = a.Next() {
+	out := []string{}
+	for a := p.Addr(); p.Contains(a); a = a.Next() {
 		if !t.Excluded(a) {
 			out = append(out, a.String())
 		}
 	}
-	return out, true
+	return out
+}
+
+// hostFile writes the addresses of a job for arp-scan --file; the caller removes it.
+func hostFile(hosts []string) (string, error) {
+	f, err := os.CreateTemp("", "netscope-arpscan-*.txt")
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.WriteString(strings.Join(hosts, "\n") + "\n"); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return "", err
+	}
+	return f.Name(), f.Close()
 }
 
 // localTargets returns the directly attached networks as targets (used when no subnet
@@ -327,7 +338,19 @@ func scan(ctx context.Context, rc *plugin.RunContext, j job, cfg config) (int, e
 	if cfg.bandwidth != "" {
 		args = append(args, "--bandwidth="+cfg.bandwidth)
 	}
-	args = append(args, j.targets...)
+	switch {
+	case j.hosts != nil && len(j.hosts) == 0:
+		return 0, nil // every address of the subnet is excluded
+	case j.hosts != nil:
+		file, err := hostFile(j.hosts)
+		if err != nil {
+			return 0, err
+		}
+		defer os.Remove(file)
+		args = append(args, "--file="+file)
+	default:
+		args = append(args, j.targets...)
+	}
 	found := 0
 	first := map[netip.Addr]string{}
 	consume := func(r io.Reader) error {

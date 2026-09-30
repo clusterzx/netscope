@@ -307,3 +307,14 @@ func TestSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Addresses excluded from scanning are not asked for by reverse lookups.
+func TestReverseNamesSkipExcluded(t *testing.T) {
+	queried := map[netip.Addr]bool{}
+	tg := plugin.Targets{Exclude: []netip.Prefix{netip.MustParsePrefix("192.168.8.20/32")}}
+	addrs := []netip.Addr{netip.MustParseAddr("192.168.8.10"), netip.MustParseAddr("192.168.8.20"), netip.MustParseAddr("192.168.8.10")}
+	got := reverseNames(addrs, queried, tg)
+	if len(got) != 1 || got[0] != "10.8.168.192.in-addr.arpa." {
+		t.Fatalf("reverse names: %v", got)
+	}
+}

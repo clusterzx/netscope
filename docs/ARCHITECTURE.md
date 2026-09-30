@@ -164,8 +164,9 @@ Regel-Engine (Ruhezeiten), `plugin.Env.Location` (geplante Berichte, Publisher) 
 
 **Ausschlüsse.** `settings.System.ScanExclusions` (Adressen oder CIDR). Der Host entfernt sie
 aus den Geräten eines Laufs (auch aus deren Ports; Geräte ohne andere Adresse fallen weg) und
-gibt sie als `Targets.Exclude` weiter; `arpscan` zerlegt betroffene Subnetze bis /20 in
-Einzeladressen (größere: Antworten werden verworfen), `nmap` ergänzt `--exclude`. Die
+gibt sie als `Targets.Exclude` weiter; `arpscan` übergibt betroffene Subnetze (bis /16) als
+Liste der übrigen Adressen (`--file`), `nmap` ergänzt `--exclude`, `upnp` lädt keine
+Gerätebeschreibungen ausgenommener Adressen und `mdns` stellt keine Reverse-Anfragen zu ihnen. Die
 Präsenzauswertung eines Subnetz-Laufs zählt Geräte, deren aktuelle Adressen im Subnetz alle
 ausgenommen sind, nicht als verpasst.
 

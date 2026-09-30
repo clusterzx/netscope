@@ -177,14 +177,18 @@ func TestSetupNeedsCodeAndEnds(t *testing.T) {
 	other := in.as()
 	resp, body = other.do(t, "GET", "/api/v1/setup/options", nil)
 	expect(t, "other browser", resp, body, 401, "setup_code_required")
+	// a code file that cannot be removed does not keep the plugins held
+	if err := os.Remove(filepath.Join(in.dir, setup.CodeFile)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(in.dir, setup.CodeFile, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	resp, body = in.do(t, "POST", "/api/v1/setup/complete", map[string]any{"language": "en", "timezone": "Europe/Vienna",
 		"federation": map[string]any{"role": "standalone"}, "subnets": []any{}, "scanners": []string{"arpscan", "icmp"}}, csrf, "1")
 	expect(t, "complete", resp, body, 200, "")
 	if in.setup.Pending() || in.host.Held() {
 		t.Fatal("setup still pending")
-	}
-	if _, err := os.Stat(filepath.Join(in.dir, setup.CodeFile)); !os.IsNotExist(err) {
-		t.Fatal("code file not removed")
 	}
 	// after completion every setup endpoint is closed, also with the old code
 	for _, c := range []struct{ method, path string }{{"GET", "/api/v1/setup/options"}, {"POST", "/api/v1/setup/account"},

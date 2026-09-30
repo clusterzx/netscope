@@ -238,7 +238,7 @@ func prepareSetup(ctx context.Context, cfg *config.Config, d *db.DB, authSvc *au
 		if _, _, err := authSvc.EnsureAdmin(ctx, cfg.AdminPassword); err != nil {
 			return nil, err
 		}
-		if err := s.Complete(ctx, setup.ModeAutomatic); err != nil {
+		if err := s.Complete(ctx, setup.ModeAutomatic); err != nil && !setup.Warning(err) {
 			return nil, err
 		}
 		log.Info("NETSCOPE_ADMIN_PASSWORD gesetzt – Einrichtungsassistent übersprungen, ab Werk aktive Plugins laufen")
@@ -247,7 +247,7 @@ func prepareSetup(ctx context.Context, cfg *config.Config, d *db.DB, authSvc *au
 		if err != nil {
 			return nil, err
 		}
-		if err := s.Complete(ctx, setup.ModeAutomatic); err != nil {
+		if err := s.Complete(ctx, setup.ModeAutomatic); err != nil && !setup.Warning(err) {
 			return nil, err
 		}
 		if created {

@@ -200,6 +200,15 @@ func TestFetchDescription(t *testing.T) {
 		!strings.Contains(obs.Raw, "<modelName>Archer C80</modelName>") {
 		t.Fatalf("observation: %+v", obs)
 	}
+	// an address excluded from scanning is not contacted: the SSDP answer only
+	hits := 0
+	mux.HandleFunc("/count.xml", func(w http.ResponseWriter, r *http.Request) { hits++; _, _ = w.Write(doc) })
+	rc.Targets.Exclude = []netip.Prefix{netip.PrefixFrom(local, local.BitLen())}
+	r = &responder{ip: local, responses: []ssdpResponse{{Location: srv.URL + "/count.xml", Server: "TPOS/V1.0.0 UPnP/1.0 Archer C80/2.20"}}}
+	obs = describeHost(ctx, rc, client, r)
+	if hits != 0 || obs.IP != local.String() || strings.Contains(obs.Raw, "<modelName>") {
+		t.Fatalf("excluded responder contacted (%d requests): %+v", hits, obs)
+	}
 }
 
 func TestBuildSessions(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,7 +114,12 @@ func (s *Service) CheckCode(code string) bool {
 	return want != "" && len(got) == len(want) && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
-// Complete stores the setup as completed and removes the code file.
+// ErrCodeFileLeft is returned by Complete when the setup is completed but the code file
+// could not be removed. It is only a warning: the code is no longer accepted anyway.
+var ErrCodeFileLeft = errors.New("Einrichtungscode-Datei konnte nicht gelöscht werden")
+
+// Complete stores the setup as completed and removes the code file. A code file that
+// cannot be removed does not undo the completion (see ErrCodeFileLeft).
 func (s *Service) Complete(ctx context.Context, mode string) error {
 	now := time.Now().UTC()
 	st := State{Completed: true, Mode: mode, CompletedAt: &now}
@@ -124,7 +130,7 @@ func (s *Service) Complete(ctx context.Context, mode string) error {
 	s.state, s.code = st, ""
 	s.mu.Unlock()
 	if err := os.Remove(s.CodePath()); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
+		return fmt.Errorf("%w: %v", ErrCodeFileLeft, err)
 	}
 	return nil
 }
@@ -166,3 +172,7 @@ func normalize(s string) string {
 	}
 	return b.String()
 }
+
+// Warning reports whether an error of Complete leaves the setup completed (only the code
+// file is left over).
+func Warning(err error) bool { return errors.Is(err, ErrCodeFileLeft) }

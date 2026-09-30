@@ -141,8 +141,9 @@ Credential gleich aus.
 
 **Vom Scannen ausgenommen** (System → Einstellungen): Adressen oder Netze, die kein Scanner
 abfragt, z. B. empfindliche Geräte, die bei Port-Scans ausfallen. Sie fehlen in den Zielen aller
-Läufe, `arp-scan` und `nmap` lassen sie auch beim Scan ganzer Subnetze aus, und Geräte, die nur
-unter ausgenommenen Adressen erreichbar sind, gelten dadurch nicht als offline.
+Läufe, `arp-scan` und `nmap` lassen sie auch beim Scan ganzer Subnetze aus, UPnP lädt ihre
+Gerätebeschreibung nicht und mDNS fragt nicht nach ihrem Namen. Geräte, die nur unter
+ausgenommenen Adressen erreichbar sind, gelten dadurch nicht als offline.
 
 | Plugin | Art | Standard | Beschreibung |
 |---|---|---|---|

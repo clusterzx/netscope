@@ -31,14 +31,17 @@
 	);
 	let errors = $state<Record<string, string>>({});
 	let formError = $state('');
+	// failure of switching off (the panel is closed then, so it is shown in the header)
+	let toggleError = $state('');
 	let saving = $state(false);
 
-	async function save(on: boolean) {
+	/** Stores the configuration; false when it failed (the message is in formError). */
+	async function save(on: boolean): Promise<boolean> {
 		formError = '';
 		if (on) {
 			const e = validateSchema(fields, values);
 			errors = Object.fromEntries(Object.entries(e).map(([k, v]) => ['settings.' + k, v]));
-			if (Object.keys(e).length) return;
+			if (Object.keys(e).length) return false;
 		}
 		saving = true;
 		try {
@@ -48,20 +51,29 @@
 			});
 			errors = {};
 			onsaved(next);
+			return true;
 		} catch (e) {
 			const split = splitConfigErrors(e);
 			errors = split.settings;
 			formError = Object.keys(split.settings).length
 				? t('Bitte die markierten Felder korrigieren.')
 				: errorMessage(e);
+			return false;
 		} finally {
 			saving = false;
 		}
 	}
 
-	function toggle(on: boolean) {
+	async function toggle(on: boolean) {
+		toggleError = '';
 		open = on;
-		if (!on && enabled) save(false);
+		if (on || !enabled) return;
+		// switching off an enabled source: only closed once the server agreed
+		if (!(await save(false))) {
+			toggleError = formError;
+			formError = '';
+			open = true;
+		}
 	}
 </script>
 
@@ -81,6 +93,11 @@
 				{#if enabled}<Badge tone="ok" dot>{t('eingerichtet')}</Badge>{/if}
 			</div>
 			<p class="mt-0.5 text-sm text-fg-muted">{plugin.info.description}</p>
+			{#if toggleError}
+				<p class="mt-1 text-sm text-danger" role="alert">
+					{t('Ausschalten fehlgeschlagen: {error}', { error: toggleError })}
+				</p>
+			{/if}
 		</div>
 	</div>
 	{#if open}

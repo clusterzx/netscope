@@ -6,6 +6,7 @@
 	"Alles im Blick – mit „Einrichtung abschließen“ startet NetScope.": "Everything at a glance – “Finish setup” starts NetScope.",
 	"Angemeldet als {name}. Der Assistent arbeitet ab jetzt mit diesem Konto weiter.": "Signed in as {name}. From now on the wizard continues with this account.",
 	"Ausgenommen": "Excluded",
+	"Ausschalten fehlgeschlagen: {error}": "Switching off failed: {error}",
 	"Auswertende Plugins (CVE-Abgleich, OUI-Hersteller, Änderungen, Topologie, Aufräumen …) bleiben aktiv. SSH-Inventar und SNMP brauchen Zugangsdaten und folgen im nächsten Schritt. Zeitpläne und Umfang lassen sich später je Plugin ändern.": "Evaluating plugins (CVE matching, OUI vendors, changes, topology, cleanup …) stay active. SSH inventory and SNMP need credentials and follow in the next step. Schedules and scope can be changed per plugin later.",
 	"CIDR erwartet, z. B. 10.20.0.0/24 (höchstens /16)": "CIDR expected, e.g. 10.20.0.0/24 (at most /16)",
 	"DNS-Server": "DNS server",
