@@ -125,6 +125,16 @@ export interface ApiCodeRequest {
 	code: string;
 }
 
+export interface ApiConnectionTestRequest {
+	settings?: Record<string, unknown>;
+	target?: string;
+}
+
+export interface ApiConnectionTestResponse {
+	ok: boolean;
+	results: PluginConnectionResult[];
+}
+
 export interface ApiCreateDeviceRequest {
 	ip: string;
 	mac: string;
@@ -507,6 +517,89 @@ export interface ApiSeriesResponse {
 	points: TimeseriesPoint[];
 	resolution: string;
 	series: TimeseriesSeries[];
+}
+
+export interface ApiSetupAccountRequest {
+	displayName: string;
+	locale: string;
+	password: string;
+	username: string;
+}
+
+export interface ApiSetupCategory {
+	hints?: string[];
+	id: string;
+	label: string;
+	plugins: string[];
+}
+
+export interface ApiSetupCodeRequest {
+	code: string;
+}
+
+export interface ApiSetupCompleteRequest {
+	dnsServer: string;
+	federation: ApiSetupFederation;
+	firstScan: boolean;
+	language: string;
+	publicUrl: string;
+	scanExclusions: string[];
+	scanners: string[];
+	subnets: ApiSetupSubnet[];
+	timezone: string;
+}
+
+export interface ApiSetupCompleteResponse {
+	ok: boolean;
+	runs: number[];
+}
+
+export interface ApiSetupFederation {
+	centralUrl: string;
+	fingerprint: string;
+	localName: string;
+	role: string;
+	token?: string;
+}
+
+export interface ApiSetupOptions {
+	account?: AuthUser;
+	categories: ApiSetupCategory[];
+	configuredSubnets: InventorySubnet[];
+	dataDir: string;
+	dnsServers: string[];
+	federation: FederationSettingsView;
+	language: string;
+	masterKeyFile: string;
+	publicUrl: string;
+	scanners: ApiSetupScanner[];
+	subnets: InventorySubnet[];
+	timezone: string;
+}
+
+export interface ApiSetupScanner {
+	defaultEnabled: boolean;
+	description: string;
+	id: string;
+	load: string;
+	missingBinaries?: string[];
+	name: string;
+	presence: boolean;
+	schedule: string;
+	scheduleText: string;
+}
+
+export interface ApiSetupStatus {
+	account: boolean;
+	pending: boolean;
+}
+
+export interface ApiSetupSubnet {
+	access: string;
+	cidr: string;
+	gateway?: string;
+	interface?: string;
+	name: string;
 }
 
 export interface ApiSeverityInfo {
@@ -1568,6 +1661,13 @@ export interface PluginCondition {
 	field: string;
 }
 
+export interface PluginConnectionResult {
+	durationMs: number;
+	message: string;
+	ok: boolean;
+	target: string;
+}
+
 export interface PluginContainerPort {
 	ip?: string;
 	privatePort: number;
@@ -1643,6 +1743,7 @@ export interface PluginField {
 
 export interface PluginInfo {
 	binaries?: string[];
+	category?: string;
 	defaultConcurrency: number;
 	defaultEnabled: boolean;
 	defaultRetries: number;
@@ -1652,6 +1753,7 @@ export interface PluginInfo {
 	description: string;
 	id: string;
 	kind: string;
+	load?: string;
 	name: string;
 	presence: boolean;
 	targets: string;
@@ -2056,6 +2158,8 @@ export interface SettingsSystem {
 	observationRawMaxKb: number;
 	offlineAfterMissed: number;
 	publicUrl: string;
+	scanExclusions: string[];
+	timezone: string;
 }
 
 export interface TimeseriesPoint {
@@ -2650,6 +2754,10 @@ export interface ApiPaths {
 		/** Konfiguration ändern (aktiv, Zeitplan, Timeout, Retries, Parallelität, Scope, Einstellungen) – wirkt sofort */
 		put: { query: never; body: PluginhostConfigInput; response: PluginhostPluginView };
 	};
+	'/api/v1/plugins/{id}/connection-test': {
+		/** Verbindung und Anmeldung prüfen, ohne etwas zu speichern (mit ungespeicherten Einstellungen aus dem Formular) */
+		post: { query: never; body: ApiConnectionTestRequest; response: ApiConnectionTestResponse };
+	};
 	'/api/v1/plugins/{id}/run': {
 		/** Jetzt ausführen */
 		post: { query: never; body: ApiRunRequest; response: ApiIdResponse };
@@ -2756,6 +2864,30 @@ export interface ApiPaths {
 			body: never;
 			response: PluginhostRunLog[];
 		};
+	};
+	'/api/v1/setup': {
+		/** Steht die Einrichtung aus? (ohne Login) */
+		get: { query: never; body: never; response: ApiSetupStatus };
+	};
+	'/api/v1/setup/account': {
+		/** Administrator anlegen und anmelden (nur mit Einrichtungscode und solange es keinen Benutzer gibt) */
+		post: { query: never; body: ApiSetupAccountRequest; response: ApiLoginResponse };
+	};
+	'/api/v1/setup/complete': {
+		/** Einrichtung abschließen: Einstellungen, Rolle, Netze und Scanner übernehmen; danach laufen die Plugins */
+		post: { query: never; body: ApiSetupCompleteRequest; response: ApiSetupCompleteResponse };
+	};
+	'/api/v1/setup/federation/test': {
+		/** Standort: Verbindung zur Zentrale mit den eingegebenen Daten prüfen (nichts wird gespeichert) */
+		post: { query: never; body: ApiSetupFederation; response: FederationTestResult };
+	};
+	'/api/v1/setup/options': {
+		/** Vorschläge des Assistenten: erkannte Netze, DNS, Zeitzone, Scanner, Quellen (Header X-NetScope-Setup-Code oder Sitzung des Administrators) */
+		get: { query: never; body: never; response: ApiSetupOptions };
+	};
+	'/api/v1/setup/verify': {
+		/** Einrichtungscode prüfen (aus dem Log bzw. data/setup-code.txt; Fehlversuche zählen zum Rate-Limit des Logins) */
+		post: { query: never; body: ApiSetupCodeRequest; response: ApiOkResponse };
 	};
 	'/api/v1/sites': {
 		/** Zentrale: Standorte mit Verbindungszustand und letzter Meldung */

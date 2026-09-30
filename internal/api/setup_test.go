@@ -193,6 +193,7 @@ func TestSetupNeedsCodeAndEnds(t *testing.T) {
 		expect(t, c.path+" after completion", resp, body, 409, "setup_completed")
 	}
 	resp, body = in.do(t, "GET", "/api/v1/setup", nil)
+	expect(t, "status after completion", resp, body, 200, "")
 	if st := decodeBody[setupStatus](t, body); st.Pending {
 		t.Fatalf("status after completion: %s", body)
 	}

@@ -73,12 +73,14 @@ services:
 ```bash
 git clone <repo> netscope && cd netscope
 make docker-up                      # builds the image and starts the container
-cat data/admin-initial-password.txt # initial password of the user "admin"
+cat data/setup-code.txt             # setup code (also in the log)
 ```
 
-Open `http://<host>:8080`, sign in and set your own password under **System → Password**. On
-the first start NetScope adopts the directly attached networks as subnets; add more (routed
-ones too) under **System → Subnets**.
+Open `http://<host>:8080` and enter the setup code. The wizard asks for language and time
+zone, the administrator account, the role (on its own, central instance or site), the
+networks to scan, the scanners and optionally routers, controllers and servers with
+credentials – no plugin runs before it is finished ([first start](docs/GUIDE.md#erster-start)).
+`NETSCOPE_ADMIN_PASSWORD` skips the wizard (automated installations).
 
 > **Back up the master key.** Credentials are encrypted with `data/master.key`; without it,
 > stored passwords and tokens are lost. It can also be passed as `NETSCOPE_MASTER_KEY`.
@@ -88,8 +90,8 @@ URL under **System → Settings**. If the proxy asks for a login (Pangolin, Auth
 sites and Prometheus must bypass it – see the [guide](docs/GUIDE.md#hinter-einem-reverse-proxy-traefik).
 
 Everything is configured in the web interface. A few bootstrap values (listen address, data
-directory, time zone, log level, first admin password) come from `/data/config.yaml` or
-environment variables – [full list](docs/GUIDE.md#konfiguration).
+directory, log level, first admin password, time zone on the first start) come from
+`/data/config.yaml` or environment variables – [full list](docs/GUIDE.md#konfiguration).
 
 ## Agents
 

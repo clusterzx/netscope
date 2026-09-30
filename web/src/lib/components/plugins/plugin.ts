@@ -18,7 +18,8 @@ export const capabilityLabel: Record<string, string> = {
 	publish: t('Versand'),
 	changes: t('Änderungs-Hook'),
 	runFinished: t('Folgelauf-Hook'),
-	actions: t('Aktionen')
+	actions: t('Aktionen'),
+	connectionTest: t('Verbindungstest')
 };
 
 export const capabilityHint: Record<string, string> = {
@@ -26,8 +27,42 @@ export const capabilityHint: Record<string, string> = {
 	publish: t('Stellt Benachrichtigungen zu'),
 	changes: t('Reagiert auf Zustandsänderungen anderer Plugins'),
 	runFinished: t('Wird nach Läufen anderer Plugins aktiv'),
-	actions: t('Bietet Aktionen (Schaltflächen) an')
+	actions: t('Bietet Aktionen (Schaltflächen) an'),
+	connectionTest: t('Kann Verbindung und Anmeldung prüfen, ohne etwas zu speichern')
 };
+
+/** Categories of the systems NetScope reads with credentials, in display order. */
+export const CATEGORY_ORDER = ['routers', 'controllers', 'virtualization', 'dns', 'servers'] as const;
+
+export const categoryLabel: Record<string, string> = {
+	routers: t('Router und Firewalls'),
+	controllers: t('Netzwerk-Controller'),
+	virtualization: t('Virtualisierung und Container'),
+	dns: t('DNS und DHCP'),
+	servers: t('Server und Switches')
+};
+
+/** Load of a network scan on the scanned devices. */
+export const loadLabel: Record<string, string> = {
+	high: t('Belastung hoch'),
+	medium: t('Belastung mittel'),
+	low: t('Belastung gering')
+};
+
+export const loadTone: Record<string, 'danger' | 'warn' | 'ok'> = {
+	high: 'danger',
+	medium: 'warn',
+	low: 'ok'
+};
+
+/** Splits plugins into those without category (first) and one group per category. */
+export function byCategory<T extends PluginView>(list: T[]): { id: string; label: string; items: T[] }[] {
+	const out = [{ id: '', label: '', items: list.filter((p) => !p.info.category) }];
+	for (const c of CATEGORY_ORDER) {
+		out.push({ id: c, label: categoryLabel[c], items: list.filter((p) => p.info.category === c) });
+	}
+	return out.filter((g) => g.items.length);
+}
 
 export const targetsLabel: Record<string, string> = {
 	subnets: t('Arbeitet auf Subnetzen'),

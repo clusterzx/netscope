@@ -3,6 +3,7 @@
 Die Bedienung im Detail. Überblick und Schnellstart stehen in der [README](../README.de.md)
 (englisch: [README.md](../README.md)).
 
+- [Erster Start](#erster-start)
 - [Hinter einem Reverse-Proxy (Traefik)](#hinter-einem-reverse-proxy-traefik)
 - [Konfiguration](#konfiguration)
 - [Plugins](#plugins)
@@ -17,6 +18,48 @@ Die Bedienung im Detail. Überblick und Schnellstart stehen in der [README](../R
 - [API](#api)
 - [Backup und Wiederherstellung](#backup-und-wiederherstellung)
 - [Sicherheit](#sicherheit)
+
+## Erster Start
+
+Eine neue Installation richtet man im Browser mit dem **Einrichtungsassistenten** ein. Bis er
+abgeschlossen ist, läuft kein Plugin – NetScope scannt nichts, bevor du entschieden hast, was.
+
+**Einrichtungscode.** Solange es kein Konto gibt, gehört der Assistent dem, der die Seite zuerst
+öffnet – und die Instanz speichert später Zugangsdaten für das ganze Netz. Deshalb verlangt er
+einen Code, den NetScope beim Start ins Log schreibt und in `data/setup-code.txt` ablegt:
+
+```bash
+docker logs netscope 2>&1 | grep -i einrichtung   # oder:
+cat data/setup-code.txt                           # z. B. K7QM-2XRP-9BWD
+```
+
+Groß-/Kleinschreibung und Bindestriche sind egal. Fehlversuche zählen zum Rate-Limit der
+Anmeldung (nach 5 Fehlversuchen wird die Adresse gesperrt, 30 s und länger). Nach dem Abschluss
+wird die Datei gelöscht und der Code gilt nicht mehr. Jeder Schritt hat „Zurück“, die Eingaben
+bleiben erhalten (auch beim Neuladen der Seite).
+
+| Schritt | Inhalt |
+|---|---|
+| 1. Sprache und Zeitzone | Deutsch oder Englisch (Vorschlag: Browsersprache) – Sprache des Kontos, der Benachrichtigungen und Berichte. Zeitzone als durchsuchbare Liste (Vorschlag: Zeitzone des Browsers, sonst `NETSCOPE_TIMEZONE`) |
+| 2. Konto | Benutzername (Vorschlag `admin`), Anzeigename, Passwort (mindestens 10 Zeichen). „Konto anlegen“ legt den Administrator an und meldet dich an; ab hier arbeitet der Assistent mit dieser Sitzung. Optional gleich TOTP einrichten |
+| 3. Instanz | Rolle *allein*, *Zentrale* (mit dem Namen dieser Instanz, z. B. „Zuhause“) oder *Standort* (URL und Token der Zentrale, optional Zertifikat-Fingerprint, „Verbindung testen“). Öffentliche URL (Vorschlag: die aufgerufene Adresse) – für Links in Benachrichtigungen, den Installationsbefehl des Agents und Passkeys |
+| 4. Netze | Erkannte Subnetze bestätigen, abwählen oder umbenennen, weitere hinzufügen (direkt oder über Router erreichbar; WireGuard-Tunnel später unter **System → Subnetze**). Ausschlüsse: einzelne Adressen oder Netze, die kein Scanner abfragt. DNS-Server für Reverse-DNS (leer = DNS-Server des Systems, die erkannten werden angezeigt) |
+| 5. Scanner | Alle Scanner mit Kurzbeschreibung, Belastung (hoch / mittel / gering) und Zeitplan, einzeln an- und abwählbar. Vorlagen: „Nur Anwesenheit“ (ARP, Ping), „Ohne belastende Scans“ (Vorauswahl), „Vollständig“. Auswertende Plugins (CVE-Abgleich, OUI-Hersteller, Änderungen, Topologie, Aufräumen …) bleiben an |
+| 6. Quellen (optional) | Systeme, die NetScope mit Zugangsdaten abfragt, in Tabs: Router und Firewalls, Netzwerk-Controller, Virtualisierung und Container, DNS und DHCP, Server und Switches. Eingeschaltet zeigt eine Karte das Formular des Plugins, legt Zugangsdaten gleich hier an und testet die Verbindung; „Übernehmen und aktivieren“ speichert |
+| 7. Abschluss | Zusammenfassung, Pfad von `master.key` zum Sichern, optional sofort ein erster ARP-Scan und Ping. „Einrichtung abschließen“ übernimmt alles und startet die gewählten Scanner |
+
+Wird der Assistent unterbrochen, nachdem das Konto angelegt ist, meldet man sich einfach an und
+landet wieder im Assistenten (der Code wird dann nicht mehr gebraucht).
+
+**Ohne Assistent:**
+
+- `NETSCOPE_ADMIN_PASSWORD` gesetzt (automatisierte Installationen): Der Benutzer `admin` bekommt
+  dieses Passwort, die direkt angeschlossenen Netze werden übernommen und alle ab Werk aktiven
+  Plugins laufen sofort. Quellen mit Zugangsdaten bleiben aus, bis sie jemand einrichtet.
+- Ohne Weboberfläche (`NETSCOPE_UI=false`, z. B. ein Standort, der nur sammelt): kein
+  Assistent; ohne `NETSCOPE_ADMIN_PASSWORD` bekommt `admin` ein Zufallspasswort, das man bei
+  Bedarf mit `netscope passwd` setzt.
+- Bestehende Installationen (es gibt schon Benutzer) gelten beim Update als eingerichtet.
 
 ## Hinter einem Reverse-Proxy (Traefik)
 
@@ -68,11 +111,11 @@ andere wird in der Oberfläche gepflegt. Jeder Wert ist per Umgebungsvariable ü
 | `data_dir` | `NETSCOPE_DATA_DIR` | `/data` |
 | `log_level` | `NETSCOPE_LOG_LEVEL` | `info` (debug, info, warn, error) |
 | `log_format` | `NETSCOPE_LOG_FORMAT` | `json` (oder `text`) |
-| `timezone` | `NETSCOPE_TIMEZONE` | `Europe/Berlin` |
+| `timezone` | `NETSCOPE_TIMEZONE` | `Europe/Berlin` – nur der Startwert beim ersten Start; danach gilt die Einstellung unter **System → Einstellungen** (wirkt ohne Neustart) |
 | `master_key_file` | `NETSCOPE_MASTER_KEY_FILE` | `<data_dir>/master.key` |
 | – | `NETSCOPE_MASTER_KEY` | Schlüssel direkt (hat Vorrang vor der Datei) |
 | `trusted_proxies` | `NETSCOPE_TRUSTED_PROXIES` | private Netze, localhost |
-| – | `NETSCOPE_ADMIN_PASSWORD` | Passwort des ersten Admins (nur beim allerersten Start) |
+| – | `NETSCOPE_ADMIN_PASSWORD` | Passwort des ersten Admins (nur beim allerersten Start); überspringt den [Einrichtungsassistenten](#erster-start) |
 | – | `NETSCOPE_CONFIG` | Pfad der Konfigurationsdatei |
 | `ui` | `NETSCOPE_UI` | `true`; `false` = nur API (Standort als reiner Sammler) |
 | – | `NETSCOPE_CENTRAL_URL`, `NETSCOPE_CENTRAL_TOKEN` | Standort: Zentrale und Token (legen die Anbindung fest, siehe [Mehrere Standorte](#mehrere-standorte-verbund)) |
@@ -85,6 +128,19 @@ Pro Plugin in der Oberfläche einstellbar: aktiv/inaktiv, Cron-Zeitplan (mit Kla
 alle Einstellungen, Scope (Subnetze, Gruppen, Tags, Geräte, Filter), Timeout, Wiederholungen
 mit Backoff, Parallelität, „Jetzt ausführen“, Laufhistorie mit Protokoll. Änderungen wirken
 sofort, ohne Neustart.
+
+Die Plugin-Liste zeigt bei Scannern die **Belastung** der gescannten Geräte (hoch: `nmap`,
+`nmap_udp`; mittel: `http`, `tls`; gering: die übrigen) und gruppiert die Quellen mit
+Zugangsdaten nach Bereich (Router und Firewalls, Netzwerk-Controller, Virtualisierung und
+Container, DNS und DHCP, Server und Switches). Diese Quellen haben in den Einstellungen
+**„Verbindung testen“**: NetScope prüft mit den Werten des Formulars – ohne sie zu speichern –
+Adresse und Anmeldung und nennt je System, was es lesen konnte. SSH-Inventar und SNMP fragen
+dafür nach der Adresse eines Geräts.
+
+**Vom Scannen ausgenommen** (System → Einstellungen): Adressen oder Netze, die kein Scanner
+abfragt, z. B. empfindliche Geräte, die bei Port-Scans ausfallen. Sie fehlen in den Zielen aller
+Läufe, `arp-scan` und `nmap` lassen sie auch beim Scan ganzer Subnetze aus, und Geräte, die nur
+unter ausgenommenen Adressen erreichbar sind, gelten dadurch nicht als offline.
 
 | Plugin | Art | Standard | Beschreibung |
 |---|---|---|---|
@@ -570,6 +626,10 @@ CLI im Container: `netscope passwd [--user NAME]` (Passwort zurücksetzen),
 - Login mit bcrypt-Passwort und Session-Cookie (HttpOnly, SameSite=Lax, Secure hinter
   HTTPS), Schutz gegen CSRF und Rate-Limit bei Fehlversuchen (je Adresse; für den zweiten
   Faktor zusätzlich je Benutzer, das richtige Passwort setzt es nicht zurück).
+- Eine neue Installation nimmt nur in Besitz, wer den Einrichtungscode vom Host kennt (Log,
+  `data/setup-code.txt`); die Einrichtungs-Endpunkte antworten nur mit Code oder der Sitzung des
+  im Assistenten angelegten Administrators und nur bis zum Abschluss. Bis dahin läuft kein
+  Plugin.
 - Rechte prüft der Server bei jedem Aufruf; ein Test stellt sicher, dass kein ändernder
   Endpunkt ohne Recht bleibt. Deaktivierte Konten verlieren sofort Sitzungen und Tokens.
 - OIDC: Authorization Code Flow mit PKCE, State (an den Browser gebunden) und Nonce; das

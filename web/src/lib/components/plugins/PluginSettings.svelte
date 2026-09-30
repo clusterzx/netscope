@@ -19,6 +19,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatSeconds } from '$lib/utils/format';
+	import ConnectionTest from './ConnectionTest.svelte';
 	import ScopeEditor from './ScopeEditor.svelte';
 	import { canRun, isPublisher, normScope, splitConfigErrors } from './plugin';
 
@@ -319,6 +320,20 @@
 
 		<Card title={t('Plugin-Einstellungen')} icon="edit">
 			<SchemaForm {fields} bind:values errors={settingsErrors} errorPrefix="settings." idPrefix="{idp}-set" />
+			{#if plugin.capabilities?.includes('connectionTest')}
+				<div class="mt-4 border-t border-border pt-4">
+					<ConnectionTest
+						{plugin}
+						settings={() => schemaPayload(fields, values)}
+						onfielderrors={(e) =>
+							(settingsErrors = Object.fromEntries(Object.entries(e).map(([k, v]) => ['settings.' + k, v])))}
+						disabled={!canManage}
+					/>
+					<p class="mt-2 text-xs text-fg-subtle">
+						{t('Prüft Adresse und Anmeldung mit den Werten des Formulars, ohne sie zu speichern.')}
+					</p>
+				</div>
+			{/if}
 		</Card>
 	</fieldset>
 

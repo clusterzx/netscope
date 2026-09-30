@@ -37,6 +37,8 @@ func (p *Plugin) Info() plugin.Info {
 		Targets:            plugin.TargetDevices, // "", TargetSubnets, TargetDevices
 		Presence:           false,               // true = Läufe bestimmen online/offline
 		Binaries:           nil,                 // benötigte Systemprogramme, z. B. {"nmap"}
+		Load:               plugin.LoadLow,      // nur Netz-Scanner: LoadHigh | LoadMedium | LoadLow
+		Category:           "",                  // Quellen mit Zugangsdaten: plugin.CategoryRouters …
 	}
 }
 
@@ -55,6 +57,29 @@ Fähigkeiten werden über Interfaces angeboten (alle in `internal/plugin/plugin.
 | `plugin.RunFinishedHandler` | `HandleRunFinished(ctx, *RunContext, RunSummary) error` | Processor |
 | `plugin.ActionProvider` | `Actions()`, `RunAction(...)` | Buttons (Plugin-Seite oder pro Gerät) |
 | `plugin.SettingsValidator` | `ValidateSettings(Settings) error` | feldübergreifende Prüfung |
+| `plugin.ConnectionTester` | `TestConnection(ctx, *RunContext) ([]ConnectionResult, error)` | Quellen mit Zugangsdaten: Verbindung und Anmeldung prüfen |
+
+**Belastung und Kategorie.** Ein Scanner, der aktiv ins Netz fragt, nennt in `Load` die
+Belastung der gescannten Geräte (`high` = viele Proben je Gerät wie Port- und Dienst-Scans,
+`medium` = einige Verbindungen wie HTTP/TLS, `low` = einzelne Pakete oder Broadcasts). Nur
+Scanner mit `Load` erscheinen im Scanner-Schritt des Einrichtungsassistenten und werden dort
+ein- oder ausgeschaltet; auswertende Plugins (ohne `Load`) behalten ihren Standard. Ein Plugin,
+das Systeme mit Zugangsdaten abfragt, setzt `Category` (`routers`, `controllers`,
+`virtualization`, `dns`, `servers`) – danach gruppieren der Quellen-Schritt des Assistenten
+(Tabs) und die Plugin-Liste. Ein Plugin mit Kategorie muss `ConnectionTester` umsetzen
+(`TestCategoriesAndLoads` in `internal/plugins/all` prüft das).
+
+**Verbindungstest.** `TestConnection` verbindet sich mit jedem konfigurierten System, meldet
+sich an und liest, was ein Lauf bräuchte – speichert aber nichts: `rc.Sink` verwirft
+Beobachtungen, `rc.RunID` ist 0, SSH-Hostschlüssel werden geprüft, aber nicht gelernt
+(`sshx.Options.DryRun`), das Datenverzeichnis bleibt unberührt. Ergebnis je System ein
+`ConnectionResult{Target, OK, Message}` (deutsche Meldung mit Katalogeintrag, z. B.
+„Verbunden – 12 Clients gelesen“); ein `error` nur, wenn gar nichts getestet werden konnte.
+Importer auf Basis von `netsrc` rufen `netsrc.Test` mit denselben Optionen und derselben
+`Fetch`-Funktion wie `netsrc.Run` auf. Plugins, die auf Geräten arbeiten (SSH, SNMP), testen
+gegen `rc.Params["target"]` (`plugin.TestTarget`). Der Host ruft den Test außerhalb der
+Lauf-Warteschlange auf (`POST /api/v1/plugins/{id}/connection-test`, mit ungespeicherten
+Einstellungen) – auch vor dem Abschluss der Einrichtung und bei deaktiviertem Plugin.
 
 ## Settings-Schema
 
@@ -257,6 +282,10 @@ obs := sink.All()
 Parser werden mit **echten Fixtures** unter `testdata/` getestet
 (`plugintest.Fixture(t, "nmap-192.168.8.1.xml")`).
 
+Den Verbindungstest prüft `plugintest.ConnectionTest(t, p, settings, creds, target)` gegen
+einen Testserver: gültige Anmeldung, falsche Zugangsdaten und falsche Adresse
+(`plugintest.ClosedURL(t, "https")`); der Helfer schlägt fehl, sobald der Test etwas speichert.
+
 ## Checkliste
 
 - [ ] ID, deutsches Label/Beschreibung, sinnvolle Defaults (Zeitplan, Timeout, Parallelität)
@@ -265,4 +294,5 @@ Parser werden mit **echten Fixtures** unter `testdata/` getestet
 - [ ] Ergebnisse pro Host sofort über den Sink, `Scanned`-Bereiche gesetzt
 - [ ] `ctx` wird respektiert, Fehler pro Host geloggt statt abgebrochen
 - [ ] Parser-Tests mit echten Fixtures
+- [ ] Netz-Scanner: `Load`; Quellen mit Zugangsdaten: `Category` und `ConnectionTester` mit Test
 - [ ] Import in `internal/plugins/all/all.go`

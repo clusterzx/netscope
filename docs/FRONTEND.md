@@ -21,14 +21,23 @@ next edit/HMR of any file or a server restart; the production build always scans
 
 1. Routing / ownership
 ----------------------
-src/routes/+layout.ts       auth guard: resolves the session once (auth.check), else redirect
+src/routes/+layout.ts       setup guard: while GET /api/v1/setup says pending, every page goes to
+                            /welcome (with an existing wizard account /login stays reachable);
+                            auth guard: resolves the session once (auth.check), else redirect
                             /login?next=<path>. ssr=false.
-src/routes/+layout.svelte   imports app.css, theme.init(), renders <AppShell> (not on /login),
-                            <ConfirmHost/>, <Toaster/>.
+src/routes/+layout.svelte   imports app.css, theme.init(), renders <AppShell> (not on /login,
+                            /setup, /welcome), <ConfirmHost/>, <Toaster/>.
+src/routes/welcome          setup wizard of a new installation (FR-013): setup code gate, then
+                            the steps in src/lib/components/welcome/ (Step*.svelte, SourceCard).
+                            State in wizard.svelte.ts (sessionStorage, survives the reload of the
+                            language step; no password). The code goes with every request as
+                            X-NetScope-Setup-Code (setSetupCode from $lib/api); step 2 creates the
+                            administrator, afterwards the normal session endpoints are used.
 src/routes/+error.svelte    404/errors.
 Pages: / (dashboard), /devices, /devices/[id], /topology, /events, /diff, /health,
 /vulnerabilities(/[cve]), /plugins(/[id](/runs/[run])), /rules(/new, /[id]), /credentials,
-/reports, /system (?tab=…), /login. Page-specific components live in
+/reports, /system (?tab=…), /login, /setup (first-login password/2FA), /welcome (setup
+wizard). Page-specific components live in
 src/lib/components/<area>/. The sidebar is src/lib/nav.ts. Every page renders
 <PageHeader title=…> (sets <title>).
 
@@ -93,6 +102,8 @@ resource.svelte.ts  Resource<T> (shared cache) and AsyncData<T> (per page reques
 toast.svelte.ts     toast.success(msg) / .info / .warning / .error(errOrMsg, { title, timeout, action })
 confirm.svelte.ts   if (await confirm({ title, message, confirmLabel: 'Löschen', danger: true })) …
 theme.svelte.ts     theme.mode system|light|dark, theme.set(), theme.resolved (dark class on <html>)
+setup.svelte.ts     setupState.check(fetch) → { pending, account } (GET /api/v1/setup, cached),
+                    setupState.finished() after the wizard
 
 
 4. UI kit  (import { … } from '$lib/components/ui')

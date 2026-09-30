@@ -19,7 +19,7 @@ services:
     environment:
       TZ: Europe/Berlin
       NETSCOPE_LISTEN: ":8080"
-      # NETSCOPE_ADMIN_PASSWORD: "only used on the very first start"
+      # NETSCOPE_ADMIN_PASSWORD: "first start only; skips the setup wizard"
       # NETSCOPE_MASTER_KEY: "base64 key; otherwise /data/master.key is generated"
     restart: unless-stopped
     # Stopping cancels running plugin runs (up to 30 s) and checkpoints the database;

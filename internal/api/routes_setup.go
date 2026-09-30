@@ -98,6 +98,16 @@ func (f setupFederation) input() federation.SettingsInput {
 	return federation.SettingsInput{Settings: f.Settings, Token: f.Token}
 }
 
+// setupSubnet is a subnet chosen in the network step.
+type setupSubnet struct {
+	CIDR      string `json:"cidr"`
+	Name      string `json:"name"`
+	Interface string `json:"interface,omitempty"`
+	Gateway   string `json:"gateway,omitempty"`
+	// Access: direct (attached) or routed (reached through a router).
+	Access string `json:"access"`
+}
+
 // setupCompleteRequest are the choices of the wizard (steps 1, 3, 4, 5 and 7; the
 // sources of step 6 are stored through the plugin endpoints as they are set up).
 type setupCompleteRequest struct {
@@ -106,7 +116,7 @@ type setupCompleteRequest struct {
 	PublicURL  string          `json:"publicUrl"`
 	Federation setupFederation `json:"federation"`
 	// Subnets to scan (confirmed detected ones and added ones).
-	Subnets []inventory.Subnet `json:"subnets"`
+	Subnets []setupSubnet `json:"subnets"`
 	// ScanExclusions are addresses or ranges no scanner probes.
 	ScanExclusions []string `json:"scanExclusions"`
 	// DNSServer for reverse DNS ("" = the DNS servers of the system).
@@ -384,9 +394,11 @@ func (s *Server) handleSetupComplete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	seen := map[string]bool{}
-	for i := range req.Subnets {
-		sn := &req.Subnets[i]
-		sn.ID, sn.Enabled = 0, true
+	subnets := make([]inventory.Subnet, len(req.Subnets))
+	for i, in := range req.Subnets {
+		sn := &subnets[i]
+		*sn = inventory.Subnet{CIDR: in.CIDR, Name: strings.TrimSpace(in.Name), Interface: in.Interface, Gateway: in.Gateway,
+			Access: in.Access, Enabled: true}
 		if sn.Access == inventory.AccessWireGuard {
 			s.fail(w, r, plugin.FieldErr(fmt.Sprintf("subnets.%d.access", i), "WireGuard-Tunnel nach der Einrichtung unter System → Subnetze anlegen"))
 			return
@@ -440,7 +452,7 @@ func (s *Server) handleSetupComplete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.syncSubnets(ctx, req.Subnets); err != nil {
+	if err := s.syncSubnets(ctx, subnets); err != nil {
 		s.fail(w, r, err)
 		return
 	}

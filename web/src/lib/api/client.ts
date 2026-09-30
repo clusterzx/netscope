@@ -119,6 +119,14 @@ function fillPath(path: string, params?: Record<string, string | number>): strin
 
 let redirecting = false;
 
+// setup code of the setup wizard (sent with every request while set, see /welcome)
+let setupCode: string | null = null;
+
+/** Sends the setup code with every request (null: stop sending it). */
+export function setSetupCode(code: string | null) {
+	setupCode = code;
+}
+
 function redirectToLogin() {
 	if (redirecting || typeof window === 'undefined') return;
 	const here = window.location.pathname + window.location.search;
@@ -170,6 +178,7 @@ export async function request<T>(
 	const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': locale };
 	let body: BodyInit | undefined;
 	if (m !== 'GET' && m !== 'HEAD') headers['X-NetScope-CSRF'] = '1';
+	if (setupCode) headers['X-NetScope-Setup-Code'] = setupCode;
 	if (opts.body instanceof FormData) body = opts.body;
 	else if (opts.body !== undefined) {
 		headers['Content-Type'] = 'application/json';
