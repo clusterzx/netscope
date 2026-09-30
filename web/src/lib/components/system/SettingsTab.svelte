@@ -21,6 +21,8 @@
 	import { deviceTypeName } from '$lib/utils/labels';
 	import OrderedList from './OrderedList.svelte';
 	import { apiErrors, LOG_LEVELS, logLevelLabel } from './system';
+	import TimezoneField from './TimezoneField.svelte';
+	import { knownTimezone } from './timezones';
 
 	const KNOWN_SOURCES = [
 		'manual',
@@ -113,6 +115,7 @@
 		if (!int(f.observationRawMaxKb, 0, 16384)) e.observationRawMaxKb = '0–16384 KB';
 		if (!f.deviceTypes?.length) e.deviceTypes = t('Mindestens ein Gerätetyp');
 		if (!LOCALES.some((l) => l.value === f.language)) e.language = t('Sprache wählen');
+		if (!knownTimezone(f.timezone)) e.timezone = t('Unbekannte Zeitzone');
 		return e;
 	}
 
@@ -132,6 +135,8 @@
 			({ errors, general } = apiErrors(e, [
 				'publicUrl',
 				'language',
+				'timezone',
+				'scanExclusions',
 				'offlineAfterMissed',
 				'maxParallelRuns',
 				'observationRawMaxKb',
@@ -221,6 +226,21 @@
 							)}
 							error={errors.language}
 							required
+						/>
+						<TimezoneField
+							bind:value={form.timezone}
+							hint={t('Für Zeitpläne, Berichte und Datumsangaben – wirkt sofort, ohne Neustart')}
+							error={errors.timezone}
+						/>
+						<TagInput
+							label={t('Vom Scannen ausgenommen')}
+							bind:value={form.scanExclusions}
+							placeholder="192.168.1.20"
+							hint={t(
+								'IP-Adressen oder Netze (CIDR), die kein Scanner abfragt – z. B. empfindliche Geräte, die bei Scans ausfallen.'
+							)}
+							error={errors.scanExclusions}
+							class="md:col-span-2"
 						/>
 						<Input
 							label={t('Offline nach verpassten Läufen')}

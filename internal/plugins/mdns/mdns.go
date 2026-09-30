@@ -43,6 +43,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "mDNS / Bonjour",
 		Description:        "Findet Geräte und Dienste per Multicast-DNS (Bonjour/Avahi): Hostnamen, Dienste, Modell-Hinweise und Gerätetyp.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "*/30 * * * *",
 		DefaultTimeout:     5 * time.Minute,
@@ -305,14 +306,7 @@ func discover(ctx context.Context, rc *plugin.RunContext, s session, listen time
 	}
 	queried := map[netip.Addr]bool{}
 	reverse := func(addrs []netip.Addr) {
-		var names []string
-		for _, a := range addrs {
-			if !queried[a] && len(queried) < maxReverseQueries {
-				queried[a] = true
-				names = append(names, reverseName(a))
-			}
-		}
-		send(queries(names))
+		send(queries(reverseNames(addrs, queried, rc.Targets)))
 	}
 	send(queries([]string{servicesDomain}))
 	reverse(s.reverse)
@@ -482,4 +476,17 @@ func (h *host) raw() string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+// reverseNames returns the reverse lookup names for addresses not asked for yet (at most
+// maxReverseQueries per session); addresses excluded from scanning are never asked for.
+func reverseNames(addrs []netip.Addr, queried map[netip.Addr]bool, t plugin.Targets) []string {
+	var names []string
+	for _, a := range addrs {
+		if !queried[a] && len(queried) < maxReverseQueries && !t.Excluded(a) {
+			queried[a] = true
+			names = append(names, reverseName(a))
+		}
+	}
+	return names
 }

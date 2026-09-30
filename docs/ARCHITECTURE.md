@@ -36,6 +36,7 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `cmd/netscope-agent` | NetScope-Agent für überwachte Linux- und Windows-Systeme (`enroll`, `run`, Windows-Dienst): Inventar, Messwerte, Long Poll, Selbst-Update |
 | `internal/app` | Verdrahtung, Start/Shutdown, In-Process-Neustart nach Restore |
 | `internal/config` | Bootstrap-Konfiguration (`/data/config.yaml`, `NETSCOPE_*`) |
+| `internal/setup` | Einrichtungsstatus (`setup` in `settings`) und Einrichtungscode (`data/setup-code.txt`) |
 | `internal/db` | SQLite (modernc), Schreib-/Lese-Pools, eingebettete Migrationen, angehängter NVD-Spiegel, Backup (gzip) |
 | `internal/vault` | AES-256-GCM, Master-Key aus Env/Datei, Key-Rotation, Credentials |
 | `internal/auth` | Benutzer, Rollen und Rechte, Login (bcrypt, Session-Cookie) mit zweitem Faktor (TOTP, Passkeys, Wiederherstellungscodes), API-Tokens (read/write), Rate-Limit |
@@ -70,7 +71,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 
 | Bereich | Tabellen |
 |---|---|
-| System | `settings`, `users` (Rolle, deaktiviert, Passwort-Änderung offen, TOTP verschlüsselt, Herkunft `auth_source`/`external_id` für LDAP und OIDC, Sprache `locale`), `roles` (Rechte als JSON-Liste, 2FA-Pflicht), `user_passkeys`, `user_recovery_codes` (Hash), `sessions`, `api_tokens`, `audit_log` |
+| System | `settings` (u. a. `system` mit Zeitzone und Ausschlüssen, `setup`, `federation`), `users` (Rolle, deaktiviert, Passwort-Änderung offen, TOTP verschlüsselt, Herkunft `auth_source`/`external_id` für LDAP und OIDC, Sprache `locale`), `roles` (Rechte als JSON-Liste, 2FA-Pflicht), `user_passkeys`, `user_recovery_codes` (Hash), `sessions`, `api_tokens`, `audit_log` |
 | Verbund | `sites` (Zentrale: Standorte mit Token-Hash, Stream, letzter Meldung und Status), `site_devices` (Geräte-ID am Standort → Gerät hier), `federation_outbox` (Standort: Puffer) |
 | Agents | `agent_enrollments` (Installations-Tokens als Hash, Tags, Nutzungen, Ablauf), `agents` (Host, Version, Secret-Hash, Gerät, letzter Kontakt, Inventar/Messwerte, volle Dateisysteme) |
 | Vault | `vault_meta` (Key-Prüfwert), `credentials` (öffentliche Felder + AES-GCM-Blob + Geltungsbereich `scope`) |
@@ -114,6 +115,60 @@ Systemeinstellungen änderbar).
 **Präsenz:** Nur Plugins mit `Presence` (arpscan, icmp, nmap) zählen verpasste Läufe je Gerät.
 Ein Gerät geht offline, wenn ein solches Plugin es `offlineAfterMissed`-mal in Folge nicht
 sieht und kein anderes Plugin es seitdem gesehen hat. IP-Wechsel werden am Laufende erkannt.
+
+## Einrichtung (erster Start)
+
+Der Einrichtungsstatus liegt in `settings` unter `setup` (`completed`, `mode`: `wizard`,
+`automatic`, `migration`, `completedAt`); die Migration 0013 setzt ihn für Datenbanken, die schon
+Benutzer haben. Beim Start (`app.prepareSetup`):
+
+| Fall | Ablauf |
+|---|---|
+| eingerichtet | normal; `SeedSubnets` übernimmt angeschlossene Netze nur, solange es kein Subnetz gibt |
+| `NETSCOPE_ADMIN_PASSWORD` gesetzt | `EnsureAdmin` wie bisher, Status `automatic`, alle ab Werk aktiven Plugins laufen sofort |
+| `NETSCOPE_UI=false` | `admin` mit Zufallspasswort (nicht ausgegeben, `netscope passwd`), Status `automatic` |
+| sonst | Einrichtungscode (12 Zeichen ohne Verwechsler, `XXXX-XXXX-XXXX`) aus `data/setup-code.txt` oder neu erzeugt (0600), Warnung mit Code im Log; kein `SeedSubnets`; `Host.Hold()` |
+
+`Host.Hold()` hält alle Plugins an: der Scheduler plant nichts ein, der Dispatcher startet
+keine eingereihten Läufe, `Trigger` (manuell, Zeitplan, Aktionen) antwortet
+`ErrSetupPending` (API: 409 `setup_pending`). Hooks von Processors bleiben aktiv (ohne Läufe
+entstehen keine Changes). `Release()` weckt Scheduler und Dispatcher.
+
+Endpunkte (`internal/api/routes_setup.go`, `Scope: public` mit eigener Prüfung
+`setupAccess`): nach dem Abschluss antworten alle mit 409 `setup_completed`. Zugang mit dem
+Header `X-NetScope-Setup-Code` (Vergleich in konstanter Zeit, Groß-/Kleinschreibung und
+Trennzeichen egal; jeder Versuch geht durch das Rate-Limit des Logins je Client-Adresse,
+`auth.Service.Limit`) oder – nach Schritt 2 – mit der Sitzung eines Administrators (Cookie
+mit CSRF-Header).
+
+| Endpunkt | Zugang | Zweck |
+|---|---|---|
+| `GET /setup` | ohne | `{pending, account}` – die Oberfläche leitet dann jede Seite nach `/welcome` (mit Konto auch `/login`) |
+| `POST /setup/verify` | Code im Body | Code prüfen |
+| `GET /setup/options` | Code oder Sitzung | Vorschläge: erkannte Subnetze (`inventory.DetectSubnets`), DNS-Server (`/etc/resolv.conf`), Bootstrap-Zeitzone, Pfad von `master.key`, Verbund (auch `managed`), Scanner mit `Load`, Kategorien mit ihren Plugins |
+| `POST /setup/account` | nur Code | erster Administrator (`auth.CreateFirstAdmin`, scheitert, sobald es einen Benutzer gibt), setzt die Sitzung |
+| `POST /setup/federation/test` | Code oder Sitzung | Heartbeat an die Zentrale mit den eingegebenen Daten (`federation.TestSettings`), nichts wird gespeichert |
+| `POST /setup/complete` | Code oder Sitzung | prüft zuerst alles (Einstellungen, Verbund `Check`, Subnetze, DNS-Server über das Schema von `dns`, Scanner-IDs), übernimmt dann Sprache, Zeitzone, öffentliche URL, Ausschlüsse, Rolle (`federation.Update` baut die Anbindung eines Standorts auf), Subnetze (genau die gewählten), Resolver, aktiv/inaktiv je Scanner mit `Load`; setzt den Status, löscht die Code-Datei, `Release()`, optional ein Lauf von `arpscan` und `icmp` |
+
+Quellen (Schritt 6) richtet der Assistent über die normalen Endpunkte ein (`/credentials`,
+`/plugins/{id}/config`, `/plugins/{id}/connection-test`) – mit der Sitzung des neuen
+Administrators; aktivierte Quellen laufen erst nach dem Abschluss.
+
+**Zeitzone.** `settings.System.Timezone` (IANA-Name) ersetzt den Bootstrap-Wert; dieser
+(`timezone`, `NETSCOPE_TIMEZONE`) wird nur übernommen, solange keine Zeitzone gespeichert ist
+(`Store.InitTimezone`, auch einmalig bei älteren Installationen). Scheduler (`NextRun`, der
+Schlüssel des nächsten Laufs enthält die Zeitzone; `OnChange` weckt den Scheduler),
+Regel-Engine (Ruhezeiten), `plugin.Env.Location` (geplante Berichte, Publisher) und die API
+(Berichte, Dateinamen, `cron/describe`, Datumsparameter) lesen `Store.Location()` – eine
+Änderung wirkt ohne Neustart. `time.Local` bleibt der Startwert.
+
+**Ausschlüsse.** `settings.System.ScanExclusions` (Adressen oder CIDR). Der Host entfernt sie
+aus den Geräten eines Laufs (auch aus deren Ports; Geräte ohne andere Adresse fallen weg) und
+gibt sie als `Targets.Exclude` weiter; `arpscan` übergibt betroffene Subnetze (bis /16) als
+Liste der übrigen Adressen (`--file`), `nmap` ergänzt `--exclude`, `upnp` lädt keine
+Gerätebeschreibungen ausgenommener Adressen und `mdns` stellt keine Reverse-Anfragen zu ihnen. Die
+Präsenzauswertung eines Subnetz-Laufs zählt Geräte, deren aktuelle Adressen im Subnetz alle
+ausgenommen sind, nicht als verpasst.
 
 ## WireGuard-Tunnel
 
@@ -259,7 +314,17 @@ der Tab „Traffic“ die Portliste.
 Siehe `internal/plugin/plugin.go` und die Anleitung [PLUGINS.md](PLUGINS.md).
 Vier Typen (`scanner`, `importer`, `processor`, `publisher`); Fähigkeiten über
 Interfaces: `Runner`, `Publisher`, `ChangeHandler`, `RunFinishedHandler`, `ActionProvider`,
-`SettingsValidator`.
+`SettingsValidator`, `ConnectionTester`.
+
+`plugin.Info` nennt bei Netz-Scannern die Belastung (`Load`: `high`, `medium`, `low`) und bei
+Quellen mit Zugangsdaten die Kategorie (`Category`: `routers`, `controllers`,
+`virtualization`, `dns`, `servers`, Bezeichnungen in `plugin.Categories`); der
+Einrichtungsassistent und die Plugin-Liste gruppieren danach. `ConnectionTester` prüft
+Verbindung und Anmeldung, ohne etwas zu speichern: `Host.TestConnection` validiert die
+(ungespeicherten) Einstellungen wie `UpdateConfig`, baut einen `RunContext` mit verwerfendem
+Sink und Event-Emitter und ruft den Test außerhalb der Warteschlange mit 60 s Zeitlimit auf
+(`capabilities` enthält dann `connectionTest`). SSH-Verbindungen des Tests prüfen bekannte
+Hostschlüssel, lernen aber keine neuen (`sshx.Options.DryRun`).
 
 ## Settings-Schema
 
@@ -434,7 +499,8 @@ Prometheus-Metriken unter `/metrics`.
 | Verbund | `GET/PUT /federation` (Rolle, Anbindung, Zustellstatus), `POST /federation/test`, `POST /federation/resync`, `/sites` (CRUD, Zentrale), `POST /sites/{id}/token`, `POST /federation/ingest` (nur Standort-Token); `site` als Parameter von `/devices`, `/events`, `/topology`, `/vulnerabilities`, `/dashboard`, `/reports/inventory` |
 | Agents | `GET /agents` (mit Builds und Basis-URL; Filter `device`), `GET/DELETE /agents/{id}`, `POST /agents/{id}/refresh`, `GET/POST /agent-enrollments`, `DELETE /agent-enrollments/{id}`; Agent-Protokoll unter `/agent/…` (siehe NetScope-Agent); Downloads `/agent/install.sh`, `/agent/bin/{platform}` |
 | Tunnel | `GET /tunnels` (Verfügbarkeit und Zustand), `POST /tunnels/inspect` (Konfiguration prüfen, nur öffentliche Angaben), `POST /tunnels/test` (Handshake-Test) |
-| Plugins | `GET /plugins`, `GET /plugins/{id}`, `PUT /plugins/{id}/config`, `POST /plugins/{id}/run`, `POST /plugins/{id}/actions/{action}` (`?wait=0` antwortet sofort mit der Lauf-ID), `POST /plugins/{id}/test`, `GET /runs` (Filter `plugin`, `status`, `kind`, `before`, `scope=full`), `GET /runs/active`, `GET /runs/{id}`, `GET /runs/{id}/logs?after=`, `POST /runs/{id}/cancel` |
+| Einrichtung | `GET /setup`, `POST /setup/verify`, `GET /setup/options`, `POST /setup/account`, `POST /setup/federation/test`, `POST /setup/complete` (siehe „Einrichtung“) |
+| Plugins | `GET /plugins`, `GET /plugins/{id}`, `PUT /plugins/{id}/config`, `POST /plugins/{id}/connection-test`, `POST /plugins/{id}/run`, `POST /plugins/{id}/actions/{action}` (`?wait=0` antwortet sofort mit der Lauf-ID), `POST /plugins/{id}/test`, `GET /runs` (Filter `plugin`, `status`, `kind`, `before`, `scope=full`), `GET /runs/active`, `GET /runs/{id}`, `GET /runs/{id}/logs?after=`, `POST /runs/{id}/cancel` |
 | Events | `GET /events`, `GET /events/{id}`, `POST /events/ack`, `GET /events/types`, `GET /events/counts`, `GET /diff` |
 | Regeln | `/rules` (CRUD), `PUT /rules/order`, `POST /rules/test`, `POST /rules/{id}/test`, `GET /notifications` (Filter `status`, `publisher`, `event`, `rule`), `GET /publishers` |
 | Credentials | `/credentials` (CRUD mit `scope`, nie Secrets), `GET /credentials/types` |

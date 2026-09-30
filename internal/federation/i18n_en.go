@@ -58,5 +58,6 @@ func init() {
 		"Zentrale antwortet mit HTTP %d: kein NetScope unter dieser Adresse oder Version ohne Verbund": "central instance responds with HTTP %d: no NetScope at this address, or a version without federation",
 		"kein Zertifikat": "no certificate",
 		"Zertifikat der Zentrale passt nicht zum hinterlegten Fingerprint (erhalten %s)": "certificate of the central instance does not match the stored fingerprint (received %s)",
+		"Nur ein Standort verbindet sich mit einer Zentrale":                             "Only a site connects to a central instance",
 	})
 }

@@ -103,7 +103,7 @@ func (s *Server) handleInventoryReport(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	stamp := time.Now().In(s.Config.Location).Format("20060102-1504")
+	stamp := time.Now().In(s.Settings.Location()).Format("20060102-1504")
 	var buf bytes.Buffer
 	switch format {
 	case "csv":
@@ -128,7 +128,7 @@ func (s *Server) handleInventoryReport(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 	case "pdf":
-		if err := reports.InventoryPDF(&buf, devs, requestLocale(r), s.Config.Location); err != nil {
+		if err := reports.InventoryPDF(&buf, devs, requestLocale(r), s.Settings.Location()); err != nil {
 			s.fail(w, r, err)
 			return
 		}
@@ -184,7 +184,7 @@ func (s *Server) handleChangeReport(w http.ResponseWriter, r *http.Request) {
 	}
 	base := s.Settings.System().PublicURL
 	lang := requestLocale(r)
-	b, ctype, err := rep.ToBytes(format, lang, s.Config.Location, base)
+	b, ctype, err := rep.ToBytes(format, lang, s.Settings.Location(), base)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -199,7 +199,7 @@ func (s *Server) handleChangeReport(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", ctype)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s-%s.%s"`, name,
-		from.In(s.Config.Location).Format("20060102"), to.In(s.Config.Location).Format("20060102"), ext))
+		from.In(s.Settings.Location()).Format("20060102"), to.In(s.Settings.Location()).Format("20060102"), ext))
 	_, _ = w.Write(b)
 }
 
@@ -244,10 +244,10 @@ func (s *Server) handleSendReport(w http.ResponseWriter, r *http.Request) {
 	// sent through publishers: in the language of the notifications (system setting), not
 	// in the language of the user who triggered it
 	lang := s.Settings.System().Lang()
-	title := i18n.Sprintf(lang, "NetScope Änderungsbericht %s–%s", from.In(s.Config.Location).Format(reports.DateLayout(lang, "02.01.")),
-		to.In(s.Config.Location).Format(reports.DateLayout(lang, "02.01.2006")))
-	body := rep.Markdown(lang, s.Config.Location, base)
-	extra, err := rep.NotificationExtra(lang, s.Config.Location, s.Settings.System().PublicURL)
+	title := i18n.Sprintf(lang, "NetScope Änderungsbericht %s–%s", from.In(s.Settings.Location()).Format(reports.DateLayout(lang, "02.01.")),
+		to.In(s.Settings.Location()).Format(reports.DateLayout(lang, "02.01.2006")))
+	body := rep.Markdown(lang, s.Settings.Location(), base)
+	extra, err := rep.NotificationExtra(lang, s.Settings.Location(), s.Settings.System().PublicURL)
 	if err != nil {
 		s.fail(w, r, err)
 		return

@@ -46,6 +46,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "UPnP / SSDP",
 		Description:        "Findet UPnP-Geräte per SSDP und liest ihre Gerätebeschreibung: Name, Hersteller, Modell und Gerätetyp.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "*/30 * * * *",
 		DefaultTimeout:     5 * time.Minute,
@@ -367,6 +368,10 @@ func describeHost(ctx context.Context, rc *plugin.RunContext, client *http.Clien
 		raws  []string
 	)
 	locs := r.locations()
+	if rc.Targets.Excluded(r.ip) {
+		// excluded from scanning: keep what it announced, but do not contact it
+		locs = nil
+	}
 	if len(locs) > maxLocationsPerHost {
 		locs = locs[:maxLocationsPerHost]
 	}

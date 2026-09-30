@@ -32,6 +32,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "NetBIOS",
 		Description:        "Fragt die NetBIOS-Namenstabelle (NBSTAT) ab: Rechnername, Arbeitsgruppe/Domäne und MAC-Adresse von Windows- und Samba-Geräten.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "20 * * * *",
 		DefaultTimeout:     10 * time.Minute,

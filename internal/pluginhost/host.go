@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"netscope/internal/bus"
@@ -87,7 +88,6 @@ type Deps struct {
 	Events    *events.Store
 	Settings  *settings.Store
 	DataDir   string
-	Location  *time.Location
 	Version   string
 }
 
@@ -106,6 +106,8 @@ type Host struct {
 	dispatch chan struct{}
 	// unreachable returns subnets that cannot be reached right now (tunnel down)
 	unreachable func() []netip.Prefix
+	// held: the setup is not finished, no plugin runs (see Hold)
+	held atomic.Bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -120,8 +122,31 @@ func New(d Deps) *Host {
 	for _, p := range plugin.All() {
 		h.plugins[p.Info().ID] = p
 	}
+	if d.Settings != nil {
+		// a new time zone moves the next scheduled runs
+		d.Settings.OnChange(func(settings.System) { h.wake() })
+	}
 	return h
 }
+
+// ErrSetupPending is returned for runs requested before the setup is finished.
+var ErrSetupPending = errors.New("Die Einrichtung ist noch nicht abgeschlossen – bis dahin läuft kein Plugin")
+
+// Hold keeps every plugin from running – no scheduled runs, no queued runs are started
+// and Trigger fails with ErrSetupPending – until Release. NetScope holds the plugins
+// while the setup wizard is not finished, so nothing scans before the user chose what.
+func (h *Host) Hold() { h.held.Store(true) }
+
+// Release lets plugins run again (the setup is finished).
+func (h *Host) Release() {
+	if h.held.Swap(false) {
+		h.wake()
+		h.kick()
+	}
+}
+
+// Held reports whether plugins are held back (see Hold).
+func (h *Host) Held() bool { return h.held.Load() }
 
 // Init creates missing config rows, loads all configurations and resets runs that were
 // interrupted by a restart.
@@ -279,9 +304,12 @@ func (h *Host) IDs() []string {
 // Env returns the plugin environment.
 func (h *Host) Env() plugin.Env {
 	sys := h.Settings.System()
-	return plugin.Env{PublicURL: sys.PublicURL, Location: h.Location, Version: h.Version, DataRoot: h.DataDir,
+	return plugin.Env{PublicURL: sys.PublicURL, Location: sys.Location(), Version: h.Version, DataRoot: h.DataDir,
 		Language: sys.Lang()}
 }
+
+// location is the configured time zone (a system setting, changes apply at once).
+func (h *Host) location() *time.Location { return h.Settings.Location() }
 
 func (h *Host) dataDir(id string) string {
 	dir := filepath.Join(h.DataDir, "plugins", id)

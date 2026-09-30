@@ -152,3 +152,26 @@ func TestOPNsenseCredentialsAndErrors(t *testing.T) {
 		t.Error("invalid source accepted")
 	}
 }
+
+// The connection test signs in and reads like a run, but stores nothing; it reports a
+// wrong key and a wrong address per firewall.
+func TestOPNsenseConnectionTest(t *testing.T) {
+	srv, _ := firewall(t, map[string]string{
+		"/api/dnsmasq/leases/search":         `{"rows":[{"hwaddr":"aa:bb:cc:00:00:01","address":"192.168.1.10","hostname":"nas"}]}`,
+		"/api/diagnostics/interface/get_arp": `[]`,
+	})
+	p := &Plugin{now: func() time.Time { return now }}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, key(1, "k", "s"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || !strings.Contains(res[0].Message, "1 Clients") {
+		t.Fatalf("valid key: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, key(1, "wrong", "x"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong key: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "https")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL, closed}}, key(1, "k", "s"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || res[1].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+}

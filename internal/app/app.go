@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	"netscope/internal/pluginhost"
 	"netscope/internal/rules"
 	"netscope/internal/settings"
+	"netscope/internal/setup"
 	"netscope/internal/tunnel"
 	"netscope/internal/vault"
 	"netscope/internal/webui"
@@ -37,7 +37,8 @@ import (
 	_ "netscope/internal/plugins/all" // register all plugins
 )
 
-// InitialPasswordFile holds the generated admin password until it is changed.
+// InitialPasswordFile held the generated admin password of installations from before the
+// setup wizard; it is removed when the password changes.
 const InitialPasswordFile = "admin-initial-password.txt"
 
 type services struct {
@@ -109,17 +110,14 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	if err != nil {
 		return fail(err)
 	}
-	authSvc := auth.New(d, v)
-	created, generated, err := authSvc.EnsureAdmin(ctx, cfg.AdminPassword)
-	if err != nil {
+	// the bootstrap time zone is the start value of the setting
+	if err := st.InitTimezone(ctx, cfg.Timezone); err != nil {
 		return fail(err)
 	}
-	if created && generated != "" {
-		p := filepath.Join(cfg.DataDir, InitialPasswordFile)
-		if err := os.WriteFile(p, []byte(generated+"\n"), 0o600); err != nil {
-			return fail(err)
-		}
-		log.Warn("Admin-Benutzer angelegt – das Startpasswort steht in der Datei (nach dem ersten Login ändern)", "user", "admin", "file", p)
+	authSvc := auth.New(d, v)
+	setupSvc, err := prepareSetup(ctx, cfg, d, authSvc, log)
+	if err != nil {
+		return fail(err)
 	}
 	b := bus.New()
 	ring.AttachBus(b)
@@ -127,10 +125,13 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	if err != nil {
 		return fail(err)
 	}
-	if added, err := inv.SeedSubnets(ctx); err != nil {
-		log.Warn("Subnetze erkennen", "err", err)
-	} else if len(added) > 0 {
-		log.Info("Lokale Subnetze übernommen", "subnets", strings.Join(added, ", "))
+	// the setup wizard lets the user confirm the detected networks instead
+	if !setupSvc.Pending() {
+		if added, err := inv.SeedSubnets(ctx); err != nil {
+			log.Warn("Subnetze erkennen", "err", err)
+		} else if len(added) > 0 {
+			log.Info("Lokale Subnetze übernommen", "subnets", strings.Join(added, ", "))
+		}
 	}
 	if filled, err := inv.FillGateways(ctx); err != nil {
 		log.Warn("Gateways ermitteln", "err", err)
@@ -139,13 +140,16 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	}
 	ev := events.New(d, b, inv)
 	host := pluginhost.New(pluginhost.Deps{DB: d, Bus: b, Log: log, Inventory: inv, Vault: v, Events: ev, Settings: st,
-		DataDir: cfg.DataDir, Location: cfg.Location, Version: version})
+		DataDir: cfg.DataDir, Version: version})
 	if err := host.Init(ctx); err != nil {
 		return fail(err)
 	}
+	if setupSvc.Pending() {
+		host.Hold()
+	}
 	tunnels := tunnel.New(tunnel.Deps{Subnets: inv, Creds: v, Events: ev, Bus: b, Log: log.With("component", "tunnel")})
 	host.SetUnreachable(tunnels.Unreachable)
-	engine := rules.New(d, b, log, ev, inv, host, st, cfg.Location)
+	engine := rules.New(d, b, log, ev, inv, host, st)
 	if err := engine.SeedDefaults(ctx); err != nil {
 		return fail(err)
 	}
@@ -164,7 +168,8 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 		log.Info("Weboberfläche abgeschaltet (NETSCOPE_UI=false) – nur die API ist erreichbar")
 	}
 	server := api.New(api.Deps{Config: cfg, DB: d, Bus: b, Log: log, Logs: ring, LevelVar: level, Auth: authSvc, Vault: v, Settings: st,
-		Inventory: inv, Events: ev, Rules: engine, Host: host, Tunnels: tunnels, Federation: fed, Agents: agents, Audit: audit.New(d), Version: version, StartedAt: started,
+		Inventory: inv, Events: ev, Rules: engine, Host: host, Tunnels: tunnels, Federation: fed, Agents: agents, Audit: audit.New(d), Setup: setupSvc,
+		Version: version, StartedAt: started,
 		Restore: func(path string) {
 			select {
 			case restore <- path:
@@ -214,6 +219,49 @@ func start(ctx context.Context, cfg *config.Config, version string, log *slog.Lo
 	}
 	log.Info("NetScope bereit", "listen", cfg.Listen, "plugins", len(host.IDs()))
 	return &services{db: d, host: host, rules: engine, tunnels: tunnels, fed: fed, agents: agents, srv: srv}, nil
+}
+
+// prepareSetup decides whether the setup wizard runs. Without it – NETSCOPE_ADMIN_PASSWORD
+// set (automated installations) or no web interface – the administrator is created as
+// before and the setup counts as completed, so the plugins enabled by default run at once.
+// With it, the setup code is written to the log and to setup-code.txt.
+func prepareSetup(ctx context.Context, cfg *config.Config, d *db.DB, authSvc *auth.Service, log *slog.Logger) (*setup.Service, error) {
+	s, err := setup.Load(ctx, d, cfg.DataDir)
+	if err != nil {
+		return nil, err
+	}
+	if !s.Pending() {
+		return s, nil
+	}
+	switch {
+	case cfg.AdminPassword != "":
+		if _, _, err := authSvc.EnsureAdmin(ctx, cfg.AdminPassword); err != nil {
+			return nil, err
+		}
+		if err := s.Complete(ctx, setup.ModeAutomatic); err != nil && !setup.Warning(err) {
+			return nil, err
+		}
+		log.Info("NETSCOPE_ADMIN_PASSWORD gesetzt – Einrichtungsassistent übersprungen, ab Werk aktive Plugins laufen")
+	case !cfg.UI:
+		created, _, err := authSvc.EnsureAdmin(ctx, "")
+		if err != nil {
+			return nil, err
+		}
+		if err := s.Complete(ctx, setup.ModeAutomatic); err != nil && !setup.Warning(err) {
+			return nil, err
+		}
+		if created {
+			log.Info("Ohne Weboberfläche kein Einrichtungsassistent – Benutzer admin mit Zufallspasswort angelegt, bei Bedarf mit „netscope passwd“ setzen")
+		}
+	default:
+		code, err := s.PrepareCode()
+		if err != nil {
+			return nil, fmt.Errorf("Einrichtungscode: %w", err)
+		}
+		log.Warn("Einrichtung ausstehend – NetScope im Browser öffnen und den Einrichtungscode eingeben; bis dahin läuft kein Plugin",
+			"code", code, "file", s.CodePath())
+	}
+	return s, nil
 }
 
 // stop shuts down in order: HTTP, rule engine, plugins (running runs are cancelled),

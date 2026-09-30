@@ -243,3 +243,41 @@ func TestIntegrationAPI(t *testing.T) {
 		t.Errorf("paging %v", pages)
 	}
 }
+
+// The connection test signs in and reads like a run (and signs out again), but stores
+// nothing; it reports a wrong password and a wrong address per controller.
+func TestUniFiConnectionTest(t *testing.T) {
+	out := 0
+	srv := controller(t, true, &out)
+	t.Cleanup(srv.Close)
+	creds := func(pw string) plugintest.Creds { return plugintest.Creds{1: password("netscope", pw)} }
+	p := &Plugin{}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("pw"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != srv.URL || !strings.Contains(res[0].Message, "3 Clients und 2 Netzwerkgeräte") {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	if out != 1 {
+		t.Errorf("logouts %d", out)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("nope"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "https")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL, closed}}, creds("pw"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || !strings.Contains(res[1].Message, "nicht erreichbar") {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+	// classic controller
+	classic := controller(t, false, &out)
+	t.Cleanup(classic.Close)
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{classic.URL}}, creds("pw"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || !strings.Contains(res[0].Message, "3 Clients und 2 Netzwerkgeräte") {
+		t.Fatalf("classic, valid password: %+v, %v", res, err)
+	}
+	// the classic controller rejects the login with HTTP 400 and api.err.Invalid
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{classic.URL}}, creds("nope"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt: api.err.Invalid") {
+		t.Fatalf("classic, wrong password: %+v, %v", res, err)
+	}
+}

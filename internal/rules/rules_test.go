@@ -72,7 +72,12 @@ func newEnv(t *testing.T) *env {
 	}
 	t.Cleanup(func() { d.Close() })
 	st, _ := settings.Load(ctx, d)
-	_ = st.SetSystem(ctx, func() settings.System { s := settings.DefaultSystem(); s.PublicURL = "https://ns.lan"; return s }())
+	_ = st.SetSystem(ctx, func() settings.System {
+		s := settings.DefaultSystem()
+		s.PublicURL = "https://ns.lan"
+		s.Timezone = "UTC"
+		return s
+	}())
 	b := bus.New()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	inv, err := inventory.New(ctx, d, b, st, log)
@@ -86,7 +91,7 @@ func newEnv(t *testing.T) *env {
 	}
 	ev := events.New(d, b, inv)
 	pub := &recorder{disabled: map[string]bool{}}
-	e := New(d, b, log, ev, inv, pub, st, time.UTC)
+	e := New(d, b, log, ev, inv, pub, st)
 	en := &env{e: e, ev: ev, inv: inv, pub: pub, dev: dev, now: time.Date(2026, 9, 22, 12, 0, 0, 0, time.UTC)}
 	e.nowFn = func() time.Time { return en.now }
 	e.ctx = ctx

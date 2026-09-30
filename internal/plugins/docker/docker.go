@@ -35,6 +35,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:        "Docker",
 		Description: "Liest Container, Images, veröffentlichte Ports und Compose-Projekte von Docker-Hosts (lokaler Socket, TCP oder SSH-Tunnel) und ordnet sie dem Host als Kind-Objekte zu.",
 		Version:     "1.0.0",
+		Category:    plugin.CategoryVirtualization,
 
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
@@ -105,19 +106,19 @@ func (p *Plugin) ValidateSettings(s plugin.Settings) error {
 	return nil
 }
 
-// Run implements plugin.Runner.
-func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+// setup parses the endpoints and prepares the importer.
+func setup(rc *plugin.RunContext) ([]endpoint, *importer, error) {
 	s := rc.Settings
 	var eps []endpoint
 	for _, raw := range s.StringList("endpoints") {
 		ep, err := parseEndpoint(raw)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		eps = append(eps, ep)
 	}
 	if len(eps) == 0 {
-		return errors.New("keine Docker-Endpunkte konfiguriert")
+		return nil, nil, errors.New("keine Docker-Endpunkte konfiguriert")
 	}
 	im := &importer{rc: rc, timeout: s.Duration("timeout"),
 		creds: &plugin.CredentialPicker{Creds: rc.Creds, Types: []string{plugin.CredSSH, plugin.CredPassword},
@@ -129,6 +130,62 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if s.String("host_key_policy") != "insecure" {
 		im.knownHosts = filepath.Join(rc.DataDir, "known_hosts")
 	}
+	return eps, im, nil
+}
+
+// TestConnection implements plugin.ConnectionTester: it connects to every engine (SSH
+// host keys are checked but not learned) and reads its version and container count.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	eps, im, err := setup(rc)
+	if err != nil {
+		return nil, err
+	}
+	im.dryRun = true
+	out := make([]plugin.ConnectionResult, 0, len(eps))
+	for _, ep := range eps {
+		start := time.Now()
+		res := plugin.ConnectionResult{Target: ep.label()}
+		version, containers, err := im.probe(ctx, ep)
+		if err != nil {
+			res.Message = err.Error()
+		} else {
+			res.OK = true
+			res.Message = fmt.Sprintf("Verbunden – Docker %s, %d Container", version, containers)
+		}
+		res.DurationMs = time.Since(start).Milliseconds()
+		out = append(out, res)
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+	}
+	return out, nil
+}
+
+// probe connects to one engine and reads its version and the number of containers.
+func (im *importer) probe(ctx context.Context, ep endpoint) (string, int, error) {
+	dial, closeFn, _, err := im.transport(ctx, ep)
+	if err != nil {
+		return "", 0, err
+	}
+	defer closeFn()
+	eng := newEngine(dial, im.timeout)
+	defer eng.close()
+	if _, err := eng.negotiate(ctx); err != nil {
+		return "", 0, fmt.Errorf("Docker-API nicht erreichbar: %w", err)
+	}
+	var info infoResp
+	if _, err := eng.get(ctx, "/info", &info); err != nil {
+		return "", 0, err
+	}
+	return info.ServerVersion, info.Containers, nil
+}
+
+// Run implements plugin.Runner.
+func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	eps, im, err := setup(rc)
+	if err != nil {
+		return err
+	}
 	rc.SetStat("endpoints", len(eps))
 	rc.SetStat("containers", 0)
 	rc.Progress(0, len(eps))
@@ -138,7 +195,7 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 		errs []error
 		done atomic.Int64
 	)
-	err := plugin.ForEach(ctx, rc.Parallelism(), eps, func(ctx context.Context, ep endpoint) error {
+	err = plugin.ForEach(ctx, rc.Parallelism(), eps, func(ctx context.Context, ep endpoint) error {
 		defer func() { rc.Progress(int(done.Add(1)), len(eps)) }()
 		if err := im.importEndpoint(ctx, ep); err != nil {
 			if ctx.Err() != nil {
@@ -166,6 +223,7 @@ type importer struct {
 	timeout    time.Duration
 	knownHosts string
 	creds      *plugin.CredentialPicker
+	dryRun     bool // connection test: SSH host keys are not learned
 
 	localOnce sync.Once
 	localIP   string
@@ -237,7 +295,7 @@ func (im *importer) transport(ctx context.Context, ep endpoint) (dial func(conte
 		if err != nil {
 			return nil, nil, "", err
 		}
-		cl, _, err := sshx.DialFirst(ctx, ep.Host, creds, sshx.Options{Port: ep.Port, Timeout: im.timeout, KnownHosts: im.knownHosts})
+		cl, _, err := sshx.DialFirst(ctx, ep.Host, creds, sshx.Options{Port: ep.Port, Timeout: im.timeout, KnownHosts: im.knownHosts, DryRun: im.dryRun})
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("SSH-Verbindung: %w", err)
 		}

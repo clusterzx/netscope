@@ -82,6 +82,8 @@
 			name = '';
 			description = '';
 			values = {};
+			// only one type to choose (e.g. a plugin field that takes API tokens only)
+			if (types.length === 1) chooseType(types[0]);
 		}
 	}
 

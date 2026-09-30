@@ -40,6 +40,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest Clients und Netzwerkgeräte aus UniFi-Controllern (UniFi-OS-Konsolen oder selbst gehosteter Controller): " +
 			"Namen, feste IPs, VLAN, Switch-Port bzw. Access Point – für die Topologie.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryControllers,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
 		DefaultTimeout:     3 * time.Minute,
@@ -88,11 +89,23 @@ func (p *Plugin) Endpoints(s plugin.Settings) []string { return netsrc.Endpoints
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	o, fetch := p.sources(rc)
+	return netsrc.Run(ctx, rc, o, fetch)
+}
+
+// TestConnection implements plugin.ConnectionTester.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	o, fetch := p.sources(rc)
+	return netsrc.Test(ctx, rc, o, fetch)
+}
+
+// sources describes the configured systems and how one is read.
+func (p *Plugin) sources(rc *plugin.RunContext) (netsrc.Options, netsrc.Fetch) {
 	s := rc.Settings
-	return netsrc.Run(ctx, rc, netsrc.Options{PluginID: "unifi", Sources: s.StringList(netsrc.KeySources), Label: "Controller",
-		Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
-		return fetch(ctx, rc, src)
-	})
+	return netsrc.Options{PluginID: "unifi", Sources: s.StringList(netsrc.KeySources), Label: "Controller",
+			Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
+			return fetch(ctx, rc, src)
+		}
 }
 
 func fetch(ctx context.Context, rc *plugin.RunContext, src string) (*netsrc.Result, error) {
@@ -160,6 +173,11 @@ func login(ctx context.Context, hc *http.Client, base, user, pass string) (*sess
 	}
 	var env envelope
 	if _, err := netsrc.Do(ctx, hc, http.MethodPost, base+"/api/login", bytes.NewReader(body), h, &env); err != nil {
+		// classic controllers answer a wrong login with 400 and {"meta":{"rc":"error","msg":"api.err.Invalid"}}
+		var se *netsrc.HTTPStatusError
+		if errors.As(err, &se) && se.Code == http.StatusBadRequest && json.Unmarshal([]byte(se.Body), &env) == nil && env.Meta.RC == "error" {
+			return nil, fmt.Errorf("%w: %s", netsrc.ErrAuth, env.Meta.Msg)
+		}
 		return nil, err
 	}
 	if env.Meta.RC != "ok" {

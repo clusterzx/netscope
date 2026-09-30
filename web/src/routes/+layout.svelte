@@ -10,8 +10,8 @@
 
 	theme.init();
 
-	// login and the first-login setup render without the shell
-	const bare = $derived(page.url.pathname === '/login' || page.url.pathname === '/setup');
+	// login, the first-login setup and the setup wizard render without the shell
+	const bare = $derived(['/login', '/setup', '/welcome'].includes(page.url.pathname));
 </script>
 
 {#if bare}

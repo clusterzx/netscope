@@ -487,3 +487,35 @@ func TestRunUnknownHost(t *testing.T) {
 		t.Errorf("observations=%d stats=%v", sink.n, rc.Stats())
 	}
 }
+
+// The connection test reads the engine version and container count (SSH host keys are
+// checked but not learned), but stores nothing; it reports a wrong password and a wrong
+// address per endpoint.
+func TestDockerConnectionTest(t *testing.T) {
+	sshSrv := startSSHDocker(t, newFakeEngine(t))
+	tcpSrv := httptest.NewServer(newFakeEngine(t))
+	t.Cleanup(tcpSrv.Close)
+	creds := func(pw string) plugintest.Creds {
+		return plugintest.Creds{7: {ID: 7, Name: "docker", Type: plugin.CredPassword,
+			Public: map[string]string{"username": "root"}, Secret: map[string]string{"password": pw}}}
+	}
+	const want = "Verbunden – Docker 29.8.1, 3 Container"
+	sshEP := "ssh://root@127.0.0.1:" + strconv.Itoa(sshSrv.port)
+	tcpEP := "tcp://" + strings.TrimPrefix(tcpSrv.URL, "http://")
+	p := &Plugin{}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"endpoints": []any{sshEP, tcpEP}}, creds("goodpass"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[0].Target != sshEP || res[0].Message != want ||
+		!res[1].OK || res[1].Target != tcpEP || res[1].Message != want {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"endpoints": []any{sshEP}}, creds("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	addr := strings.TrimPrefix(plugintest.ClosedURL(t, "tcp"), "tcp://")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"endpoints": []any{"ssh://root@" + addr, "tcp://" + addr}, "timeout": "3s"}, creds("goodpass"), "")
+	if err != nil || len(res) != 2 || res[0].OK || !strings.Contains(res[0].Message, "SSH-Verbindung") || res[1].OK ||
+		!strings.Contains(res[1].Message, "Docker-API nicht erreichbar") {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+}

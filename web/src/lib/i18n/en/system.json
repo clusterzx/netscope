@@ -356,5 +356,9 @@
 	"Zum Anzeigen des Audit-Logs fehlt die Berechtigung „Audit-Log und Server-Protokoll einsehen“.": "Viewing the audit log requires the permission “View audit log and server log”.",
 	"Zum Anzeigen des Server-Protokolls fehlt die Berechtigung „Audit-Log und Server-Protokoll einsehen“.": "Viewing the server log requires the permission “View audit log and server log”.",
 	"Zum Ende springen": "Jump to the end",
-	"Zur Bestätigung „{word}“ eingeben": "Type “{word}” to confirm"
+	"Zur Bestätigung „{word}“ eingeben": "Type “{word}” to confirm",
+	"Unbekannte Zeitzone": "Unknown time zone",
+	"Für Zeitpläne, Berichte und Datumsangaben – wirkt sofort, ohne Neustart": "For schedules, reports and dates – applies at once, without restart",
+	"Vom Scannen ausgenommen": "Excluded from scanning",
+	"IP-Adressen oder Netze (CIDR), die kein Scanner abfragt – z. B. empfindliche Geräte, die bei Scans ausfallen.": "IP addresses or networks (CIDR) no scanner probes – e.g. sensitive devices that fail during scans."
 }

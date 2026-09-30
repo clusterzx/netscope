@@ -76,5 +76,6 @@ func init() {
 		"kein Start-Date":                  "no Start-Date",
 		"ungültiges Datum %q":              "invalid date %q",
 		"unbekanntes Datumsformat %q":      "unknown date format %q",
+		"Angemeldet als %s (%s) – %s":      "Signed in as %s (%s) – %s",
 	})
 }

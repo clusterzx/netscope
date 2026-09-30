@@ -20,7 +20,15 @@
 	} from '$lib/components/ui';
 	import RunProgress from '$lib/components/plugins/RunProgress.svelte';
 	import RunStatusBadge from '$lib/components/plugins/RunStatusBadge.svelte';
-	import { KIND_ORDER, canRun, isPublisher, kindDescription } from '$lib/components/plugins/plugin';
+	import {
+		KIND_ORDER,
+		byCategory,
+		canRun,
+		isPublisher,
+		kindDescription,
+		loadLabel,
+		loadTone
+	} from '$lib/components/plugins/plugin';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { live } from '$lib/stores/live.svelte';
 	import { AsyncData } from '$lib/stores/resource.svelte';
@@ -254,150 +262,152 @@
 						</h2>
 						<p class="text-sm text-fg-muted">{kindDescription[g.kind]}</p>
 					</div>
-					<ul
-						class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
-					>
-						{#each g.items as p (p.info.id)}
-							{@const run = activeRunOf(p)}
-							{@const enabled = !!p.config?.enabled}
-							<li
-								class="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-surface-2
-									lg:grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_auto] lg:items-center"
-							>
-								<div class="pt-0.5 lg:pt-0">
-									{#if canManage}
-										<Toggle
-											checked={enabled}
-											onchange={(v) => setEnabled(p, v)}
-											disabled={busy[p.info.id]}
-											label={t('{name} aktiv', { name: p.info.name })}
-											hideLabel
-											size="sm"
-										/>
-									{/if}
-								</div>
-
-								<!-- name, description, warnings -->
-								<div class="min-w-0">
-									<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-										<a href={href(p)} class="font-medium text-fg hover:text-accent hover:underline"
-											>{p.info.name}</a
-										>
-										<span class="mono text-xs text-fg-subtle">{p.info.id}</span>
-										{#if !enabled}<Badge>{t('inaktiv')}</Badge>{/if}
-										{#if p.missingBinaries?.length}
-											<Badge
-												tone="warn"
-												title={t('Fehlende Programme: {list}', { list: p.missingBinaries.join(', ') })}
-											>
-												<Icon name="alert" size={12} class="-mt-px inline align-middle" />
-												{t('fehlt: {list}', { list: p.missingBinaries.join(', ') })}
-											</Badge>
-										{/if}
-										{#if p.backlog > 0}
-											<Badge tone="warn" title={t('Ausstehende Änderungen in der Warteschlange')}>
-												{t('{n} ausstehend', { n: formatNumber(p.backlog) })}
-											</Badge>
-										{/if}
-									</div>
-									<p
-										class="mt-0.5 line-clamp-2 text-sm text-fg-muted lg:line-clamp-1"
-										title={p.info.description}
-									>
-										{p.info.description}
-									</p>
-								</div>
-
-								<!-- last / current run -->
-								<div class="col-start-2 min-w-0 lg:col-start-auto">
-									{#if run}
-										<div class="flex flex-col gap-1">
-											<span class="flex items-center gap-2 text-sm">
-												<RunStatusBadge status={run.status} />
-												<a class="link mono text-xs" href="{href(p)}/runs/{run.id}">#{run.id}</a>
-											</span>
-											<RunProgress {run} class="max-w-64" />
-										</div>
-									{:else if p.lastRun}
-										<div class="flex flex-col gap-0.5 text-sm">
-											<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
-												<RunStatusBadge status={p.lastRun.status} />
-												<span class="text-xs text-fg-muted">
-													<RelativeTime value={p.lastRun.finishedAt ?? p.lastRun.createdAt} />
-													· {formatDuration(p.lastRun.durationMs)}
-												</span>
-											</span>
-											{#if p.lastRun.error}
-												<a
-													href="{href(p)}/runs/{p.lastRun.id}"
-													class="truncate text-xs text-danger hover:underline"
-													title={p.lastRun.error}>{p.lastRun.error}</a
-												>
-											{/if}
-										</div>
-									{:else}
-										<span class="text-xs text-fg-subtle">
-											{isPublisher(p)
-												? t('Versand über Regeln')
-												: canRun(p)
-													? t('Noch nicht gelaufen')
-													: t('Nur Aktionen')}
-										</span>
-									{/if}
-								</div>
-
-								<!-- schedule -->
-								<div class="col-start-2 min-w-0 text-sm lg:col-start-auto">
-									{#if canRun(p)}
-										{#if p.config?.schedule}
-											<span class="flex items-center gap-1.5" title={p.config.schedule}>
-												<Icon name="clock" size={14} class="shrink-0 text-fg-subtle" />
-												<span class="truncate">{p.config.scheduleText || p.config.schedule}</span>
-											</span>
-											{#if enabled && p.nextRun}
-												<span class="block text-xs text-fg-subtle"
-													>{t('nächster Lauf')} <RelativeTime value={p.nextRun} /></span
-												>
-											{:else if !enabled}
-												<span class="block text-xs text-fg-subtle">{t('pausiert (inaktiv)')}</span>
-											{/if}
-										{:else}
-											<span class="text-fg-muted">{t('Nur manuell')}</span>
-										{/if}
-									{:else}
-										<span class="text-xs text-fg-subtle">{t('kein Zeitplan')}</span>
-									{/if}
-								</div>
-
-								<!-- actions -->
-								<div class="col-start-2 flex items-center gap-1 lg:col-start-auto lg:justify-end">
-									{#if canRun(p) && canScan}
-										<Button
-											size="sm"
-											icon="play"
-											loading={starting[p.info.id]}
-											onclick={() => runNow(p)}
-											disabled={!!run && run.status === 'queued'}
-											label={t('{name} jetzt ausführen', { name: p.info.name })}
-										>
-											<span class="lg:hidden xl:inline">{t('Jetzt ausführen')}</span>
-										</Button>
-									{/if}
-									<Button
-										size="sm"
-										variant="ghost"
-										icon="system"
-										label={canManage
-											? t('{name} konfigurieren', { name: p.info.name })
-											: t('{name} öffnen', { name: p.info.name })}
-										href={href(p)}
-									/>
-								</div>
-							</li>
-						{/each}
-					</ul>
+					{#each byCategory(g.items) as sg (sg.id)}
+						{#if sg.label}
+							<h3 class="mt-3 mb-1.5 text-sm font-medium text-fg-muted">{sg.label}</h3>
+						{/if}
+						<ul
+							class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
+						>
+							{#each sg.items as p (p.info.id)}
+								{@render row(p)}
+							{/each}
+						</ul>
+					{/each}
 				</section>
 			{/if}
 		{/each}
 	</div>
 {/if}
+
+{#snippet row(p: PluginView)}
+	{@const run = activeRunOf(p)}
+	{@const enabled = !!p.config?.enabled}
+	<li
+		class="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-surface-2
+				lg:grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_auto] lg:items-center"
+	>
+		<div class="pt-0.5 lg:pt-0">
+			{#if canManage}
+				<Toggle
+					checked={enabled}
+					onchange={(v) => setEnabled(p, v)}
+					disabled={busy[p.info.id]}
+					label={t('{name} aktiv', { name: p.info.name })}
+					hideLabel
+					size="sm"
+				/>
+			{/if}
+		</div>
+
+		<!-- name, description, warnings -->
+		<div class="min-w-0">
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+				<a href={href(p)} class="font-medium text-fg hover:text-accent hover:underline">{p.info.name}</a>
+				<span class="mono text-xs text-fg-subtle">{p.info.id}</span>
+				{#if p.info.load}<Badge tone={loadTone[p.info.load]}>{loadLabel[p.info.load]}</Badge>{/if}
+				{#if !enabled}<Badge>{t('inaktiv')}</Badge>{/if}
+				{#if p.missingBinaries?.length}
+					<Badge tone="warn" title={t('Fehlende Programme: {list}', { list: p.missingBinaries.join(', ') })}>
+						<Icon name="alert" size={12} class="-mt-px inline align-middle" />
+						{t('fehlt: {list}', { list: p.missingBinaries.join(', ') })}
+					</Badge>
+				{/if}
+				{#if p.backlog > 0}
+					<Badge tone="warn" title={t('Ausstehende Änderungen in der Warteschlange')}>
+						{t('{n} ausstehend', { n: formatNumber(p.backlog) })}
+					</Badge>
+				{/if}
+			</div>
+			<p class="mt-0.5 line-clamp-2 text-sm text-fg-muted lg:line-clamp-1" title={p.info.description}>
+				{p.info.description}
+			</p>
+		</div>
+
+		<!-- last / current run -->
+		<div class="col-start-2 min-w-0 lg:col-start-auto">
+			{#if run}
+				<div class="flex flex-col gap-1">
+					<span class="flex items-center gap-2 text-sm">
+						<RunStatusBadge status={run.status} />
+						<a class="link mono text-xs" href="{href(p)}/runs/{run.id}">#{run.id}</a>
+					</span>
+					<RunProgress {run} class="max-w-64" />
+				</div>
+			{:else if p.lastRun}
+				<div class="flex flex-col gap-0.5 text-sm">
+					<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+						<RunStatusBadge status={p.lastRun.status} />
+						<span class="text-xs text-fg-muted">
+							<RelativeTime value={p.lastRun.finishedAt ?? p.lastRun.createdAt} />
+							· {formatDuration(p.lastRun.durationMs)}
+						</span>
+					</span>
+					{#if p.lastRun.error}
+						<a
+							href="{href(p)}/runs/{p.lastRun.id}"
+							class="truncate text-xs text-danger hover:underline"
+							title={p.lastRun.error}>{p.lastRun.error}</a
+						>
+					{/if}
+				</div>
+			{:else}
+				<span class="text-xs text-fg-subtle">
+					{isPublisher(p)
+						? t('Versand über Regeln')
+						: canRun(p)
+							? t('Noch nicht gelaufen')
+							: t('Nur Aktionen')}
+				</span>
+			{/if}
+		</div>
+
+		<!-- schedule -->
+		<div class="col-start-2 min-w-0 text-sm lg:col-start-auto">
+			{#if canRun(p)}
+				{#if p.config?.schedule}
+					<span class="flex items-center gap-1.5" title={p.config.schedule}>
+						<Icon name="clock" size={14} class="shrink-0 text-fg-subtle" />
+						<span class="truncate">{p.config.scheduleText || p.config.schedule}</span>
+					</span>
+					{#if enabled && p.nextRun}
+						<span class="block text-xs text-fg-subtle"
+							>{t('nächster Lauf')} <RelativeTime value={p.nextRun} /></span
+						>
+					{:else if !enabled}
+						<span class="block text-xs text-fg-subtle">{t('pausiert (inaktiv)')}</span>
+					{/if}
+				{:else}
+					<span class="text-fg-muted">{t('Nur manuell')}</span>
+				{/if}
+			{:else}
+				<span class="text-xs text-fg-subtle">{t('kein Zeitplan')}</span>
+			{/if}
+		</div>
+
+		<!-- actions -->
+		<div class="col-start-2 flex items-center gap-1 lg:col-start-auto lg:justify-end">
+			{#if canRun(p) && canScan}
+				<Button
+					size="sm"
+					icon="play"
+					loading={starting[p.info.id]}
+					onclick={() => runNow(p)}
+					disabled={!!run && run.status === 'queued'}
+					label={t('{name} jetzt ausführen', { name: p.info.name })}
+				>
+					<span class="lg:hidden xl:inline">{t('Jetzt ausführen')}</span>
+				</Button>
+			{/if}
+			<Button
+				size="sm"
+				variant="ghost"
+				icon="system"
+				label={canManage
+					? t('{name} konfigurieren', { name: p.info.name })
+					: t('{name} öffnen', { name: p.info.name })}
+				href={href(p)}
+			/>
+		</div>
+	</li>
+{/snippet}

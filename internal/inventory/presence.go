@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/netip"
+	"strings"
 	"time"
 
 	"netscope/internal/db"
@@ -44,6 +46,17 @@ func (s *Store) RunFinished(ctx context.Context, run plugin.RunSummary) error {
 	sub, args, subnetMode := scopeFilter(run.Targets)
 	if sub == "" {
 		return nil
+	}
+	if subnetMode && len(run.Targets.Exclude) > 0 {
+		// devices reachable only at excluded addresses were not scanned, so not missed
+		skip, err := s.excludedDevices(ctx, sub, args, run.Targets)
+		if err != nil {
+			return err
+		}
+		if len(skip) > 0 {
+			sub += fmt.Sprintf(" AND device_id NOT IN (%s)", db.Placeholders(len(skip)))
+			args = append(args, db.Int64Args(skip)...)
+		}
 	}
 	p := presenceRun{run: run, sub: sub, args: args, subnetMode: subnetMode,
 		threshold: s.settings.System().OfflineAfterMissed, now: time.Now()}
@@ -191,4 +204,37 @@ func (p *presenceRun) evaluate(ctx context.Context, tx *sql.Tx) error {
 		p.touched = append(p.touched, c.dev)
 	}
 	return nil
+}
+
+// excludedDevices returns the devices of a subnet scan whose current addresses in the
+// scanned subnets are all excluded from scanning.
+func (s *Store) excludedDevices(ctx context.Context, sub string, args []any, t plugin.Targets) ([]int64, error) {
+	q := strings.Replace(sub, "SELECT device_id FROM", "SELECT device_id, ip FROM", 1)
+	rows, err := s.db.R.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	only := map[int64]bool{}
+	for rows.Next() {
+		var (
+			id int64
+			ip string
+		)
+		if err := rows.Scan(&id, &ip); err != nil {
+			return nil, err
+		}
+		a, err := netip.ParseAddr(ip)
+		excluded := err == nil && t.Excluded(a)
+		if cur, seen := only[id]; !seen || cur {
+			only[id] = excluded
+		}
+	}
+	var out []int64
+	for id, ex := range only {
+		if ex {
+			out = append(out, id)
+		}
+	}
+	return out, rows.Err()
 }

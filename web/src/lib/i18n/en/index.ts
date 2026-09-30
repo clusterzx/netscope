@@ -14,6 +14,7 @@ import system from './system.json';
 import topology from './topology.json';
 import ui from './ui.json';
 import users from './users.json';
+import welcome from './welcome.json';
 
 const en = {
 	...common,
@@ -28,7 +29,8 @@ const en = {
 	...topology,
 	...plugins,
 	...rules,
-	...system
+	...system,
+	...welcome
 };
 
 export default en;

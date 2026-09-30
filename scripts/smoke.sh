@@ -74,6 +74,13 @@ health=$(curl -fsS "$BASE_URL/api/v1/health")
 [[ $(jq -r .status <<<"$health") == ok ]] || fail "health: $health"
 ok "Health-Endpoint: $(jq -r .version <<<"$health")"
 
+# a new installation without NETSCOPE_ADMIN_PASSWORD waits for the setup wizard: no user,
+# no plugin runs
+if [[ $(curl -fsS "$BASE_URL/api/v1/setup" | jq -r .pending) == true ]]; then
+	fail "Einrichtung ausstehend – im Browser den Assistenten abschließen (Einrichtungscode: data/setup-code.txt) oder mit NETSCOPE_ADMIN_PASSWORD starten"
+fi
+ok "Einrichtung abgeschlossen"
+
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/api/v1/devices")
 [[ $code == 401 ]] || fail "API ohne Anmeldung liefert $code statt 401"
 ok "API verlangt Anmeldung"

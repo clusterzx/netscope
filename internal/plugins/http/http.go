@@ -36,6 +36,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "HTTP-Fingerprinting",
 		Description:        "Untersucht HTTP(S)-Ports: Titel, Server-Header, Redirects, Favicon-Hash und erkennt Web-Anwendungen.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadMedium,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "30 3 * * *",
 		DefaultTimeout:     30 * time.Minute,

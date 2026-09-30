@@ -28,6 +28,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "Nmap (UDP)",
 		Description:        "Seltener UDP-Scan der häufigsten Ports bekannter Geräte (langsam, daher standardmäßig wöchentlich).",
 		Version:            "1.0.0",
+		Load:               plugin.LoadHigh,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "0 4 * * 0",
 		DefaultTimeout:     6 * time.Hour,

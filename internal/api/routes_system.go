@@ -216,12 +216,13 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
-	var in settings.System
+	before := s.Settings.System()
+	// fields a client leaves out keep their value (e.g. the time zone of an older client)
+	in := s.Settings.System()
 	if err := decode(r, &in); err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	before := s.Settings.System()
 	if err := s.Settings.SetSystem(r.Context(), in); err != nil {
 		s.fail(w, r, err)
 		return
@@ -308,7 +309,7 @@ func (s *Server) handleListBackups(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCreateBackup(w http.ResponseWriter, r *http.Request) {
-	name := "netscope-" + time.Now().In(s.Config.Location).Format("20060102-150405") + ".db.gz"
+	name := "netscope-" + time.Now().In(s.Settings.Location()).Format("20060102-150405") + ".db.gz"
 	p := filepath.Join(s.backupDir(), name)
 	if err := s.DB.BackupGzip(r.Context(), p); err != nil {
 		s.fail(w, r, err)
@@ -465,7 +466,7 @@ func (s *Server) handleCron(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	text, _ := describeCron(expr, loc)
-	writeJSON(w, http.StatusOK, cronResponse{Valid: true, Text: text, Next: cron.NextN(sched, time.Now().In(s.Config.Location), 5)})
+	writeJSON(w, http.StatusOK, cronResponse{Valid: true, Text: text, Next: cron.NextN(sched, time.Now().In(s.Settings.Location()), 5)})
 }
 
 func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {

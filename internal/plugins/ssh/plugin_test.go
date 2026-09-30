@@ -377,3 +377,39 @@ func TestSchemaDefaults(t *testing.T) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// The connection test signs in at the test address and runs "uname -sr" (the host key is
+// checked but not learned), but stores nothing; it reports a wrong password and a wrong
+// address.
+func TestSSHConnectionTest(t *testing.T) {
+	srv := newTestServer(t, []byte("Linux 6.8.0-45-generic\n"), nil, nil)
+	creds := func(pw string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Name: "root-pw", Type: plugin.CredPassword, Public: map[string]string{"username": "root"},
+			Secret: map[string]string{"password": pw}}}
+	}
+	target := "127.0.0.1:" + itoa(srv.addr.Port)
+	p := &Plugin{}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{}, creds("richtig"), target)
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != target || res[0].Message != "Angemeldet als root (root-pw) – Linux 6.8.0-45-generic" {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	srv.mu.Lock()
+	cmds := append([]string(nil), srv.commands...)
+	srv.mu.Unlock()
+	if len(cmds) != 1 || cmds[0] != "uname -sr" {
+		t.Errorf("commands = %q", cmds)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{}, creds("falsch"), target)
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	closed := strings.TrimPrefix(plugintest.ClosedURL(t, "ssh"), "ssh://")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{}, creds("richtig"), closed)
+	if err != nil || len(res) != 1 || res[0].OK || res[0].Target != closed || res[0].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
+	}
+	// without a test address nothing can be tested
+	if _, err := plugintest.ConnectionTest(t, p, map[string]any{}, creds("richtig"), ""); err == nil {
+		t.Error("missing target accepted")
+	}
+}

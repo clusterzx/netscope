@@ -8,6 +8,7 @@
 </script>
 
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type { HTMLSelectAttributes } from 'svelte/elements';
 	import FormField from './FormField.svelte';
 	import Icon from './Icon.svelte';
@@ -22,6 +23,8 @@
 		size?: 'sm' | 'md';
 		class?: string;
 		selectClass?: string;
+		/** rendered right of the label (e.g. a small action) */
+		labelExtra?: Snippet;
 	}
 
 	let {
@@ -36,6 +39,7 @@
 		id,
 		class: klass = '',
 		selectClass = '',
+		labelExtra,
 		...rest
 	}: Props = $props();
 
@@ -44,7 +48,7 @@
 	);
 </script>
 
-<FormField {label} {hint} {error} required={!!required} id={id ?? undefined} class={klass}>
+<FormField {label} {hint} {error} required={!!required} id={id ?? undefined} class={klass} {labelExtra}>
 	{#snippet children(fid, describedby)}
 		<div class="relative flex items-center">
 			<select

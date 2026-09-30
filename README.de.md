@@ -74,12 +74,14 @@ services:
 ```bash
 git clone <repo> netscope && cd netscope
 make docker-up                      # baut das Image und startet den Container
-cat data/admin-initial-password.txt # Startpasswort für den Benutzer "admin"
+cat data/setup-code.txt             # Einrichtungscode (steht auch im Log)
 ```
 
-`http://<host>:8080` öffnen, anmelden und unter **System → Passwort** ein eigenes Passwort
-setzen. Beim ersten Start übernimmt NetScope die direkt angeschlossenen Netze als Subnetze;
-weitere (auch geroutete) unter **System → Subnetze** ergänzen.
+`http://<host>:8080` öffnen und den Einrichtungscode eingeben. Der Assistent fragt Sprache und
+Zeitzone, das Administrator-Konto, die Rolle (allein, Zentrale oder Standort), die zu
+scannenden Netze, die Scanner und optional Router, Controller und Server mit Zugangsdaten ab –
+bis zum Abschluss läuft kein Plugin ([Erster Start](docs/GUIDE.md#erster-start)). Mit
+`NETSCOPE_ADMIN_PASSWORD` entfällt der Assistent (automatisierte Installationen).
 
 > **Master-Key sichern.** Zugangsdaten sind mit `data/master.key` verschlüsselt; ohne ihn sind
 > gespeicherte Passwörter und Tokens verloren. Alternativ per `NETSCOPE_MASTER_KEY` übergeben.
@@ -90,7 +92,7 @@ weitere (auch geroutete) unter **System → Subnetze** ergänzen.
 [Handbuch](docs/GUIDE.md#hinter-einem-reverse-proxy-traefik).
 
 Eingestellt wird alles in der Oberfläche. Nur wenige Startwerte (Adresse, Datenverzeichnis,
-Zeitzone, Log-Level, erstes Admin-Passwort) kommen aus `/data/config.yaml` oder
+Log-Level, erstes Admin-Passwort, Zeitzone beim ersten Start) kommen aus `/data/config.yaml` oder
 Umgebungsvariablen – [vollständige Liste](docs/GUIDE.md#konfiguration).
 
 ## Agents

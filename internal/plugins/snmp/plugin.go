@@ -33,6 +33,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Fragt Geräte per SNMP v2c/v3 ab: Systemdaten, Interfaces, ARP-Tabelle, Bridge-FDB (MAC → Port) " +
 			"und LLDP-Nachbarn als Grundlage für die Topologie.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryServers,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/30 * * * *",
 		DefaultTimeout:     20 * time.Minute,

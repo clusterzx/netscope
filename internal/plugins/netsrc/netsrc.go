@@ -330,3 +330,41 @@ func runSource(ctx context.Context, rc *plugin.RunContext, o Options, src string
 	}
 	return nil
 }
+
+// Test is the connection test of an importer (plugin.ConnectionTester): it reads every
+// source like Run – address, sign-in, the data it needs – but stores nothing and reports
+// per source what it would import.
+func Test(ctx context.Context, rc *plugin.RunContext, o Options, fetch Fetch) ([]plugin.ConnectionResult, error) {
+	if len(o.Sources) == 0 {
+		return nil, fmt.Errorf("kein %s konfiguriert", o.Label)
+	}
+	out := make([]plugin.ConnectionResult, 0, len(o.Sources))
+	for _, src := range o.Sources {
+		start := time.Now()
+		res, err := fetch(ctx, src)
+		r := plugin.ConnectionResult{Target: src}
+		switch {
+		case err != nil:
+			r.Message = err.Error()
+		default:
+			r.OK = true
+			clients := 0
+			for _, c := range Merge(res.Clients) {
+				if o.Filter == nil || o.Filter(c) {
+					clients++
+				}
+			}
+			if len(res.Devices) > 0 {
+				r.Message = fmt.Sprintf("Verbunden – %d Clients und %d Netzwerkgeräte gelesen", clients, len(res.Devices))
+			} else {
+				r.Message = fmt.Sprintf("Verbunden – %d Clients gelesen", clients)
+			}
+		}
+		r.DurationMs = time.Since(start).Milliseconds()
+		out = append(out, r)
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+	}
+	return out, nil
+}

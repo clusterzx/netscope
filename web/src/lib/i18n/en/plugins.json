@@ -276,5 +276,18 @@
 	"Zielsystem": "Target system",
 	"zum Ende springen": "jump to the end",
 	"Zur Laufhistorie": "Go to the run history",
-	"Zur Pluginliste": "Go to the plugin list"
+	"Zur Pluginliste": "Go to the plugin list",
+	"Verbindungstest": "Connection test",
+	"Kann Verbindung und Anmeldung prüfen, ohne etwas zu speichern": "Can check connection and sign-in without storing anything",
+	"Router und Firewalls": "Routers and firewalls",
+	"Netzwerk-Controller": "Network controllers",
+	"Virtualisierung und Container": "Virtualisation and containers",
+	"DNS und DHCP": "DNS and DHCP",
+	"Server und Switches": "Servers and switches",
+	"Belastung hoch": "High load",
+	"Belastung mittel": "Medium load",
+	"Belastung gering": "Low load",
+	"Testadresse": "Test address",
+	"Ein Gerät, an dem die Zugangsdaten funktionieren sollen (optional mit :Port)": "A device where the credentials should work (optionally with :port)",
+	"Prüft Adresse und Anmeldung mit den Werten des Formulars, ohne sie zu speichern.": "Checks address and sign-in with the values of the form without saving them."
 }

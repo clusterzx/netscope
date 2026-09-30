@@ -42,6 +42,7 @@ func init() {
 		"Image-Liste nicht lesbar":     "Cannot read image list",
 		"Speichern fehlgeschlagen: %w": "saving failed: %w",
 		"Docker-Host ist nicht im Inventar – die Container werden zugeordnet, sobald ein Scan den Host gefunden hat": "Docker host is not in the inventory – the containers will be assigned once a scan has found the host",
-		"Docker-Host importiert": "Imported Docker host",
+		"Docker-Host importiert":              "Imported Docker host",
+		"Verbunden – Docker %s, %d Container": "Connected – Docker %s, %d containers",
 	})
 }

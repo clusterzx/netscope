@@ -23,6 +23,7 @@ import (
 	"netscope/internal/bus"
 	"netscope/internal/db"
 	"netscope/internal/federation/wire"
+	"netscope/internal/plugin"
 	"netscope/internal/settings"
 )
 
@@ -587,6 +588,29 @@ func (s *Service) Test(ctx context.Context) TestResult {
 	s.Bus.Publish(bus.TopicSystem, "federation", map[string]any{"connected": true})
 	res.OK, res.Site = true, resp.Site
 	return res
+}
+
+// TestSettings checks a connection to a central instance that is not stored yet (setup
+// wizard): it sends a heartbeat without entries with the given settings and token and
+// changes nothing here.
+func (s *Service) TestSettings(ctx context.Context, in SettingsInput) (TestResult, error) {
+	cfg, token, err := s.Check(in)
+	if err != nil {
+		return TestResult{}, err
+	}
+	if cfg.Role != RoleSite {
+		return TestResult{}, plugin.FieldErr("role", "Nur ein Standort verbindet sich mit einer Zentrale")
+	}
+	start := time.Now()
+	batch := wire.Batch{Protocol: wire.Protocol, Instance: s.instance(), Items: []wire.Item{}, Status: s.collectStatus(ctx, true)}
+	resp, err := s.post(ctx, cfg, token, &batch)
+	res := TestResult{Duration: time.Since(start).Milliseconds()}
+	if err != nil {
+		res.Error = err.Error()
+		return res, nil
+	}
+	res.OK, res.Site = true, resp.Site
+	return res, nil
 }
 
 func eachRow(ctx context.Context, q db.Querier, query string, fn func(*sql.Rows) error, args ...any) error {

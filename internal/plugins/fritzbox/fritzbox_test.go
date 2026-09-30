@@ -2,6 +2,8 @@ package fritzbox
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec // HTTP digest authentication of the fake box
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,8 +25,29 @@ const hostListXML = `<?xml version="1.0" ?>
 </List>`
 
 type fakeBox struct {
-	listRight bool // user may read the host list (else 606)
+	listRight bool   // user may read the host list (else 606)
+	password  string // checked in the digest response when set
 	soapCalls []string
+}
+
+// digestValid checks the digest response (MD5, qop=auth) of r against password.
+func digestValid(r *http.Request, password string) bool {
+	rest, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Digest ")
+	if !ok {
+		return false
+	}
+	p := map[string]string{}
+	for _, part := range strings.Split(rest, ", ") {
+		k, v, _ := strings.Cut(part, "=")
+		p[k] = strings.Trim(v, `"`)
+	}
+	sum := func(s string) string {
+		h := md5.Sum([]byte(s)) //nolint:gosec // HTTP digest authentication
+		return hex.EncodeToString(h[:])
+	}
+	ha1 := sum(p["username"] + ":" + p["realm"] + ":" + password)
+	ha2 := sum(r.Method + ":" + p["uri"])
+	return p["response"] == sum(ha1+":"+p["nonce"]+":"+p["nc"]+":"+p["cnonce"]+":"+p["qop"]+":"+ha2)
 }
 
 var actionRe = regexp.MustCompile(`#([A-Za-z_-]+)"`)
@@ -43,7 +66,7 @@ func (f *fakeBox) handler(t *testing.T) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		if !strings.HasPrefix(r.Header.Get("Authorization"), `Digest username="fritz1234"`) {
+		if !strings.HasPrefix(r.Header.Get("Authorization"), `Digest username="fritz1234"`) || (f.password != "" && !digestValid(r, f.password)) {
 			w.Header().Set("WWW-Authenticate", `Digest realm="F!Box SOAP-Auth", nonce="n1", algorithm=MD5, qop="auth"`)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -145,5 +168,29 @@ func TestBase(t *testing.T) {
 		if got, err := base(in); err != nil || got != want {
 			t.Errorf("%q = %q %v", in, got, err)
 		}
+	}
+}
+
+// The connection test signs in over TR-064 and reads the host list like a run, but stores
+// nothing; it reports a wrong password and a wrong address per box.
+func TestFritzBoxConnectionTest(t *testing.T) {
+	srv := httptest.NewServer((&fakeBox{listRight: true, password: "geheim"}).handler(t))
+	t.Cleanup(srv.Close)
+	creds := func(pw string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Type: plugin.CredPassword, Public: map[string]string{"username": "fritz1234"}, Secret: map[string]string{"password": pw}}}
+	}
+	p := &Plugin{}
+	res, err := plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("geheim"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != srv.URL || !strings.Contains(res[0].Message, "3 Clients") {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL}}, creds("falsch"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "http")
+	res, err = plugintest.ConnectionTest(t, p, map[string]any{"hosts": []any{srv.URL, closed}}, creds("geheim"), "")
+	if err != nil || len(res) != 2 || !res[0].OK || res[1].OK || res[1].Target != closed || res[1].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
 	}
 }

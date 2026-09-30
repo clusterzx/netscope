@@ -45,6 +45,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest Clients und Geräte aus Meraki-Netzen über die Dashboard-API: Namen, Adressen, VLAN, SSID, Switch-Port " +
 			"bzw. Access Point, Betriebssystem, feste IP-Zuweisungen der MX-Appliances.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryControllers,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/15 * * * *",
 		DefaultTimeout:     5 * time.Minute,
@@ -94,11 +95,23 @@ func apiURL(s plugin.Settings) string {
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	o, fetch := p.sources(rc)
+	return netsrc.Run(ctx, rc, o, fetch)
+}
+
+// TestConnection implements plugin.ConnectionTester.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	o, fetch := p.sources(rc)
+	return netsrc.Test(ctx, rc, o, fetch)
+}
+
+// sources describes the configured systems and how one is read.
+func (p *Plugin) sources(rc *plugin.RunContext) (netsrc.Options, netsrc.Fetch) {
 	s := rc.Settings
-	return netsrc.Run(ctx, rc, netsrc.Options{PluginID: "meraki", Sources: []string{apiURL(s)}, Label: "Meraki-Dashboard",
-		Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
-		return p.fetch(ctx, rc, src)
-	})
+	return netsrc.Options{PluginID: "meraki", Sources: []string{apiURL(s)}, Label: "Meraki-Dashboard",
+			Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
+			return p.fetch(ctx, rc, src)
+		}
 }
 
 type client struct {

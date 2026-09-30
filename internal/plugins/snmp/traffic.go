@@ -97,6 +97,7 @@ func (t *Traffic) Info() plugin.Info {
 		Description: "Misst per SNMP den Datenverkehr, die Auslastung, Fehler und Verwürfe je Interface (IF-MIB) und meldet " +
 			"Port-Ausfälle und überlastete Ports.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryServers,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/5 * * * *",
 		DefaultTimeout:     4 * time.Minute,

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -188,4 +189,40 @@ func Fixture(t testing.TB, name string) []byte {
 		t.Fatalf("fixture %s: %v", name, err)
 	}
 	return b
+}
+
+// ConnectionTest runs the connection test of p with the given settings, credentials and
+// test address (plugins that work on devices). It fails t when the test stored an
+// observation, emitted an event or wrote a file to the plugin's data directory – a
+// connection test must not store anything.
+func ConnectionTest(t testing.TB, p plugin.ConnectionTester, settings map[string]any, creds Creds, target string) ([]plugin.ConnectionResult, error) {
+	t.Helper()
+	rc, sink, evs := RunContext(t, p, settings)
+	rc.RunID, rc.Trigger = 0, "test"
+	rc.Creds = creds
+	rc.Params[plugin.TargetParam] = target
+	res, err := p.TestConnection(context.Background(), rc)
+	if n := len(sink.All()); n > 0 {
+		t.Errorf("connection test stored %d observations", n)
+	}
+	if len(evs.Events) > 0 {
+		t.Errorf("connection test emitted %d events", len(evs.Events))
+	}
+	if entries, _ := os.ReadDir(rc.DataDir); len(entries) > 0 {
+		t.Errorf("connection test wrote %s to the data directory", entries[0].Name())
+	}
+	return res, err
+}
+
+// ClosedURL returns the URL of a server that is no longer listening (a wrong address for
+// connection tests).
+func ClosedURL(t testing.TB, scheme string) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+	return scheme + "://" + addr
 }

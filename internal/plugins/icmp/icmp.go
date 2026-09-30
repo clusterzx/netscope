@@ -35,6 +35,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "ICMP-Ping",
 		Description:        "Misst Latenz und Paketverlust aller Geräte per Ping und speichert sie als Zeitreihe.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "*/5 * * * *",
 		DefaultTimeout:     5 * time.Minute,

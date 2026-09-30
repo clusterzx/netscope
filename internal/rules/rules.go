@@ -637,7 +637,7 @@ func (e *Engine) match(ctx context.Context, c Conditions, ev EventInput, dev *De
 		add("Payload "+pc.Field, ok, fmt.Sprintf("%v %s %s", v, pc.Op, pc.Value))
 	}
 	if tw := c.TimeWindow; tw != nil {
-		local := ev.At.In(e.loc)
+		local := ev.At.In(e.settings.Location())
 		from, _ := parseHM(tw.From)
 		to, _ := parseHM(tw.To)
 		ok := inRange(local.Hour()*60+local.Minute(), from, to)

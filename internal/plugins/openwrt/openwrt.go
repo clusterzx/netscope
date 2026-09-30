@@ -35,6 +35,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:        "OpenWrt DHCP",
 		Description: "Liest DHCP-Leases und statische Leases von OpenWrt-/GL.iNet-Routern (per SSH oder LuCI) und füllt damit Hostnamen und Adressen.",
 		Version:     "1.1.0",
+		Category:    plugin.CategoryRouters,
 
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
@@ -153,13 +154,7 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	if len(routers) == 0 {
 		return fmt.Errorf("kein Router konfiguriert")
 	}
-	method := s.String("method")
-	types := []string{plugin.CredSSH, plugin.CredPassword}
-	if method == "luci" {
-		types = []string{plugin.CredPassword}
-	} else {
-		method = "ssh"
-	}
+	method, types := accessMethod(s)
 	picker := &plugin.CredentialPicker{Creds: rc.Creds, Types: types, Allowed: s.CredentialIDs("credentials"), Log: rc.Log}
 	for _, k := range []string{"leases", "static", "observed"} {
 		rc.SetStat(k, 0)
@@ -189,59 +184,51 @@ func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
 	return nil
 }
 
+// TestConnection implements plugin.ConnectionTester: it reads the DHCP data of every
+// router (SSH host keys are checked but not learned) without storing it.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	s := rc.Settings
+	routers := s.StringList("hosts")
+	if len(routers) == 0 {
+		return nil, fmt.Errorf("kein Router konfiguriert")
+	}
+	method, types := accessMethod(s)
+	picker := &plugin.CredentialPicker{Creds: rc.Creds, Types: types, Allowed: s.CredentialIDs("credentials"), Log: rc.Log}
+	out := make([]plugin.ConnectionResult, 0, len(routers))
+	for _, r := range routers {
+		start := time.Now()
+		res := plugin.ConnectionResult{Target: r}
+		_, leases, sections, err := p.readRouter(ctx, rc, picker, method, r, true)
+		if err != nil {
+			res.Message = err.Error()
+		} else {
+			res.OK = true
+			res.Message = fmt.Sprintf("Verbunden – %d Leases und %d statische Leases gelesen", len(leases), len(staticHosts(sections)))
+		}
+		res.DurationMs = time.Since(start).Milliseconds()
+		out = append(out, res)
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+	}
+	return out, nil
+}
+
+// accessMethod returns the configured access (ssh or luci) and its credential types.
+func accessMethod(s plugin.Settings) (string, []string) {
+	if s.String("method") == "luci" {
+		return "luci", []string{plugin.CredPassword}
+	}
+	return "ssh", []string{plugin.CredSSH, plugin.CredPassword}
+}
+
 // importRouter reads one router, trying the applicable credentials in order.
 func (p *Plugin) importRouter(ctx context.Context, rc *plugin.RunContext, picker *plugin.CredentialPicker, method, entry string) error {
 	s := rc.Settings
-	host, luciURL, err := parseRouter(entry, method)
+	host, leases, sections, err := p.readRouter(ctx, rc, picker, method, entry, false)
 	if err != nil {
 		return err
 	}
-	ip, _ := netutil.ResolveHost(ctx, host)
-	creds, err := picker.For(ctx, plugin.CredentialTarget{IP: ip})
-	if err != nil {
-		return err
-	}
-	if len(creds) == 0 {
-		return fmt.Errorf("keine passenden Zugangsdaten für %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w", host, plugin.ErrNoCredential)
-	}
-	var (
-		leases   []lease
-		sections []uciSection
-	)
-	switch method {
-	case "luci":
-		endpoint, err := ubusEndpoint(luciURL)
-		if err != nil {
-			return err
-		}
-		c := newUbusClient(endpoint, s.Bool("verify_tls"), luciTimeout)
-		defer c.close()
-		for i, cred := range creds {
-			user := cred.Get("username")
-			if user == "" {
-				user = "root"
-			}
-			leases, sections, err = fetchLuCI(ctx, rc.Log, c, user, cred.Get("password"))
-			if errors.Is(err, errLoginRejected) && i < len(creds)-1 {
-				rc.Log.Info("LuCI-Anmeldung abgelehnt, nächste Zugangsdaten werden probiert", "router", host, "credential", cred.Name)
-				continue
-			}
-			break
-		}
-		if err != nil {
-			return err
-		}
-	default:
-		opt := sshx.Options{Port: s.Int("port")}
-		if s.String("host_key_policy") != "insecure" {
-			opt.KnownHosts = filepath.Join(rc.DataDir, "known_hosts")
-		}
-		leases, sections, err = fetchSSH(ctx, rc.Log, host, creds, opt)
-		if err != nil {
-			return err
-		}
-	}
-
 	hosts := staticHosts(sections)
 	entries := mergeEntries(leases, hosts, s.Bool("import_static"))
 	rc.AddStat("leases", len(leases))
@@ -328,4 +315,61 @@ func entryObservation(e *entry, router, method string, create bool) *plugin.Obse
 		Attrs:     map[string]string{"dhcp.static": strconv.FormatBool(e.Static != nil)},
 		Inventory: inv,
 	}
+}
+
+// readRouter reads the leases and the DHCP configuration of one router, trying the
+// applicable credentials in order. dryRun (connection test) does not learn SSH host keys.
+func (p *Plugin) readRouter(ctx context.Context, rc *plugin.RunContext, picker *plugin.CredentialPicker, method, entry string,
+	dryRun bool) (string, []lease, []uciSection, error) {
+	s := rc.Settings
+	host, luciURL, err := parseRouter(entry, method)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	ip, _ := netutil.ResolveHost(ctx, host)
+	creds, err := picker.For(ctx, plugin.CredentialTarget{IP: ip})
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if len(creds) == 0 {
+		return "", nil, nil, fmt.Errorf("keine passenden Zugangsdaten für %s (Auswahl oder Geltungsbereich der Credentials prüfen): %w", host, plugin.ErrNoCredential)
+	}
+	var (
+		leases   []lease
+		sections []uciSection
+	)
+	switch method {
+	case "luci":
+		endpoint, err := ubusEndpoint(luciURL)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		c := newUbusClient(endpoint, s.Bool("verify_tls"), luciTimeout)
+		defer c.close()
+		for i, cred := range creds {
+			user := cred.Get("username")
+			if user == "" {
+				user = "root"
+			}
+			leases, sections, err = fetchLuCI(ctx, rc.Log, c, user, cred.Get("password"))
+			if errors.Is(err, errLoginRejected) && i < len(creds)-1 {
+				rc.Log.Info("LuCI-Anmeldung abgelehnt, nächste Zugangsdaten werden probiert", "router", host, "credential", cred.Name)
+				continue
+			}
+			break
+		}
+		if err != nil {
+			return "", nil, nil, err
+		}
+	default:
+		opt := sshx.Options{Port: s.Int("port"), DryRun: dryRun}
+		if s.String("host_key_policy") != "insecure" {
+			opt.KnownHosts = filepath.Join(rc.DataDir, "known_hosts")
+		}
+		leases, sections, err = fetchSSH(ctx, rc.Log, host, creds, opt)
+		if err != nil {
+			return "", nil, nil, err
+		}
+	}
+	return host, leases, sections, nil
 }

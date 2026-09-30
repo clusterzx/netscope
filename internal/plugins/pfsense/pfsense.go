@@ -59,6 +59,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest DHCP-Leases (ISC oder Kea), statische Zuordnungen und die ARP-Tabelle von pfSense-Firewalls per SSH " +
 			"(nur feste Lesebefehle).",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryRouters,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
 		DefaultTimeout:     2 * time.Minute,
@@ -102,11 +103,24 @@ func (p *Plugin) Endpoints(s plugin.Settings) []string { return netsrc.Endpoints
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	o, fetch := p.sources(rc, false)
+	return netsrc.Run(ctx, rc, o, fetch)
+}
+
+// TestConnection implements plugin.ConnectionTester.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	o, fetch := p.sources(rc, true)
+	return netsrc.Test(ctx, rc, o, fetch)
+}
+
+// sources describes the configured systems and how one is read. dryRun (connection test)
+// checks SSH host keys without learning new ones.
+func (p *Plugin) sources(rc *plugin.RunContext, dryRun bool) (netsrc.Options, netsrc.Fetch) {
 	s := rc.Settings
-	return netsrc.Run(ctx, rc, netsrc.Options{PluginID: "pfsense", Sources: s.StringList(netsrc.KeySources), Label: "Firewall",
-		Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
-		return p.fetch(ctx, rc, src)
-	})
+	return netsrc.Options{PluginID: "pfsense", Sources: s.StringList(netsrc.KeySources), Label: "Firewall",
+			Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
+			return p.fetch(ctx, rc, src, dryRun)
+		}
 }
 
 func (p *Plugin) clock() time.Time {
@@ -142,12 +156,12 @@ func (r sshRemote) Query(ctx context.Context, socket string, cmd []byte) ([]byte
 	return io.ReadAll(io.LimitReader(conn, maxOutput))
 }
 
-func (p *Plugin) fetch(ctx context.Context, rc *plugin.RunContext, host string) (*netsrc.Result, error) {
+func (p *Plugin) fetch(ctx context.Context, rc *plugin.RunContext, host string, dryRun bool) (*netsrc.Result, error) {
 	creds, err := netsrc.Credentials(ctx, rc, []string{plugin.CredSSH, plugin.CredPassword}, host)
 	if err != nil {
 		return nil, err
 	}
-	opt := sshx.Options{Port: rc.Settings.Int("port")}
+	opt := sshx.Options{Port: rc.Settings.Int("port"), DryRun: dryRun}
 	if rc.Settings.String("host_key_policy") != "insecure" {
 		opt.KnownHosts = filepath.Join(rc.DataDir, "known_hosts")
 	}

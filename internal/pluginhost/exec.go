@@ -63,6 +63,9 @@ func (h *Host) Trigger(ctx context.Context, id string, opt TriggerOptions) (int6
 	if !ok {
 		return 0, db.ErrNotFound
 	}
+	if h.Held() {
+		return 0, ErrSetupPending
+	}
 	_, isRunner := p.(plugin.Runner)
 	_, isAction := opt.Params[actionParam]
 	if !isRunner && !isAction {
@@ -218,6 +221,7 @@ func (h *Host) execute(r queuedRun, a *activeRun, runCtx context.Context) {
 		if skipped := h.dropUnreachable(&targets); len(skipped) > 0 {
 			logger.Info("Subnetze übersprungen – Tunnel getrennt", "subnets", prefixList(skipped))
 		}
+		h.applyExclusions(&targets)
 		rc.Targets = targets
 		if len(targets.Subnets) > 0 || len(targets.Devices) > 0 {
 			logger.Log(ctx, lifecycleLevel(r.trigger), "Lauf gestartet", "subnets", len(targets.Subnets), "devices", len(targets.Devices), "trigger", r.trigger)
@@ -533,9 +537,13 @@ func (h *Host) schedulerLoop() {
 	next := map[string]time.Time{}
 	keys := map[string]string{}
 	for {
-		now := time.Now().In(h.Location)
+		loc := h.location()
+		now := time.Now().In(loc)
 		var earliest time.Time
 		for _, id := range h.IDs() {
+			if h.Held() {
+				break // nothing is scheduled before the setup is finished
+			}
 			cfg, _ := h.Config(id)
 			if cfg == nil || !cfg.Enabled || cfg.Schedule == "" {
 				delete(next, id)
@@ -546,8 +554,9 @@ func (h *Host) schedulerLoop() {
 			if err != nil {
 				continue
 			}
-			if keys[id] != cfg.Schedule || next[id].IsZero() {
-				keys[id] = cfg.Schedule
+			// a new schedule or time zone recomputes the next run
+			if key := cfg.Schedule + "|" + loc.String(); keys[id] != key || next[id].IsZero() {
+				keys[id] = key
 				next[id] = sched.Next(now)
 			}
 			if !next[id].After(now) {
@@ -595,7 +604,7 @@ func (h *Host) NextRun(id string) *time.Time {
 	if err != nil {
 		return nil
 	}
-	t := s.Next(time.Now().In(h.Location))
+	t := s.Next(time.Now().In(h.location()))
 	if t.IsZero() {
 		return nil
 	}
@@ -620,6 +629,9 @@ func (h *Host) dispatcherLoop() {
 }
 
 func (h *Host) dispatchQueued() error {
+	if h.Held() {
+		return nil
+	}
 	rows, err := h.DB.R.QueryContext(h.ctx, `SELECT id, plugin_id, trigger, attempt, parent_run_id, scope, params, requested_by FROM runs
 		WHERE status = 'queued' AND (not_before IS NULL OR not_before <= ?) ORDER BY id`, db.Now())
 	if err != nil {

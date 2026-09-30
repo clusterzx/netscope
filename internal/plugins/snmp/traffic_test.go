@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -190,5 +191,30 @@ func TestTrafficWaitsForSilentDevices(t *testing.T) {
 	now = t0.Add(71 * time.Minute)
 	if st := run("public"); st["answered"] != int64(1) {
 		t.Fatalf("device with fresh counters skipped: %v", st)
+	}
+}
+
+// The connection test of the traffic plugin is the one of the SNMP plugin: it asks the
+// test address for its system group, but stores nothing; a wrong community (no answer)
+// and a wrong address fail.
+func TestSNMPTrafficConnectionTest(t *testing.T) {
+	pdus := append(agentPDUs(1000, []port{{1, "Gi0/1", "Uplink", 6, 1000, 1, 1, 1, 2, 0, 0}}),
+		gosnmp.SnmpPDU{Name: oidSysName, Type: gosnmp.OctetString, Value: []byte("core-sw")})
+	agent := newFakeAgent(t, "public", pdus)
+	settings := map[string]any{"timeout": "1s", "retries": 0}
+	target := "127.0.0.1:" + strconv.Itoa(agent.port())
+	tr := &Traffic{}
+	res, err := plugintest.ConnectionTest(t, tr, settings, plugintest.Creds{1: v2c(1, "public", "public")}, target)
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != target || res[0].Message != "Antwort von core-sw (SNMP 2c, public)" {
+		t.Fatalf("valid community: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, tr, settings, plugintest.Creds{1: v2c(1, "falsch", "private")}, target)
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "keine SNMP-Antwort") || agent.dropped.Load() == 0 {
+		t.Fatalf("wrong community: %+v, %v (dropped %d)", res, err, agent.dropped.Load())
+	}
+	closed := closedUDP(t)
+	res, err = plugintest.ConnectionTest(t, tr, settings, plugintest.Creds{1: v2c(1, "public", "public")}, closed)
+	if err != nil || len(res) != 1 || res[0].OK || res[0].Target != closed || res[0].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
 	}
 }

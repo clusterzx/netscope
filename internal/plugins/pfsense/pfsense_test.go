@@ -3,6 +3,8 @@ package pfsense
 import (
 	"context"
 	"errors"
+	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +13,7 @@ import (
 	"netscope/internal/plugin/plugintest"
 	"netscope/internal/plugins/netsrc"
 	"netscope/internal/sshx"
+	"netscope/internal/sshx/sshtest"
 )
 
 var now = time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
@@ -155,5 +158,42 @@ func TestPfSenseConsoleMenu(t *testing.T) {
 	r := &fakeRemote{out: "\n*** Welcome to pfSense 2.7.2-RELEASE ***\n 0) Logout (SSH only)\n 8) Shell\n\nEnter an option:"}
 	if _, err := runPf(t, r); err == nil || !strings.Contains(err.Error(), "Konsolenmenü") {
 		t.Errorf("menu: %v", err)
+	}
+}
+
+// The connection test signs in over SSH and reads like a run, but stores nothing; it
+// reports a wrong password and a wrong address.
+func TestPfSenseConnectionTest(t *testing.T) {
+	srv := sshtest.New(t, "admin", "pw", func(cmd string) (string, int) {
+		if cmd != script {
+			return "", 127
+		}
+		return output(iscFile, ""), 0
+	})
+	creds := func(pw string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Name: "fw", Type: plugin.CredPassword, Public: map[string]string{"username": "admin"},
+			Secret: map[string]string{"password": pw}}}
+	}
+	p := &Plugin{now: func() time.Time { return now }}
+	// default host key policy (tofu): the test checks keys but must not write known_hosts
+	settings := map[string]any{"hosts": []any{"127.0.0.1"}, "port": srv.Port()}
+	res, err := plugintest.ConnectionTest(t, p, settings, creds("pw"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != "127.0.0.1" || !strings.Contains(res[0].Message, "3 Clients") {
+		t.Fatalf("valid password: %+v, %v", res, err)
+	}
+	if cmds := srv.Commands(); len(cmds) != 1 || cmds[0] != script {
+		t.Errorf("commands %q", cmds)
+	}
+	res, err = plugintest.ConnectionTest(t, p, settings, creds("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong password: %+v, %v", res, err)
+	}
+	// the SSH port applies to every firewall: a closed port is a wrong address
+	u, _ := url.Parse(plugintest.ClosedURL(t, "ssh"))
+	closed, _ := strconv.Atoi(u.Port())
+	settings["port"] = closed
+	res, err = plugintest.ConnectionTest(t, p, settings, creds("pw"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "SSH-Verbindung zu 127.0.0.1 fehlgeschlagen") {
+		t.Fatalf("wrong address: %+v, %v", res, err)
 	}
 }

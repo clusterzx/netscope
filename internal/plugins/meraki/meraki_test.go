@@ -13,10 +13,12 @@ import (
 	"netscope/internal/plugins/netsrc"
 )
 
-func TestMeraki(t *testing.T) {
+// dashboard serves the Dashboard API below /api/v1; the key "key1" is accepted. The first
+// request for the clients of N_1 is rate limited, /organizations redirects to a shard.
+func dashboard(t *testing.T) *httptest.Server {
+	t.Helper()
 	var srv *httptest.Server
 	throttled := false
-	var waited []time.Duration
 	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer key1" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -61,7 +63,13 @@ func TestMeraki(t *testing.T) {
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestMeraki(t *testing.T) {
+	srv := dashboard(t)
+	var waited []time.Duration
 	p := &Plugin{insecureTLS: true, sleep: func(ctx context.Context, d time.Duration) error { waited = append(waited, d); return nil }}
 	rc, sink, _ := plugintest.RunContext(t, p, map[string]any{"api_url": srv.URL + "/api/v1", "organizations": []any{"Firma GmbH"}})
 	rc.Creds = plugintest.Creds{1: {ID: 1, Type: plugin.CredAPIToken, Secret: map[string]string{"token": "key1"}}}
@@ -127,5 +135,32 @@ func TestSameSiteRedirect(t *testing.T) {
 		if got := req.Header.Get("Authorization") != ""; got != keep {
 			t.Errorf("%s: header kept = %v", target, got)
 		}
+	}
+}
+
+// The connection test reads like a run, but stores nothing; it reports a wrong API key
+// and a wrong API address.
+func TestMerakiConnectionTest(t *testing.T) {
+	srv := dashboard(t)
+	key := func(tok string) plugintest.Creds {
+		return plugintest.Creds{1: {ID: 1, Type: plugin.CredAPIToken, Secret: map[string]string{"token": tok}}}
+	}
+	settings := func(api string) map[string]any {
+		return map[string]any{"api_url": api, "organizations": []any{"Firma GmbH"}}
+	}
+	p := &Plugin{insecureTLS: true, sleep: func(ctx context.Context, d time.Duration) error { return nil }}
+	api := srv.URL + "/api/v1"
+	res, err := plugintest.ConnectionTest(t, p, settings(api), key("key1"), "")
+	if err != nil || len(res) != 1 || !res[0].OK || res[0].Target != api || !strings.Contains(res[0].Message, "3 Clients und 2 Netzwerkgeräte") {
+		t.Fatalf("valid key: %+v, %v", res, err)
+	}
+	res, err = plugintest.ConnectionTest(t, p, settings(api), key("wrong"), "")
+	if err != nil || len(res) != 1 || res[0].OK || !strings.Contains(res[0].Message, "Anmeldung abgelehnt") {
+		t.Fatalf("wrong key: %+v, %v", res, err)
+	}
+	closed := plugintest.ClosedURL(t, "https") + "/api/v1"
+	res, err = plugintest.ConnectionTest(t, p, settings(closed), key("key1"), "")
+	if err != nil || len(res) != 1 || res[0].OK || res[0].Target != closed || res[0].Message == "" {
+		t.Fatalf("wrong address: %+v, %v", res, err)
 	}
 }

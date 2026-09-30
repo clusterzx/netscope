@@ -36,6 +36,7 @@ func (p *Plugin) Info() plugin.Info {
 		Description: "Liest DHCP-Leases, die ARP-Tabelle und die Bridge-Hosttabelle (welches Gerät an welchem Port) von MikroTik-Routern " +
 			"und -Switches über die REST-API von RouterOS 7.",
 		Version:            "1.0.0",
+		Category:           plugin.CategoryRouters,
 		DefaultEnabled:     false,
 		DefaultSchedule:    "*/10 * * * *",
 		DefaultTimeout:     3 * time.Minute,
@@ -75,11 +76,23 @@ func (p *Plugin) Endpoints(s plugin.Settings) []string { return netsrc.Endpoints
 
 // Run implements plugin.Runner.
 func (p *Plugin) Run(ctx context.Context, rc *plugin.RunContext) error {
+	o, fetch := p.sources(rc)
+	return netsrc.Run(ctx, rc, o, fetch)
+}
+
+// TestConnection implements plugin.ConnectionTester.
+func (p *Plugin) TestConnection(ctx context.Context, rc *plugin.RunContext) ([]plugin.ConnectionResult, error) {
+	o, fetch := p.sources(rc)
+	return netsrc.Test(ctx, rc, o, fetch)
+}
+
+// sources describes the configured systems and how one is read.
+func (p *Plugin) sources(rc *plugin.RunContext) (netsrc.Options, netsrc.Fetch) {
 	s := rc.Settings
-	return netsrc.Run(ctx, rc, netsrc.Options{PluginID: "mikrotik", Sources: s.StringList(netsrc.KeySources), Label: "Router",
-		Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
-		return p.fetch(ctx, rc, src)
-	})
+	return netsrc.Options{PluginID: "mikrotik", Sources: s.StringList(netsrc.KeySources), Label: "Router",
+			Create: s.Bool(netsrc.KeyCreate)}, func(ctx context.Context, src string) (*netsrc.Result, error) {
+			return p.fetch(ctx, rc, src)
+		}
 }
 
 func (p *Plugin) clock() time.Time {

@@ -17,9 +17,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/netip"
 	"regexp"
+	"slices"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,6 +74,45 @@ type Info struct {
 	Targets  TargetMode `json:"targets"`
 	Presence bool       `json:"presence"` // runs decide online/offline state
 	Binaries []string   `json:"binaries,omitempty"`
+
+	// Load is the burden a network scan puts on the scanned devices (LoadHigh, LoadMedium,
+	// LoadLow). Scanners with a load are offered in the scanner step of the setup wizard.
+	Load string `json:"load,omitempty"`
+	// Category groups the systems NetScope reads with credentials (CategoryRouters …);
+	// the setup wizard shows them as tabs and the plugin list groups by it. New importers
+	// bring their category along.
+	Category string `json:"category,omitempty"`
+}
+
+// Loads of a network scan on the scanned devices.
+const (
+	LoadHigh   = "high"   // many probes per device (port and service scans)
+	LoadMedium = "medium" // a few connections per device (HTTP, TLS)
+	LoadLow    = "low"    // single packets or answers to broadcasts
+)
+
+// Categories of the systems NetScope reads with credentials.
+const (
+	CategoryRouters        = "routers"        // Router und Firewalls
+	CategoryControllers    = "controllers"    // Netzwerk-Controller
+	CategoryVirtualization = "virtualization" // Virtualisierung und Container
+	CategoryDNS            = "dns"            // DNS und DHCP
+	CategoryServers        = "servers"        // Server und Switches
+)
+
+// CategoryInfo describes a category.
+type CategoryInfo struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// Categories lists the categories in display order.
+var Categories = []CategoryInfo{
+	{CategoryRouters, "Router und Firewalls"},
+	{CategoryControllers, "Netzwerk-Controller"},
+	{CategoryVirtualization, "Virtualisierung und Container"},
+	{CategoryDNS, "DNS und DHCP"},
+	{CategoryServers, "Server und Switches"},
 }
 
 // Plugin is implemented by every plugin.
@@ -122,6 +165,29 @@ type EndpointProvider interface {
 	// Endpoints returns the host names or IP addresses the plugin connects to.
 	Endpoints(s Settings) []string
 }
+
+// ConnectionTester is implemented by plugins that read systems with credentials. The
+// test connects to every configured system (or to rc.Params["target"] for plugins that
+// work on devices, e.g. SSH and SNMP) and signs in, without storing anything: rc.Sink
+// discards observations, rc.RunID is 0. The results name each system; an error is
+// returned only when nothing could be tested (e.g. no system configured).
+type ConnectionTester interface {
+	Plugin
+	TestConnection(ctx context.Context, rc *RunContext) ([]ConnectionResult, error)
+}
+
+// ConnectionResult is the outcome of the connection test of one system.
+type ConnectionResult struct {
+	Target  string `json:"target"`
+	OK      bool   `json:"ok"`
+	Message string `json:"message"`
+	// DurationMs is the time the test of this system took.
+	DurationMs int64 `json:"durationMs"`
+}
+
+// TargetParam is the RunContext parameter naming the address a connection test uses for
+// plugins that work on devices.
+const TargetParam = "target"
 
 // SettingsMigrator converts stored settings of an older plugin version (renamed or
 // merged keys) before they are normalized against the current schema. It must be
@@ -223,6 +289,20 @@ type Targets struct {
 	// DeviceMode is true when the scope selected devices (groups, tags, explicit devices,
 	// query). Subnet scanners must then only scan the device addresses.
 	DeviceMode bool `json:"deviceMode"`
+	// Exclude are addresses and ranges no scanner may probe (system setting). The core
+	// already removed them from Devices; subnet scanners must skip them.
+	Exclude []netip.Prefix `json:"exclude,omitempty"`
+}
+
+// Excluded reports whether an address must not be scanned.
+func (t Targets) Excluded(a netip.Addr) bool {
+	a = a.Unmap()
+	for _, p := range t.Exclude {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
 }
 
 // DeviceIPs returns all addresses of the target devices (primary first, deduplicated).
@@ -503,6 +583,14 @@ func Register(p Plugin) {
 	if err := p.Schema().Check(); err != nil {
 		panic(fmt.Sprintf("plugin %s: invalid schema: %v", info.ID, err))
 	}
+	switch info.Load {
+	case "", LoadHigh, LoadMedium, LoadLow:
+	default:
+		panic(fmt.Sprintf("plugin %s: invalid load %q", info.ID, info.Load))
+	}
+	if info.Category != "" && !slices.ContainsFunc(Categories, func(c CategoryInfo) bool { return c.ID == info.Category }) {
+		panic(fmt.Sprintf("plugin %s: invalid category %q", info.ID, info.Category))
+	}
 	if info.DefaultSchedule != "" {
 		if _, ok := p.(Runner); !ok {
 			panic(fmt.Sprintf("plugin %s: schedule without Runner", info.ID))
@@ -544,4 +632,26 @@ func All() []Plugin {
 		return a.ID < b.ID
 	})
 	return out
+}
+
+// TestTarget returns the address a connection test of a plugin that works on devices
+// uses: rc.Params["target"] as "host" or "host:port" (port 0 = the plugin's default).
+func TestTarget(rc *RunContext) (host string, port int, err error) {
+	raw, _ := rc.Params[TargetParam].(string)
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", 0, errors.New("Adresse eines Geräts für den Verbindungstest angeben")
+	}
+	if h, p, err := net.SplitHostPort(raw); err == nil {
+		n, perr := strconv.Atoi(p)
+		if h == "" || perr != nil || n < 1 || n > 65535 {
+			return "", 0, fmt.Errorf("ungültige Adresse %q (Host oder Host:Port erwartet)", raw)
+		}
+		return h, n, nil
+	}
+	raw = strings.Trim(raw, "[]")
+	if strings.ContainsAny(raw, " /:") && net.ParseIP(raw) == nil {
+		return "", 0, fmt.Errorf("ungültige Adresse %q (Host oder Host:Port erwartet)", raw)
+	}
+	return raw, 0, nil
 }

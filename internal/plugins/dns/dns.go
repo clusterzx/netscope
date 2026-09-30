@@ -29,6 +29,7 @@ func (p *Plugin) Info() plugin.Info {
 		Name:               "Reverse-DNS",
 		Description:        "Ermittelt Hostnamen per Reverse-DNS-Abfrage (PTR) gegen einen konfigurierbaren DNS-Server.",
 		Version:            "1.0.0",
+		Load:               plugin.LoadLow,
 		DefaultEnabled:     true,
 		DefaultSchedule:    "15 * * * *",
 		DefaultTimeout:     10 * time.Minute,

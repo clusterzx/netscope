@@ -74,13 +74,15 @@ func init() {
 		"Interface-Tabelle: %s":                                        "interface table: %s",
 
 		// events
-		"%s auf %s zu %.0f %% ausgelastet":                "%s on %s at %.0f%% utilisation",
-		"%s %s bei %s Mbit/s Portgeschwindigkeit.":        "%s %s at %s Mbit/s port speed.",
-		"%s eingehend bei %s Mbit/s Portgeschwindigkeit.": "%s inbound at %s Mbit/s port speed.",
-		"%s ausgehend bei %s Mbit/s Portgeschwindigkeit.": "%s outbound at %s Mbit/s port speed.",
-		"%s auf %s hat keine Verbindung mehr":             "%s on %s is no longer connected",
-		"Port-Status: %s (vorher up).":                    "Port status: %s (previously up).",
-		"%s auf %s ist wieder verbunden":                  "%s on %s is connected again",
-		"Port-Status: up (vorher %s).":                    "Port status: up (previously %s).",
+		"%s auf %s zu %.0f %% ausgelastet":                                 "%s on %s at %.0f%% utilisation",
+		"%s %s bei %s Mbit/s Portgeschwindigkeit.":                         "%s %s at %s Mbit/s port speed.",
+		"%s eingehend bei %s Mbit/s Portgeschwindigkeit.":                  "%s inbound at %s Mbit/s port speed.",
+		"%s ausgehend bei %s Mbit/s Portgeschwindigkeit.":                  "%s outbound at %s Mbit/s port speed.",
+		"%s auf %s hat keine Verbindung mehr":                              "%s on %s is no longer connected",
+		"Port-Status: %s (vorher up).":                                     "Port status: %s (previously up).",
+		"%s auf %s ist wieder verbunden":                                   "%s on %s is connected again",
+		"Port-Status: up (vorher %s).":                                     "Port status: up (previously %s).",
+		"Antwort von %s (SNMP %s, %s)":                                     "Answer from %s (SNMP %s, %s)",
+		"keine SNMP-Antwort – Adresse, Community bzw. Benutzer prüfen: %w": "no SNMP answer – check address, community or user: %w",
 	})
 }
