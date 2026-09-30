@@ -37,7 +37,7 @@ http:
     netscope:
       loadBalancer:
         servers:
-          - url: http://192.168.8.123:8080
+          - url: http://192.168.10.123:8080
 ```
 
 Unter **System → Einstellungen** die öffentliche URL (`https://netscope.example.lan`)
@@ -177,7 +177,7 @@ Dann auf dem Node in `/root/.ssh/authorized_keys` eine Zeile mit dem öffentlich
 NetScope ergänzen – `from=` auf die IP von NetScope setzen:
 
 ```
-command="/usr/local/sbin/netscope-docker-inventory",from="192.168.8.123",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA… netscope
+command="/usr/local/sbin/netscope-docker-inventory",from="192.168.10.123",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA… netscope
 ```
 
 Der Schlüssel kann dann weder eine Shell öffnen noch andere Befehle ausführen oder Ports
@@ -203,7 +203,7 @@ Installations-Token (gültig z. B. 30 Tage, für beliebig viele oder eine festge
 Systeme, optional mit Tags für die Geräte). Auf dem System als root ausführen:
 
 ```bash
-curl -fsSL http://192.168.8.123:8080/agent/install.sh | sudo sh -s -- --token nse_…
+curl -fsSL http://192.168.10.123:8080/agent/install.sh | sudo sh -s -- --token nse_…
 ```
 
 Das Skript lädt den Agent von der Instanz (amd64, arm64, armv7), prüft die Prüfsumme, legt den
@@ -230,7 +230,7 @@ und arm64). Unter **Agents → Agent installieren** auf **Windows** umschalten u
 einer PowerShell **als Administrator** ausführen:
 
 ```powershell
-& ([scriptblock]::Create((irm 'http://192.168.8.123:8080/agent/install.ps1'))) -Token nse_…
+& ([scriptblock]::Create((irm 'http://192.168.10.123:8080/agent/install.ps1'))) -Token nse_…
 ```
 
 Das Skript lädt den Agent, prüft die Prüfsumme, legt ihn unter `C:\Program Files\NetScope Agent`
@@ -369,7 +369,7 @@ trennt Alternativen, `-` negiert, Werte mit Leerzeichen in Anführungszeichen:
 ```
 tag:iot port:22 os:linux cve>=7 seen<24h
 -state:known is:online vendor:"tp-link"
-port:22|80 ip:192.168.8.0/24 app:grafana cert<30d
+port:22|80 ip:192.168.10.0/24 app:grafana cert<30d
 ```
 
 | Feld | Bedeutung |
@@ -543,7 +543,7 @@ Abschnitt 9), im Server in `i18n_en.go` je Paket ([PLUGINS.md](PLUGINS.md)).
   scrape_configs:
     - job_name: netscope
       authorization: { credentials: ns_… }
-      static_configs: [{ targets: ["192.168.8.123:8080"] }]
+      static_configs: [{ targets: ["192.168.10.123:8080"] }]
   ```
 
 ## Backup und Wiederherstellung

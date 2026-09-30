@@ -142,7 +142,6 @@ Regel-Engine entscheidet, wer benachrichtigt wird. Details in
 | [docs/PLUGINS.md](docs/PLUGINS.md) | Eigene Plugins entwickeln |
 | [docs/PUBLISHERS.md](docs/PUBLISHERS.md) | Telegram, ntfy, E-Mail, Webhook und n8n |
 | [docs/FRONTEND.md](docs/FRONTEND.md) | Weboberfläche: Komponenten, API-Client, Konventionen |
-| [docs/FUTURE_REQUESTS.md](docs/FUTURE_REQUESTS.md) | Erfasste Wünsche für spätere Versionen |
 
 Die API ist in der laufenden Instanz unter `/api/docs` dokumentiert (OpenAPI:
 `/api/openapi.json`).

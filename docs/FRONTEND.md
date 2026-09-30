@@ -39,7 +39,7 @@ import { api, ApiError, errorMessage, fieldErrors } from '$lib/api';
 import type { PluginView, Rule, HealthCheck, … } from '$lib/api';     // friendly aliases, types.ts
 
 Typed against ApiPaths (generated.ts, generated from /api/openapi.json – DO NOT EDIT;
-regenerate: `npm run gen:api -- http://192.168.8.123:8080` or `-- path/to/openapi.json`):
+regenerate: `npm run gen:api -- http://192.168.10.123:8080` or `-- path/to/openapi.json`):
 
   const list = await api.get('/api/v1/plugins');                                   // PluginView[]
   const p    = await api.get('/api/v1/plugins/{id}', { path: { id } });

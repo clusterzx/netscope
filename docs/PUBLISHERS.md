@@ -98,13 +98,13 @@ Regel: Ports (bekannt) + CVE>=9 · 2 Ereignisse
 
 🟡 Neuer Port 8080/tcp (http-alt) auf nas_01!
 Port neu · Mittel · 22.09. 12:03
-🖥 nas_01 · 192.168.8.10
+🖥 nas_01 · 192.168.10.10
 Server: nginx/1.25
 Öffnen
 
 🔴 CVE-2024-6387 auf nas_01
 Neue Schwachstelle · Kritisch · 22.09. 12:04
-🖥 nas_01 · 192.168.8.10
+🖥 nas_01 · 192.168.10.10
 Öffnen · ⏰ eskaliert · ✅ quittiert
 
 In NetScope öffnen
@@ -118,9 +118,9 @@ _Regel: Ports \(bekannt\) \+ CVE\>\=9 · 2 Ereignisse_
 
 🟡 *Neuer Port 8080/tcp \(http\-alt\) auf nas\_01\!*
 _Port neu · Mittel · 22\.09\. 12:03_
-🖥 [nas\_01](http://192.168.8.123:8080/devices/17) · 192\.168\.8\.10
+🖥 [nas\_01](http://192.168.10.123:8080/devices/17) · 192\.168\.10\.10
 Server: nginx/1\.25
-[Öffnen](http://192.168.8.123:8080/events/1)
+[Öffnen](http://192.168.10.123:8080/events/1)
 ```
 
 Aufbau:
@@ -299,10 +299,10 @@ Sonderzeichen in Titel und Nachricht ohne weitere Kodierung möglich.
 {
   "topic": "netscope-a8f3k2",
   "title": "2 Ereignisse auf nas_01",
-  "message": "**Neuer Port 22/tcp auf nas\\_01** (Mittel)  \nnas\\_01 · 192.168.8.10 · 22.09. 12:03  \n[Öffnen](http://192.168.8.123:8080/events/1)\n\n…",
+  "message": "**Neuer Port 22/tcp auf nas\\_01** (Mittel)  \nnas\\_01 · 192.168.10.10 · 22.09. 12:03  \n[Öffnen](http://192.168.10.123:8080/events/1)\n\n…",
   "priority": 4,
   "tags": ["rotating_light"],
-  "click": "http://192.168.8.123:8080/events?notification=8",
+  "click": "http://192.168.10.123:8080/events?notification=8",
   "markdown": true
 }
 ```
@@ -514,7 +514,7 @@ geprüft.
     "title": "2 neue Ereignisse auf nas",
     "ruleId": 3,
     "ruleName": "Neuer Port auf bekanntem Gerät",
-    "link": "http://192.168.8.123:8080/events?notification=42",
+    "link": "http://192.168.10.123:8080/events?notification=42",
     "createdAt": "2026-09-22T12:03:34Z"
   },
   "summary": {
@@ -543,20 +543,20 @@ geprüft.
       "at": "2026-09-22T12:03:04Z",
       "acknowledged": false,
       "escalated": false,
-      "link": "http://192.168.8.123:8080/events/1001",
+      "link": "http://192.168.10.123:8080/events/1001",
       "device": {
         "id": 17,
         "name": "nas",
-        "ip": "192.168.8.10",
+        "ip": "192.168.10.10",
         "mac": "aa:bb:cc:dd:ee:ff",
-        "link": "http://192.168.8.123:8080/devices/17"
+        "link": "http://192.168.10.123:8080/devices/17"
       },
       "payload": {
-        "device_ip": "192.168.8.10",
+        "device_ip": "192.168.10.10",
         "device_mac": "aa:bb:cc:dd:ee:ff",
         "device_name": "nas",
         "device_state": "known",
-        "ip": "192.168.8.10",
+        "ip": "192.168.10.10",
         "port": 22,
         "product": "OpenSSH",
         "proto": "tcp",
@@ -577,19 +577,19 @@ geprüft.
       "at": "2026-09-22T12:03:06Z",
       "acknowledged": false,
       "escalated": false,
-      "link": "http://192.168.8.123:8080/events/1002",
+      "link": "http://192.168.10.123:8080/events/1002",
       "device": {
         "id": 17,
         "name": "nas",
-        "ip": "192.168.8.10",
+        "ip": "192.168.10.10",
         "mac": "aa:bb:cc:dd:ee:ff",
-        "link": "http://192.168.8.123:8080/devices/17"
+        "link": "http://192.168.10.123:8080/devices/17"
       },
       "payload": {
         "cpe": "cpe:2.3:a:openbsd:openssh:9.6:p1:*:*:*:*:*:*",
         "cve": "CVE-2024-6387",
         "cvss": 8.1,
-        "device_ip": "192.168.8.10",
+        "device_ip": "192.168.10.10",
         "device_mac": "aa:bb:cc:dd:ee:ff",
         "device_name": "nas",
         "device_state": "known",
@@ -600,7 +600,7 @@ geprüft.
       }
     }
   ],
-  "text": "2 neue Ereignisse auf nas\n\n[Mittel] Neuer Port 22/tcp (ssh) auf nas (192.168.8.10)\n  OpenSSH 9.6p1 Ubuntu 3ubuntu13\n  http://192.168.8.123:8080/events/1001\n\n[Kritisch] CVE-2024-6387 (CVSS 8.1) auf nas (192.168.8.10)\n  OpenSSH: Race Condition im Signal-Handler (regreSSHion)\n  http://192.168.8.123:8080/events/1002\n\nhttp://192.168.8.123:8080/events?notification=42\n",
+  "text": "2 neue Ereignisse auf nas\n\n[Mittel] Neuer Port 22/tcp (ssh) auf nas (192.168.10.10)\n  OpenSSH 9.6p1 Ubuntu 3ubuntu13\n  http://192.168.10.123:8080/events/1001\n\n[Kritisch] CVE-2024-6387 (CVSS 8.1) auf nas (192.168.10.10)\n  OpenSSH: Race Condition im Signal-Handler (regreSSHion)\n  http://192.168.10.123:8080/events/1002\n\nhttp://192.168.10.123:8080/events?notification=42\n",
   "body": ""
 }
 ```
@@ -616,11 +616,11 @@ Bericht (`kind: report`) – typischerweise ohne Events:
   "source": "netscope",
   "sentAt": "2026-09-28T07:00:02Z",
   "notification": {"id": 57, "kind": "report", "priority": "low", "title": "Wochenbericht KW 39",
-    "ruleId": 0, "ruleName": "", "link": "http://192.168.8.123:8080/reports", "createdAt": "2026-09-28T07:00:00Z"},
+    "ruleId": 0, "ruleName": "", "link": "http://192.168.10.123:8080/reports", "createdAt": "2026-09-28T07:00:00Z"},
   "summary": {"events": 0, "maxSeverity": "info", "maxSeverityRank": 0,
     "bySeverity": {"critical": 0, "high": 0, "info": 0, "low": 0, "medium": 0}},
   "events": [],
-  "text": "Wochenbericht KW 39\n\n## Änderungen\n- 3 neue Geräte\n- 1 Zertifikat läuft ab\n\nhttp://192.168.8.123:8080/reports\n",
+  "text": "Wochenbericht KW 39\n\n## Änderungen\n- 3 neue Geräte\n- 1 Zertifikat läuft ab\n\nhttp://192.168.10.123:8080/reports\n",
   "body": "## Änderungen\n- 3 neue Geräte\n- 1 Zertifikat läuft ab"
 }
 ```

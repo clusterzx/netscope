@@ -141,7 +141,6 @@ The detailed documentation is in German.
 | [docs/PLUGINS.md](docs/PLUGINS.md) | Writing your own plugins |
 | [docs/PUBLISHERS.md](docs/PUBLISHERS.md) | Telegram, ntfy, e-mail, webhook and n8n |
 | [docs/FRONTEND.md](docs/FRONTEND.md) | Web interface: components, API client, conventions |
-| [docs/FUTURE_REQUESTS.md](docs/FUTURE_REQUESTS.md) | Recorded feature requests |
 
 The API is documented in the running instance at `/api/docs` (OpenAPI: `/api/openapi.json`).
 

@@ -7,3 +7,15 @@
 /web/.svelte-kit/
 /internal/webui/dist/*
 !/internal/webui/dist/.keep
+
+# Private notes and planning, kept locally only
+/PROMPT.md
+/docs/BACKLOG.md
+/docs/FUTURE_REQUESTS.md
+
+# Local environment files, logs, backups and dumps
+.env
+.env.*
+*.log
+*.bak
+*.dump
