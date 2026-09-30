@@ -294,6 +294,18 @@ func TestRebuild(t *testing.T) {
 			},
 		},
 		{
+			name: "connections set in a rack pin the device like manual edges",
+			setup: func(f *fixture) {
+				f.device("sw1", "mac:02:00:00:00:00:01")
+				f.device("sw2", "mac:02:00:00:00:00:02")
+				f.device("pc", "mac:aa:00:00:00:00:01")
+				f.device("nas", "mac:aa:00:00:00:00:02")
+				f.inventory("sw1", snmp.Inventory{FDB: fdb("1", []string{"aa:00:00:00:00:01"}, "2", []string{"aa:00:00:00:00:02"})}, time.Minute)
+				f.relation("sw2", "pc", plugin.RelSwitchPort, "rack", old)
+			},
+			want: []string{"rack:switch_port sw2>pc", "switch_port sw1>nas 2|"},
+		},
+		{
 			name:     "excluded tags",
 			settings: map[string]any{"exclude_tags": []any{"Keine Topologie"}},
 			setup: func(f *fixture) {

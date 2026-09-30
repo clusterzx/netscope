@@ -173,5 +173,6 @@ func init() {
 		"offen":                     "open",
 		"vorhanden":                 "present",
 		"gesehen":                   "seen",
+		"die Verbindung ist in einem Rack eingetragen und wird dort gelöst": "the connection is entered in a rack and is removed there",
 	})
 }
