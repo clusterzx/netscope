@@ -42,6 +42,8 @@
 - **Schwachstellen:** CVE-Abgleich gegen eine lokal gespiegelte NVD, priorisiert nach CISA KEV
   und EPSS.
 - **Überwachung:** Änderungs-Events, Health-Checks, Topologie-Graph und Berichte.
+- **Racks:** Geräte und Patchfelder in Racks (auch halbe und drittel Breite), Switch-Ports aus
+  SNMP mit erkannten Geräten, Zuordnung per Klick und Patchkabel bis zur Dose.
 - **Benachrichtigungen:** Regeln mit Bündelung, Ruhezeiten, Drosselung und Eskalation über
   Telegram, ntfy, E-Mail, Webhook und n8n.
 - **Entfernte Netze und Standorte:** eigene WireGuard-Tunnel oder je Standort eine

@@ -8,6 +8,17 @@ export const icons = {
 	dashboard: ['M4 4h6v8H4z', 'M14 4h6v5h-6z', 'M14 13h6v7h-6z', 'M4 16h6v4H4z'],
 	devices: ['M3 5h18v11H3z', 'M8 20h8', 'M12 16v4'],
 	server: ['M4 4h16v6H4z', 'M4 14h16v6H4z', 'M8 7h.01', 'M8 17h.01'],
+	rack: [
+		'M5 3h14v18H5z',
+		'M5 9h14',
+		'M5 15h14',
+		'M8 6h5',
+		'M8 12h5',
+		'M8 18h5',
+		'M16 6h.01',
+		'M16 12h.01',
+		'M16 18h.01'
+	],
 	topology: [c(12, 5, 2.5), c(5, 19, 2.5), c(19, 19, 2.5), 'M12 7.5v4M12 11.5l-5.6 5.4M12 11.5l5.6 5.4'],
 	events: ['M6 16V11a6 6 0 1 1 12 0v5l2 2H4z', 'M10 21h4'],
 	diff: [

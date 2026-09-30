@@ -10,6 +10,7 @@ Die Bedienung im Detail. Überblick und Schnellstart stehen in der [README](../R
 - [NetScope-Agent](#netscope-agent)
 - [Entfernte Netze (Router, WireGuard)](#entfernte-netze-router-wireguard)
 - [Mehrere Standorte (Verbund)](#mehrere-standorte-verbund)
+- [Racks](#racks)
 - [Filter-Query-Sprache](#filter-query-sprache)
 - [Regeln und Benachrichtigungen](#regeln-und-benachrichtigungen)
 - [Schwachstellen](#schwachstellen)
@@ -419,6 +420,57 @@ In der Zentrale gilt:
 Wird ein Netz bisher per Tunnel von der Zentrale gescannt, das Subnetz dort entfernen,
 sobald der Standort liefert – sonst erscheinen Geräte ohne MAC doppelt (einmal über den
 Tunnel, einmal vom Standort).
+
+## Racks
+
+Unter **Racks** dokumentierst du den physischen Aufbau: Racks mit ihren Höheneinheiten (HE),
+die eingebauten Geräte und passiven Elemente, und was an welchem Port steckt. Die
+Verbindungen fließen in die Topologie ein.
+
+**Rack anlegen:** Name, Standort, Breite (19" oder 10"), Höhe in HE (1–60) und Zählung
+(HE 1 unten oder oben). Die Übersicht zeigt je Rack, wie viel belegt ist und ob eingebaute
+Geräte offline sind.
+
+**Einbauen:** Klick auf eine freie Höheneinheit (oder „Einbauen“) und dann entweder ein
+**Gerät aus dem Inventar** wählen oder ein passives Element: Patchfeld, Fachboden, Blende,
+Kabelführung, Steckdosenleiste, Sonstiges. Jedes Element hat eine Höhe, eine Seite (vorne oder
+hinten, „volle Tiefe“ belegt beide), und eine Breite: voll, halb oder ein Drittel – so passen
+Mini-PCs oder Raspberry Pis nebeneinander in eine HE. Elemente lassen sich mit der Maus auf
+eine andere HE (bei halber und drittel Breite auch zur Seite) ziehen, mit den Pfeiltasten im
+Seitenpanel um eine HE verschieben oder beim Bearbeiten in ein anderes Rack verschieben. Ein
+Gerät steckt in höchstens einem Rack. Wird es aus dem Inventar gelöscht, bleibt sein Platz mit
+dem letzten Namen stehen; beim Zusammenführen übernimmt das Zielgerät den Platz.
+
+**Ports:** Bei einem Gerät mit SNMP kommen die Ports aus der Interface-Tabelle (nur
+physische Ports, mit Link-Status und Geschwindigkeit). Ohne SNMP gibst du die Anzahl und
+ein Präfix an (`ether` → ether1, ether2 …); Ports, die Importe oder die Topologie nennen
+(UniFi, MikroTik, LLDP …), kommen automatisch dazu. Patchfelder haben die angegebene Zahl an
+Ports.
+
+**Was an einem Port steckt:**
+
+- **Erkannt** (gestrichelt grün): Geräte, die andere Quellen an diesem Port sehen – die
+  Topologie aus SNMP (Bridge-Tabelle, LLDP) und Importe wie UniFi oder MikroTik. Namen wie
+  „5“, „Port 5“ oder „ether5“ werden dem richtigen Port zugeordnet.
+- **Von Hand** (blau): Port anklicken, im Panel „Gerät anschließen“. Ein erkanntes Gerät
+  übernimmst du mit „Übernehmen“; „N erkannte Verbindungen übernehmen“ beim Gerät übernimmt
+  alle Ports mit genau einem erkannten Gerät auf einmal. Steht ein erkanntes Gerät im Rack an
+  einem anderen Port, weist das Panel darauf hin.
+- **Patchkabel** (in seiner Farbe): Port anklicken, „Kabel ziehen“ und den Ziel-Port
+  anklicken (Esc bricht ab) – oder „Ziel auswählen …“, auch für Ports in einem anderen Rack.
+  Farbe und Beschriftung (z. B. Kabelnummer) sind optional. Ein Geräte-Port nimmt ein Kabel,
+  ein Patchfeld-Port zwei (vorne und hinten). An einem Patchfeld-Port trägst du die Dose ein
+  („Dose Büro 1.04“) und das Gerät, das dort angeschlossen ist. Das Panel des Switch-Ports
+  zeigt dann den ganzen Weg: Kabel zum Patchfeld → Dose → Gerät.
+
+Jede von Hand eingetragene Verbindung – direkt oder über Kabel und Patchfelder – wird eine
+geschützte Beziehung „Switch-Port“ (Quelle `rack`): Die Topologie zeigt sie, und die
+automatische Ableitung hängt dieses Gerät nicht mehr um. Gelöst wird sie im Rack (Zuordnung
+lösen, Kabel entfernen, Element ausbauen), nicht in der Topologie. Die Geräteseite zeigt unter
+**Rack**, wo das Gerät eingebaut ist und an welchem Rack-Port es hängt.
+
+Racks anlegen und ändern erfordert das Recht `devices.edit`; ansehen darf jeder angemeldete
+Benutzer.
 
 ## Filter-Query-Sprache
 

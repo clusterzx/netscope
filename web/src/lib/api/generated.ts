@@ -68,6 +68,10 @@ export interface ApiActionRequest {
 	params?: Record<string, unknown>;
 }
 
+export interface ApiAdoptResponse {
+	ports: number;
+}
+
 export interface ApiAgentsResponse {
 	agents: AgentAgent[];
 	baseUrl: string;
@@ -1974,6 +1978,180 @@ export interface ProtoUpdate {
 	version: string;
 }
 
+export interface RackCableInput {
+	a: RackEnd;
+	b: RackEnd;
+	color?: string;
+	label?: string;
+}
+
+export interface RackDetected {
+	device: RackDeviceRef;
+	elsewhere?: string;
+	kind: string;
+	remotePort?: string;
+	source: string;
+}
+
+export interface RackDeviceInfo {
+	links: RackLink[];
+	mount?: RackMount;
+}
+
+export interface RackDeviceRef {
+	id: number;
+	ip?: string;
+	model?: string;
+	name: string;
+	online: boolean;
+	type?: string;
+	vendor?: string;
+}
+
+export interface RackEnd {
+	itemId: number;
+	port: string;
+}
+
+export interface RackItem {
+	col: number;
+	cols: number;
+	device?: RackDeviceRef;
+	deviceId?: number;
+	deviceName?: string;
+	face: string;
+	fullDepth: boolean;
+	height: number;
+	id: number;
+	kind: string;
+	label: string;
+	portCount: number;
+	portPrefix: string;
+	ports: RackPort[];
+	position: number;
+	rackId: number;
+}
+
+export interface RackItemInput {
+	col?: number;
+	cols?: number;
+	deviceId?: number;
+	face?: string;
+	fullDepth?: boolean;
+	height?: number;
+	kind: string;
+	label?: string;
+	portCount?: number;
+	portPrefix?: string;
+	position: number;
+	rackId?: number;
+}
+
+export interface RackLink {
+	itemId: number;
+	itemName: string;
+	port: string;
+	rackId: number;
+	rackName: string;
+}
+
+export interface RackMount {
+	face: string;
+	height: number;
+	itemId: number;
+	position: number;
+	rackId: number;
+	rackName: string;
+	unit: number;
+}
+
+export interface RackPort {
+	cables: RackPortCable[];
+	detected: RackDetected[];
+	detectedMore?: number;
+	device?: RackDeviceRef;
+	label?: string;
+	media: string;
+	name: string;
+	source: string;
+	speedMbps?: number;
+	status?: string;
+}
+
+export interface RackPortCable {
+	color?: string;
+	end?: RackTarget;
+	id: number;
+	label?: string;
+	peer: RackTarget;
+}
+
+export interface RackPortInput {
+	deviceId?: number;
+	label?: string;
+	port: string;
+}
+
+export interface RackRack {
+	createdAt: string;
+	height: number;
+	id: number;
+	location: string;
+	name: string;
+	notes: string;
+	numbering: string;
+	updatedAt: string;
+	width: string;
+}
+
+export interface RackRackInput {
+	height?: number;
+	location?: string;
+	name: string;
+	notes?: string;
+	numbering?: string;
+	width?: string;
+}
+
+export interface RackSummary {
+	createdAt: string;
+	devices: number;
+	height: number;
+	id: number;
+	items: number;
+	location: string;
+	name: string;
+	notes: string;
+	numbering: string;
+	offline: number;
+	updatedAt: string;
+	usedUnits: number;
+	width: string;
+}
+
+export interface RackTarget {
+	device?: RackDeviceRef;
+	itemId: number;
+	itemName: string;
+	label?: string;
+	port: string;
+	rackId: number;
+	rackName: string;
+}
+
+export interface RackView {
+	createdAt: string;
+	height: number;
+	id: number;
+	items: RackItem[];
+	location: string;
+	name: string;
+	notes: string;
+	numbering: string;
+	updatedAt: string;
+	width: string;
+}
+
 export interface ReportsCVELine {
 	cve: string;
 	cvss: number;
@@ -2562,6 +2740,10 @@ export interface ApiPaths {
 		/** Ports & Dienste */
 		get: { query: { history?: boolean | null }; body: never; response: InventoryPortView[] };
 	};
+	'/api/v1/devices/{id}/rack': {
+		/** Einbauort im Rack und Rack-Ports, die zum Gerät führen */
+		get: { query: never; body: never; response: RackDeviceInfo };
+	};
 	'/api/v1/devices/{id}/relations': {
 		/** Beziehungen (Eltern/Kinder, Topologie) */
 		get: { query: never; body: never; response: InventoryRelation[] };
@@ -2769,6 +2951,46 @@ export interface ApiPaths {
 	'/api/v1/publishers': {
 		/** Verfügbare Publisher */
 		get: { query: never; body: never; response: PluginhostPublisherInfo[] };
+	};
+	'/api/v1/rack-cables': {
+		/** Patchkabel zwischen zwei Ports */
+		post: { query: never; body: RackCableInput; response: ApiIdResponse };
+	};
+	'/api/v1/rack-cables/{id}': {
+		/** Patchkabel entfernen */
+		delete: { query: never; body: never; response: ApiOkResponse };
+	};
+	'/api/v1/rack-items/{id}': {
+		/** Element ändern oder verschieben (auch in ein anderes Rack) */
+		put: { query: never; body: RackItemInput; response: ApiOkResponse };
+		/** Element ausbauen */
+		delete: { query: never; body: never; response: ApiOkResponse };
+	};
+	'/api/v1/rack-items/{id}/adopt': {
+		/** Erkannte Verbindungen an freien Ports übernehmen */
+		post: { query: never; body: never; response: ApiAdoptResponse };
+	};
+	'/api/v1/rack-items/{id}/port': {
+		/** Beschriftung und angeschlossenes Gerät eines Ports */
+		put: { query: never; body: RackPortInput; response: ApiOkResponse };
+	};
+	'/api/v1/racks': {
+		/** Racks mit Belegung */
+		get: { query: never; body: never; response: RackSummary[] };
+		/** Rack anlegen */
+		post: { query: never; body: RackRackInput; response: RackRack };
+	};
+	'/api/v1/racks/{id}': {
+		/** Rack mit eingebauten Elementen, Ports und Kabeln */
+		get: { query: never; body: never; response: RackView };
+		/** Rack ändern */
+		put: { query: never; body: RackRackInput; response: RackRack };
+		/** Rack mit allem Eingebauten löschen */
+		delete: { query: never; body: never; response: ApiOkResponse };
+	};
+	'/api/v1/racks/{id}/items': {
+		/** Gerät oder passives Element einbauen */
+		post: { query: never; body: RackItemInput; response: ApiIdResponse };
 	};
 	'/api/v1/reports/changes': {
 		/** Änderungsbericht für einen Zeitraum (json, md, pdf) */

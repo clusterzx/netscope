@@ -27,6 +27,7 @@ export const nav: NavSection[] = [
 			{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 			{ href: '/devices', label: t('Geräte'), icon: 'devices' },
 			{ href: '/topology', label: t('Topologie'), icon: 'topology' },
+			{ href: '/racks', label: t('Racks'), icon: 'rack' },
 			{ href: '/sites', label: t('Standorte'), icon: 'globe', central: true }
 		]
 	},

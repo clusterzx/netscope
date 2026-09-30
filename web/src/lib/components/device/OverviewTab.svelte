@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
 	import { api, errorMessage, fieldErrors } from '$lib/api';
-	import type { DeviceDetail, Relation } from '$lib/api/types';
+	import type { DeviceDetail, RackDeviceInfo, Relation } from '$lib/api/types';
 	import { formatCustom } from '$lib/components/devices/columns';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -23,6 +23,7 @@
 	import CredentialsCard from './CredentialsCard.svelte';
 	import NotesCard from './NotesCard.svelte';
 	import PingCharts from './PingCharts.svelte';
+	import { portLabel } from '$lib/components/racks/rack';
 	import { groupFacts, LazyData, sourceName } from './util';
 
 	interface Props {
@@ -72,8 +73,35 @@
 		);
 	});
 	$effect(() => () => rel.abort());
-	const parents = $derived((rel.data ?? []).filter((r) => r.childId === d.id));
-	const children = $derived((rel.data ?? []).filter((r) => r.parentId === d.id));
+
+	// place in a rack and rack ports leading to the device (card only shown when there is one)
+	const rackInfo = new LazyData<RackDeviceInfo>();
+	$effect(() => {
+		if (!active) return;
+		rackInfo.ensure(String(version), (signal) =>
+			api.get('/api/v1/devices/{id}/rack', { path: { id: d.id }, signal })
+		);
+	});
+	$effect(() => () => rackInfo.abort());
+	// one entry per device: a protected edge (manual, rack) before detected ones
+	function uniqueBy(list: Relation[], other: (r: Relation) => number): Relation[] {
+		const seen = new Set<number>();
+		return [...list]
+			.sort((a, b) => Number(b.protected) - Number(a.protected))
+			.filter((r) => !seen.has(other(r)) && !!seen.add(other(r)));
+	}
+	const parents = $derived(
+		uniqueBy(
+			(rel.data ?? []).filter((r) => r.childId === d.id),
+			(r) => r.parentId
+		)
+	);
+	const children = $derived(
+		uniqueBy(
+			(rel.data ?? []).filter((r) => r.parentId === d.id),
+			(r) => r.childId
+		)
+	);
 
 	// ---------------------------------------------------------------- manual addresses
 	/** addresses of a site device are kept at the site */
@@ -483,6 +511,36 @@
 				{/each}
 			{/if}
 		</Card>
+
+		{#if rackInfo.data && (rackInfo.data.mount || rackInfo.data.links.length)}
+			{@const ri = rackInfo.data}
+			<Card title="Rack" icon="rack" padding="md">
+				<ul class="flex flex-col gap-1.5 text-sm">
+					{#if ri.mount}
+						<li>
+							<a href="/racks/{ri.mount.rackId}?item={ri.mount.itemId}" class="link">{ri.mount.rackName}</a>
+							<span class="text-fg-muted">
+								· {t('HE {units}', {
+									units:
+										ri.mount.height > 1
+											? `${ri.mount.unit}–${ri.mount.unit + ri.mount.height - 1}`
+											: String(ri.mount.unit)
+								})} · {ri.mount.face === 'front' ? t('Vorderseite') : t('Rückseite')}
+							</span>
+						</li>
+					{/if}
+					{#each ri.links as l (l.itemId + '/' + l.port)}
+						<li class="text-fg-muted">
+							{t('Angeschlossen an')}
+							<a href="/racks/{l.rackId}?item={l.itemId}&port={encodeURIComponent(l.port)}" class="link"
+								>{l.itemName} · {portLabel(l.port)}</a
+							>
+							({l.rackName})
+						</li>
+					{/each}
+				</ul>
+			</Card>
+		{/if}
 
 		{#if !d.siteRef && auth.can('credentials.view')}
 			<!-- credentials of a site device live at the site -->

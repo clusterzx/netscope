@@ -33,8 +33,14 @@ src/routes/welcome          setup wizard of a new installation (FR-013): setup c
                             language step; no password). The code goes with every request as
                             X-NetScope-Setup-Code (setSetupCode from $lib/api); step 2 creates the
                             administrator, afterwards the normal session endpoints are used.
+src/routes/racks            racks (FR-014): list; /racks/[id] renders RackPage from
+                            src/lib/components/racks/ – RackDrawing (one face to scale: units,
+                            elements in sixths of the width, drag and drop, free units open the
+                            mount dialog), Faceplate (ports as sockets), ItemPanel/PortPanel
+                            (side panel), ItemFormModal, RackFormModal, CableModal; helpers in
+                            rack.ts. Selection in the URL (?item=&port=&view=).
 src/routes/+error.svelte    404/errors.
-Pages: / (dashboard), /devices, /devices/[id], /topology, /events, /diff, /health,
+Pages: / (dashboard), /devices, /devices/[id], /topology, /racks, /racks/[id], /events, /diff, /health,
 /vulnerabilities(/[cve]), /plugins(/[id](/runs/[run])), /rules(/new, /[id]), /credentials,
 /reports, /system (?tab=…), /login, /setup (first-login password/2FA), /welcome (setup
 wizard). Page-specific components live in

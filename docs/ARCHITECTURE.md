@@ -43,6 +43,7 @@ Benachrichtigungen plant und über Publisher zustellt.
 | `internal/plugin` | Plugin-SDK: Interfaces, Settings-Schema, Observation, Change, Event-Katalog |
 | `internal/pluginhost` | Registry, Konfiguration, Scheduler, Worker-Pool, Laufhistorie, Hooks, Aktionen |
 | `internal/inventory` | Datenmodell, Ingest, Präsenz, Query-Sprache, Merge/Split, Diff, Topologie-Graph |
+| `internal/rack` | Racks: Einbau (HE, Seite, Sechstel-Breite), Ports (SNMP, Anzahl, erkannte Namen), Patchkabel mit Weg durch Patchfelder, Abgleich als Beziehungen (Quelle `rack`) |
 | `internal/events` | Event-Speicher mit Dedup, Quittierung |
 | `internal/rules` | Regel-Engine, Bündelung, Ruhezeiten, Drosselung, Eskalation, Simulation |
 | `internal/timeseries` | Zeitreihen roh/5 min/1 h, Downsampling, Retention |
@@ -78,6 +79,7 @@ darauf beruhen Diff zu beliebigen Zeitpunkten und die Gerätehistorie.
 | Plugins | `plugin_configs` (inkl. verschlüsselter Secret-Felder), `runs`, `run_logs` |
 | Netz | `subnets` (inkl. Erreichbarkeit `access` und Tunnel-Credential) |
 | Geräte | `devices` (manuelle Felder + effektive Werte, `site_id` = liefernder Standort), `device_macs`, `device_ips`*, `device_facts`* (Hostname/Hersteller/OS/Typ/Attribute je Quelle), `device_presence`, `external_refs`, `device_inventory`, `device_tags`, `groups`, `group_members`, `custom_fields`, `saved_views`, `relations` |
+| Racks | `racks` (Breite, Höhe, Zählung), `rack_items` (Art, Gerät oder passiv, Position = unterste HE, Höhe, Seite, volle Tiefe, `col`/`cols` in Sechsteln, Portanzahl und -präfix), `rack_ports` (Beschriftung und direkt angeschlossenes Gerät je Port), `rack_cables` (Patchkabel zwischen zwei Ports, Farbe, Beschriftung) |
 | Beobachtungen | `observations` (normalisiert + Rohausgabe je Plugin und Lauf) |
 | Zustand | `ports`*, `certificates`*, `http_services`*, `packages`*, `containers`*, `container_images`* |
 | Events & Regeln | `events` (`site_id` bei Events eines Standorts), `rules`, `notifications`, `rule_throttle`, `escalations` |
@@ -309,6 +311,44 @@ Antwort werden höchstens stündlich erneut gefragt, solange keine frischen Zäh
 `GET /devices/{id}/timeseries` liefert je Reihe den letzten Rohwert (`last`), daraus baut
 der Tab „Traffic“ die Portliste.
 
+## Racks
+
+`internal/rack` (Migration 0014). Ein Rack hat 1–60 HE; `rack_items.position` ist die
+unterste belegte HE (1 = unten), die Zählung (`numbering` bottom/top) betrifft nur die
+Anzeige. Die Breite ist in Sechsteln gezählt: `cols` 6 (voll), 3 (halb) oder 2 (Drittel),
+`col` ein Vielfaches von `cols`. Zwei Elemente kollidieren, wenn sich HE und Spalten
+überschneiden und sie auf derselben Seite sitzen oder eines volle Tiefe hat. Ein Gerät steckt
+in höchstens einem Rack (`device_id UNIQUE`); wird es gelöscht, bleibt der Platz mit
+`device_name` (`ON DELETE SET NULL`). Beim Merge übernimmt das Ziel den Platz, ist es selbst
+eingebaut, wird der Platz der Quelle ein passives Element mit ihrem Namen.
+
+**Ports** eines Elements: mit `port_count > 0` Präfix + 1…N (SNMP-Status und -Geschwindigkeit
+werden per Namensabgleich ergänzt), sonst die physischen Interfaces aus dem SNMP-Inventar
+(`device_inventory`, IANAifType 6/62/69/117 ohne virtuelle Namen wie `br`, `vlan`, `lo`,
+Subinterfaces mit Punkt; in ifIndex-Reihenfolge). Dazu kommen Namen aus `rack_ports`, Kabeln
+und Beziehungen anderer Quellen (`parent_port`, bei LLDP auch `child_port`), die keinem Port
+entsprechen. Der Abgleich (`match`) nimmt den gleichen Namen, dann ohne Groß-/Kleinschreibung,
+dann die eindeutige Endziffer („5“ ↔ „Port 5“ ↔ „ether5“; mehrdeutig wie 1/0/5 und 1/1/5 =
+kein Treffer).
+
+**Erkannt** sind Beziehungen anderer Quellen (`switch_port`, `lldp`, `manual`) am Port eines
+eingebauten Geräts, höchstens 8 je Port (weitere gezählt, `detectedMore`). **Von Hand**:
+`rack_ports.device_id` (direkt angeschlossen) und `rack_cables`. Ein Geräte-Port nimmt ein
+Kabel und schließt ein direkt angeschlossenes Gerät aus; ein Patchfeld-Port nimmt zwei Kabel,
+mit angeschlossenem Gerät eines. `trace` folgt einem Kabel durch Patchfeld-Ports (anderes
+Kabel am selben Port) bis zu einem Geräte-Port, einem Patchfeld-Port mit Gerät oder einem
+offenen Ende (höchstens 32 Kabel, jedes einmal).
+
+**Abgleich (`Sync`)** nach jeder Änderung: Für jeden Port eines eingebauten Geräts ergibt das
+direkt angeschlossene oder über Kabel erreichte Gerät eine Beziehung `switch_port` mit Quelle
+`rack` und `protected = 1`; die Ports eines Gerätepaares werden mit Komma verbunden. Oben steht
+der Typ mit höherem Rang (Router/Firewall › Switch › Access Point › Hypervisor/Server/NAS ›
+Rest), bei Gleichstand das eingebaute Gerät (Kabel zwischen zwei Geräten: die kleinere ID).
+Vorhandene `rack`-Beziehungen werden angepasst, fehlende angelegt, überzählige gelöscht;
+betroffene Geräte gehen als `device updated` auf den Bus. Die Topologie behandelt `rack` wie
+`manual` (das Kind wird nicht neu abgeleitet, kein LLDP-Paar), `DELETE /topology/edges/{id}`
+lehnt `rack`-Kanten ab.
+
 ## Plugin-Interfaces
 
 Siehe `internal/plugin/plugin.go` und die Anleitung [PLUGINS.md](PLUGINS.md).
@@ -507,6 +547,7 @@ Prometheus-Metriken unter `/metrics`.
 | Health | `GET /health/board`, `/health-checks` (CRUD), `POST /health-checks/{id}/run`, `…/outages`, `…/latency` |
 | Schwachstellen | `GET /vulnerabilities`, `GET /vulnerabilities/{cve}`, `POST /vulnerabilities/ignore`, `GET /vulnerabilities/status` |
 | Topologie | `GET /topology`, `GET/POST /topology/edges`, `DELETE /topology/edges/{id}` |
+| Racks | `GET/POST /racks`, `GET/PUT/DELETE /racks/{id}` (GET: Elemente mit Ports, Kabeln und Weg), `POST /racks/{id}/items`, `PUT/DELETE /rack-items/{id}` (PUT mit `rackId` verschiebt), `PUT /rack-items/{id}/port` (Beschriftung, Gerät), `POST /rack-items/{id}/adopt` (erkannte Verbindungen übernehmen), `POST /rack-cables`, `DELETE /rack-cables/{id}`, `GET /devices/{id}/rack` (Einbauort, Rack-Ports zum Gerät) |
 | Reports | `GET /reports/inventory?format=csv|json|pdf`, `GET /reports/changes?format=json|md|pdf`, `POST /reports/send` |
 | System | `GET /health` (ohne Login), `GET /system/info`, `GET/PUT /system/settings`, `PUT /system/loglevel`, `GET /system/logs`, Backups (`/system/backups`, `/system/restore`), `POST /system/vault/rotate`, `GET /audit`, `GET /cron/describe`, `GET /meta`, `POST /uploads`, `GET /dashboard` |
 

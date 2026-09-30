@@ -41,6 +41,8 @@
   NAT; it updates itself.
 - **Vulnerabilities:** CVE matching against a local NVD mirror, prioritised by CISA KEV and EPSS.
 - **Monitoring:** change events, health checks, topology graph and reports.
+- **Racks:** devices and patch panels in racks (also half and third width), switch ports from
+  SNMP with detected devices, assignment with a click and patch cables through to the socket.
 - **Notifications:** rules with bundling, quiet hours, throttling and escalation via Telegram,
   ntfy, e-mail, webhook and n8n.
 - **Remote networks and sites:** built-in WireGuard tunnels, or one NetScope instance per site
