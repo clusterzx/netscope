@@ -181,6 +181,9 @@ Plugin settings (plugin.schema.fields) and credential types (credentialTypes[].s
   advanced (collapsible)/visibleIf/validation (min/max/pattern/format).
 - Server errors: pass fieldErrors(e); prefixed keys supported via errorPrefix="settings."; unknown
   keys are listed below the form.
+- Credentials on the spot: wrap a form in <CredentialCreator> ($lib/components/credentials);
+  every credential-ref field inside then offers "Neu anlegen" (dialog with the field's types,
+  the new credential is selected). The dialog renders after the children, never inside their form.
 - CronField and CredentialField can also be used standalone (e.g. the plugin schedule field:
   <CronField id="sched" label="Zeitplan" bind:value={schedule} />).
 

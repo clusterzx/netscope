@@ -45,7 +45,7 @@ bleiben erhalten (auch beim Neuladen der Seite).
 | 3. Instanz | Rolle *allein*, *Zentrale* (mit dem Namen dieser Instanz, z. B. „Zuhause“) oder *Standort* (URL und Token der Zentrale, optional Zertifikat-Fingerprint, „Verbindung testen“). Öffentliche URL (Vorschlag: die aufgerufene Adresse) – für Links in Benachrichtigungen, den Installationsbefehl des Agents und Passkeys |
 | 4. Netze | Erkannte Subnetze bestätigen, abwählen oder umbenennen, weitere hinzufügen (direkt oder über Router erreichbar; WireGuard-Tunnel später unter **System → Subnetze**). Ausschlüsse: einzelne Adressen oder Netze, die kein Scanner abfragt. DNS-Server für Reverse-DNS (leer = DNS-Server des Systems, die erkannten werden angezeigt) |
 | 5. Scanner | Alle Scanner mit Kurzbeschreibung, Belastung (hoch / mittel / gering) und Zeitplan, einzeln an- und abwählbar. Vorlagen: „Nur Anwesenheit“ (ARP, Ping), „Ohne belastende Scans“ (Vorauswahl), „Vollständig“. Auswertende Plugins (CVE-Abgleich, OUI-Hersteller, Änderungen, Topologie, Aufräumen …) bleiben an |
-| 6. Quellen (optional) | Systeme, die NetScope mit Zugangsdaten abfragt, in Tabs: Router und Firewalls, Netzwerk-Controller, Virtualisierung und Container, DNS und DHCP, Server und Switches. Eingeschaltet zeigt eine Karte das Formular des Plugins, legt Zugangsdaten gleich hier an und testet die Verbindung; „Übernehmen und aktivieren“ speichert |
+| 6. Quellen (optional) | Systeme, die NetScope mit Zugangsdaten abfragt, in Tabs: Router und Firewalls, Netzwerk-Controller, Virtualisierung und Container, DNS und DHCP, Server und Switches. Eingeschaltet zeigt eine Karte das Formular des Plugins; Zugangsdaten legt man direkt am Feld mit „Neu anlegen“ an (sie werden gleich ausgewählt), „Verbindung testen“ prüft Adresse und Anmeldung, „Übernehmen und aktivieren“ speichert |
 | 7. Abschluss | Zusammenfassung, Pfad von `master.key` zum Sichern, optional sofort ein erster ARP-Scan und Ping. „Einrichtung abschließen“ übernimmt alles und startet die gewählten Scanner |
 
 Wird der Assistent unterbrochen, nachdem das Konto angelegt ist, meldet man sich einfach an und
@@ -135,7 +135,9 @@ Zugangsdaten nach Bereich (Router und Firewalls, Netzwerk-Controller, Virtualisi
 Container, DNS und DHCP, Server und Switches). Diese Quellen haben in den Einstellungen
 **„Verbindung testen“**: NetScope prüft mit den Werten des Formulars – ohne sie zu speichern –
 Adresse und Anmeldung und nennt je System, was es lesen konnte. SSH-Inventar und SNMP fragen
-dafür nach der Adresse eines Geräts.
+dafür nach der Adresse eines Geräts. Fehlen noch Zugangsdaten, legt man sie in den Plugin-Einstellungen direkt am
+Feld mit **„Neu anlegen“** an; der Dialog bietet nur die passenden Typen an und wählt das neue
+Credential gleich aus.
 
 **Vom Scannen ausgenommen** (System → Einstellungen): Adressen oder Netze, die kein Scanner
 abfragt, z. B. empfindliche Geräte, die bei Port-Scans ausfallen. Sie fehlen in den Zielen aller

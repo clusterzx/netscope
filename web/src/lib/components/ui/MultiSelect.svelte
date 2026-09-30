@@ -11,6 +11,7 @@
 	import { t } from '$lib/i18n';
 	import FormField from './FormField.svelte';
 	import Icon from './Icon.svelte';
+	import type { Snippet } from 'svelte';
 	import Popover from './Popover.svelte';
 	import { formatNumber } from '$lib/utils/format';
 
@@ -29,6 +30,8 @@
 		id?: string;
 		class?: string;
 		onchange?: (value: string[]) => void;
+		/** rendered right of the label (e.g. a small action) */
+		labelExtra?: Snippet;
 	}
 
 	let {
@@ -44,7 +47,8 @@
 		searchable,
 		id,
 		class: klass = '',
-		onchange
+		onchange,
+		labelExtra
 	}: Props = $props();
 
 	let open = $state(false);
@@ -84,7 +88,7 @@
 	});
 </script>
 
-<FormField {label} {hint} {error} {required} {id} class={klass}>
+<FormField {label} {hint} {error} {required} {id} class={klass} {labelExtra}>
 	{#snippet children(fid, describedby)}
 		<button
 			bind:this={trigger}

@@ -4,22 +4,16 @@
 -->
 <script lang="ts">
 	import { api } from '$lib/api';
-	import type { CredentialType, PluginView } from '$lib/api';
+	import type { PluginView } from '$lib/api';
 	import { Alert, ErrorState, Skeleton, Tabs } from '$lib/components/ui';
 	import { intlLocale, t } from '$lib/i18n';
 	import { AsyncData } from '$lib/stores/resource.svelte';
 	import SourceCard from './SourceCard.svelte';
 	import { wizard } from './wizard.svelte';
 
-	const data = new AsyncData<{ plugins: PluginView[]; types: CredentialType[] }>();
+	const data = new AsyncData<{ plugins: PluginView[] }>();
 	$effect(() => {
-		data.run(async (signal) => {
-			const [plugins, types] = await Promise.all([
-				api.get('/api/v1/plugins', { signal }),
-				api.get('/api/v1/credentials/types', { signal })
-			]);
-			return { plugins: plugins ?? [], types: types ?? [] };
-		});
+		data.run(async (signal) => ({ plugins: (await api.get('/api/v1/plugins', { signal })) ?? [] }));
 	});
 
 	const categories = $derived(wizard.options?.categories ?? []);
@@ -71,7 +65,7 @@
 					class="flex flex-col gap-3"
 				>
 					{#each pluginsOf(c.id) as p (p.info.id)}
-						<SourceCard plugin={p} credentialTypes={data.data.types} onsaved={saved} />
+						<SourceCard plugin={p} onsaved={saved} />
 					{/each}
 					{#if c.hints?.includes('windows_dhcp')}
 						<Alert tone="info" title={t('Windows-DHCP')}>

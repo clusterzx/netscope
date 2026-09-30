@@ -108,5 +108,7 @@
 	"z. B. */15 * * * *": "e.g. */15 * * * *",
 	"z. B. 30s, 5m, 1h": "e.g. 30s, 5m, 1h",
 	"Zeile auswählen": "Select row",
-	"Zum Filter hinzufügen": "Add to filter"
+	"Zum Filter hinzufügen": "Add to filter",
+	"Neu anlegen": "Create new",
+	"Noch kein passendes Credential – mit „Neu anlegen“ gleich hier anlegen.": "No matching credential yet – create one right here with “Create new”."
 }
