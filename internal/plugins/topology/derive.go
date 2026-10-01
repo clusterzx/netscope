@@ -183,7 +183,7 @@ func derive(in *input, o options) result {
 		case plugin.RelRunsOn, plugin.RelWireless, plugin.RelSwitchPort, plugin.RelLLDP, plugin.RelManual:
 			fixed[r.child] = true
 		}
-		if r.source == "manual" {
+		if r.source == "manual" || r.source == "rack" { // placed by hand (rack: see internal/rack)
 			fixed[r.child] = true
 			manualPair[pairKey(r.parent, r.child)] = true
 		}

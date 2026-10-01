@@ -30,6 +30,7 @@ import (
 	"netscope/internal/logging"
 	"netscope/internal/plugin"
 	"netscope/internal/pluginhost"
+	"netscope/internal/rack"
 	"netscope/internal/rules"
 	"netscope/internal/settings"
 	"netscope/internal/setup"
@@ -58,7 +59,9 @@ type Deps struct {
 	// Agents manages NetScope agents (nil in tests without agents).
 	Agents *agent.Service
 	// Setup is the state of the setup wizard.
-	Setup     *setup.Service
+	Setup *setup.Service
+	// Racks documents racks, their devices and patch cables (created from DB when nil).
+	Racks     *rack.Service
 	Audit     *audit.Log
 	Version   string
 	StartedAt time.Time
@@ -114,6 +117,9 @@ type route struct {
 // New builds the server and registers all routes.
 func New(d Deps) *Server {
 	s := &Server{Deps: d, mux: http.NewServeMux(), start: time.Now()}
+	if s.Racks == nil && d.DB != nil {
+		s.Racks = rack.New(d.DB, d.Bus)
+	}
 	s.registerAuth()
 	s.registerExternalAuth()
 	s.registerSystem()
@@ -133,6 +139,7 @@ func New(d Deps) *Server {
 	s.registerUsers()
 	s.registerAgents()
 	s.registerSetup()
+	s.registerRacks()
 	s.mux.HandleFunc("GET /api/v1/stream", s.withAuth(&route{Scope: scopeRead, handler: s.handleStream}))
 	s.mux.HandleFunc("GET /metrics", s.handleMetrics)
 	s.mux.HandleFunc("GET /api/openapi.json", s.handleOpenAPI)

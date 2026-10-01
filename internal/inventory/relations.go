@@ -137,6 +137,9 @@ func (s *Store) DeleteRelation(ctx context.Context, id int64) (*Relation, error)
 	if len(list) == 0 {
 		return nil, db.ErrNotFound
 	}
+	if list[0].Source == "rack" {
+		return nil, errors.New("die Verbindung ist in einem Rack eingetragen und wird dort gelöst")
+	}
 	if _, err := s.db.W.ExecContext(ctx, "DELETE FROM relations WHERE id = ?", id); err != nil {
 		return nil, err
 	}

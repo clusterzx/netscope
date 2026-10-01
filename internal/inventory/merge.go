@@ -74,6 +74,12 @@ func (s *Store) mergeInto(ctx context.Context, tx *sql.Tx, target int64, sources
 			{"UPDATE events SET device_id = ? WHERE device_id = ?", []any{target, src}},
 			{"UPDATE health_checks SET device_id = ? WHERE device_id = ?", []any{target, src}},
 			{"UPDATE site_devices SET device_id = ? WHERE device_id = ?", []any{target, src}},
+			// racks: the target takes the place of the source unless it is mounted itself;
+			// then the source's place stays as a passive element with its name
+			{"UPDATE OR IGNORE rack_items SET device_id = ? WHERE device_id = ?", []any{target, src}},
+			{`UPDATE rack_items SET kind = 'other', device_id = NULL, label = CASE WHEN label <> '' THEN label ELSE device_name END
+				WHERE device_id = ?`, []any{src}},
+			{"UPDATE rack_ports SET device_id = ? WHERE device_id = ?", []any{target, src}},
 		}
 		for _, st := range steps {
 			if err := exec(st.q, st.args...); err != nil {

@@ -9,6 +9,7 @@ import devices from './devices.json';
 import layout from './layout.json';
 import monitoring from './monitoring.json';
 import plugins from './plugins.json';
+import racks from './racks.json';
 import rules from './rules.json';
 import system from './system.json';
 import topology from './topology.json';
@@ -27,6 +28,7 @@ const en = {
 	...device,
 	...monitoring,
 	...topology,
+	...racks,
 	...plugins,
 	...rules,
 	...system,
