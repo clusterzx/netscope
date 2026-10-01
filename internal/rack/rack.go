@@ -88,6 +88,21 @@ type Summary struct {
 	Offline int `json:"offline"`
 	// UsedUnits counts the height units with at least one item (either face).
 	UsedUnits int `json:"usedUnits"`
+	// Layout lists the places of the items (for a thumbnail of the rack).
+	Layout []Place `json:"layout"`
+}
+
+// Place is where an item sits, for thumbnails.
+type Place struct {
+	Kind      string `json:"kind"`
+	Type      string `json:"type,omitempty"` // device type
+	Online    bool   `json:"online"`
+	Position  int    `json:"position"`
+	Height    int    `json:"height"`
+	Face      string `json:"face"`
+	FullDepth bool   `json:"fullDepth"`
+	Col       int    `json:"col"`
+	Cols      int    `json:"cols"`
 }
 
 // DeviceRef is a device as shown in a rack.
@@ -212,14 +227,15 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			return nil, err
 		}
 		idx[r.ID] = len(out)
-		out = append(out, Summary{Rack: r})
+		out = append(out, Summary{Rack: r, Layout: []Place{}})
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	irows, err := s.db.R.QueryContext(ctx, `SELECT i.rack_id, i.position, i.height, i.device_id IS NOT NULL, IFNULL(d.online, 1)
-		FROM rack_items i LEFT JOIN devices d ON d.id = i.device_id`)
+	irows, err := s.db.R.QueryContext(ctx, `SELECT i.rack_id, i.position, i.height, i.device_id IS NOT NULL, IFNULL(d.online, 1),
+		i.kind, IFNULL(d.type, ''), i.face, i.full_depth, i.col, i.cols
+		FROM rack_items i LEFT JOIN devices d ON d.id = i.device_id ORDER BY i.position DESC, i.col`)
 	if err != nil {
 		return nil, err
 	}
@@ -231,13 +247,16 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			pos, h         int
 			device, online bool
 		)
-		if err := irows.Scan(&rack, &pos, &h, &device, &online); err != nil {
+		var pl Place
+		if err := irows.Scan(&rack, &pos, &h, &device, &online, &pl.Kind, &pl.Type, &pl.Face, &pl.FullDepth, &pl.Col, &pl.Cols); err != nil {
 			return nil, err
 		}
 		i, ok := idx[rack]
 		if !ok {
 			continue
 		}
+		pl.Position, pl.Height, pl.Online = pos, h, online
+		out[i].Layout = append(out[i].Layout, pl)
 		out[i].Items++
 		if device {
 			out[i].Devices++

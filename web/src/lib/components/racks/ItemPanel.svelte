@@ -7,7 +7,8 @@
 	import { Badge, Button, DescItem, DescList, Icon, StatusDot } from '$lib/components/ui';
 	import { t } from '$lib/i18n';
 	import { deviceTypeName } from '$lib/utils/labels';
-	import { cableCss, fits, itemIcon, itemName, kindLabel, portDevice, portState, unitsText } from './rack';
+	import PortSocket from './PortSocket.svelte';
+	import { fits, itemIcon, itemName, kindLabel, portDevice, portState, unitsText } from './rack';
 
 	interface Props {
 		rack: RackView;
@@ -152,19 +153,19 @@
 							aria-pressed={selectedPort === p.name}
 							onclick={() => onport?.(p)}
 						>
-							<span
-								class="inline-block size-2.5 shrink-0 rounded-[2px] border {st === 'device'
-									? 'border-accent bg-accent'
-									: st === 'detected'
-										? 'border-dashed border-ok bg-ok-soft'
-										: st === 'up'
-											? 'border-ok'
-											: 'border-border-strong bg-surface-2'}"
-								style={st === 'cable'
-									? `background:${cableCss(p.cables[0].color)};border-color:${cableCss(p.cables[0].color)}`
-									: ''}
-								aria-hidden="true"
-							></span>
+							<span class="chip"
+								><PortSocket
+									port={p}
+									kind={p.media === 'sfp'
+										? 'sfp'
+										: item.kind === 'patch_panel'
+											? 'keystone'
+											: item.kind === 'pdu'
+												? 'outlet'
+												: 'rj45'}
+									width={14}
+								/></span
+							>
 							<span class="mono w-20 shrink-0 truncate text-xs">{p.name}</span>
 							<span class="min-w-0 flex-1 truncate {d ? 'text-fg' : 'text-fg-subtle'}">
 								{#if d}
@@ -186,3 +187,13 @@
 		</div>
 	{/if}
 </section>
+
+<style>
+	.chip {
+		display: inline-flex;
+		flex: none;
+		padding: 2px 3px;
+		border-radius: 3px;
+		background: #23272c;
+	}
+</style>

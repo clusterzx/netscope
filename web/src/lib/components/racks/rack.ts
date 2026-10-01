@@ -192,3 +192,100 @@ export function sourceLabel(source: string): string {
 	}
 	return source;
 }
+
+// ---------------------------------------------------------------- hardware drawing
+
+export type Skin =
+	'switch' | 'router' | 'firewall' | 'patch' | 'server' | 'nas' | 'box' | 'shelf' | 'blank' | 'cable' | 'pdu';
+
+/** How an element is drawn: from its kind, and for devices from type and ports. */
+export function skinOf(item: RackItem): Skin {
+	switch (item.kind) {
+		case 'patch_panel':
+			return 'patch';
+		case 'shelf':
+			return 'shelf';
+		case 'blank':
+			return 'blank';
+		case 'cable_manager':
+			return 'cable';
+		case 'pdu':
+			return 'pdu';
+		case 'other':
+			return 'box';
+	}
+	switch (item.device?.type) {
+		case 'switch':
+			return 'switch';
+		case 'router':
+			return 'router';
+		case 'firewall':
+			return 'firewall';
+		case 'nas':
+			return 'nas';
+		case 'server':
+		case 'hypervisor':
+			return 'server';
+	}
+	if (item.ports.length > 4 && item.cols === COLUMNS) return 'switch';
+	if (item.height >= 2 && item.cols === COLUMNS) return 'server';
+	return 'box';
+}
+
+export interface PortGrid {
+	rows: number;
+	cols: number;
+	/** socket width in px */
+	size: number;
+	/** ports that fit */
+	shown: number;
+	/** width of the block in px */
+	width: number;
+}
+
+const SOCKET_GAP = 2;
+const GROUP_GAP = 4;
+
+/**
+ * Arranges n sockets in a block at most `avail` wide and `avail_h` high: as few rows as
+ * possible (at least `minRows`), column-wise (1 above 2, like a switch), a small gap after
+ * every `group` columns. aspect = socket height / width.
+ */
+export function portGrid(
+	n: number,
+	avail: number,
+	availH: number,
+	opts: { minRows?: number; maxSize?: number; minSize?: number; aspect?: number; group?: number } = {}
+): PortGrid {
+	const { minRows = 1, maxSize = 14, minSize = 9, aspect = 0.8, group = 6 } = opts;
+	if (n <= 0 || avail <= 0) return { rows: 0, cols: 0, size: 0, shown: 0, width: 0 };
+	const maxRows = Math.max(1, Math.floor((availH + SOCKET_GAP) / (minSize * aspect + SOCKET_GAP)));
+	const blockWidth = (cols: number, size: number) =>
+		cols * size + (cols - 1) * SOCKET_GAP + Math.max(0, Math.ceil(cols / group) - 1) * GROUP_GAP;
+	for (let rows = Math.min(minRows, maxRows); rows <= maxRows; rows++) {
+		const cols = Math.ceil(n / rows);
+		const byHeight = Math.floor((availH - (rows - 1) * SOCKET_GAP) / rows / aspect);
+		const groups = Math.max(0, Math.ceil(cols / group) - 1);
+		const byWidth = Math.floor((avail - (cols - 1) * SOCKET_GAP - groups * GROUP_GAP) / cols);
+		const size = Math.min(maxSize, byHeight, byWidth);
+		if (size >= minSize) return { rows, cols, size, shown: n, width: blockWidth(cols, size) };
+	}
+	const size = minSize;
+	let cols = Math.max(1, Math.floor((avail + SOCKET_GAP) / (size + SOCKET_GAP)));
+	while (cols > 1 && blockWidth(cols, size) > avail) cols--;
+	const shown = Math.min(n, cols * maxRows);
+	return { rows: maxRows, cols, size, shown, width: blockWidth(cols, size) };
+}
+
+/** Columns of a grid: indices of the ports per column (1 above 2 …). */
+export function gridColumns<T>(list: T[], grid: PortGrid): T[][] {
+	const out: T[][] = [];
+	for (let i = 0; i < Math.min(list.length, grid.shown); i++) {
+		const c = Math.floor(i / grid.rows);
+		(out[c] ??= []).push(list[i]);
+	}
+	return out;
+}
+
+export const GRID_GAP = SOCKET_GAP;
+export const GRID_GROUP_GAP = GROUP_GAP;

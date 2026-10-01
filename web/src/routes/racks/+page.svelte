@@ -3,12 +3,12 @@
 	import { api } from '$lib/api';
 	import type { RackSummary } from '$lib/api';
 	import RackFormModal from '$lib/components/racks/RackFormModal.svelte';
+	import RackThumb from '$lib/components/racks/RackThumb.svelte';
 	import {
 		Badge,
 		Button,
 		EmptyState,
 		ErrorState,
-		Icon,
 		PageHeader,
 		ProgressBar,
 		Skeleton
@@ -63,29 +63,33 @@
 			<li>
 				<a
 					href="/racks/{r.id}"
-					class="flex h-full flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm transition-colors hover:border-accent focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
+					class="group flex h-full gap-4 rounded-lg border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
 				>
-					<div class="flex items-start gap-3">
-						<span class="rounded-md bg-surface-2 p-2 text-fg-muted"><Icon name="rack" size={20} /></span>
-						<div class="min-w-0 flex-1">
-							<h2 class="truncate font-semibold text-fg">{r.name}</h2>
-							<p class="truncate text-sm text-fg-muted">
-								{[r.location, `${r.width}" · ${r.height} ${t('HE')}`].filter(Boolean).join(' · ')}
+					<RackThumb rack={r} />
+					<div class="flex min-w-0 flex-1 flex-col gap-3">
+						<div class="flex items-start gap-2">
+							<div class="min-w-0 flex-1">
+								<h2 class="truncate font-semibold text-fg group-hover:text-accent">{r.name}</h2>
+								<p class="text-sm text-fg-muted">
+									{[r.location, `${r.width}" · ${r.height} ${t('HE')}`].filter(Boolean).join(' · ')}
+								</p>
+							</div>
+							{#if r.offline > 0}
+								<Badge tone="danger" dot>{t('{n} offline', { n: r.offline })}</Badge>
+							{/if}
+						</div>
+						<div class="mt-auto flex flex-col gap-2">
+							<ProgressBar done={r.usedUnits} total={r.height} label={t('Belegte Höheneinheiten')} />
+							<p class="text-xs text-fg-muted">
+								{t('{used} von {total} HE belegt · {devices} Geräte · {items} Elemente', {
+									used: r.usedUnits,
+									total: r.height,
+									devices: r.devices,
+									items: r.items
+								})}
 							</p>
 						</div>
-						{#if r.offline > 0}
-							<Badge tone="danger" dot>{t('{n} offline', { n: r.offline })}</Badge>
-						{/if}
 					</div>
-					<ProgressBar done={r.usedUnits} total={r.height} label={t('Belegte Höheneinheiten')} />
-					<p class="text-xs text-fg-muted">
-						{t('{used} von {total} HE belegt · {devices} Geräte · {items} Elemente', {
-							used: r.usedUnits,
-							total: r.height,
-							devices: r.devices,
-							items: r.items
-						})}
-					</p>
 				</a>
 			</li>
 		{/each}

@@ -29,6 +29,7 @@
 	import ItemFormModal from './ItemFormModal.svelte';
 	import ItemPanel from './ItemPanel.svelte';
 	import PortPanel from './PortPanel.svelte';
+	import PortSocket from './PortSocket.svelte';
 	import RackDrawing from './RackDrawing.svelte';
 	import RackFormModal from './RackFormModal.svelte';
 	import { CABLE_COLORS, itemName, type Face, type Slot } from './rack';
@@ -72,7 +73,7 @@
 	const sp = $derived(page.url.searchParams);
 	const selItemId = $derived(sp.get('item') ? Number(sp.get('item')) : null);
 	const selPortName = $derived(sp.get('port'));
-	const view = $derived<'both' | Face>((sp.get('view') as Face | null) ?? 'both');
+	const view = $derived<'both' | Face>((sp.get('view') as 'both' | Face | null) ?? 'front');
 	const selItem = $derived(rack?.items.find((i) => i.id === selItemId) ?? null);
 	const selPort = $derived(
 		selItem && selPortName ? (selItem.ports.find((p) => p.name === selPortName) ?? null) : null
@@ -226,12 +227,12 @@
 		{#snippet actions()}
 			<div class="flex flex-wrap items-center gap-2">
 				<div class="inline-flex rounded-md border border-border p-0.5" role="group" aria-label={t('Ansicht')}>
-					{#each [['both', t('Beide Seiten')], ['front', t('Vorderseite')], ['rear', t('Rückseite')]] as [v, l] (v)}
+					{#each [['front', t('Vorderseite')], ['rear', t('Rückseite')], ['both', t('Beide Seiten')]] as [v, l] (v)}
 						<Button
 							size="sm"
 							variant={view === v ? 'secondary' : 'ghost'}
 							active={view === v}
-							onclick={() => setParams({ view: v === 'both' ? null : v })}
+							onclick={() => setParams({ view: v === 'front' ? null : v })}
 						>
 							{l}
 						</Button>
@@ -255,7 +256,7 @@
 		</Alert>
 	{/if}
 
-	<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+	<div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,max-content)_minmax(320px,440px)]">
 		<div class="min-w-0">
 			<div class="flex flex-wrap gap-6 overflow-x-auto pb-2" bind:clientWidth={areaW}>
 				{#each view === 'both' ? (['front', 'rear'] as Face[]) : [view] as face (face)}
@@ -274,28 +275,17 @@
 					/>
 				{/each}
 			</div>
-			<ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted" aria-label={t('Legende')}>
-				<li class="flex items-center gap-1.5">
-					<span class="size-2.5 rounded-[2px] border border-accent bg-accent"></span>{t(
-						'Gerät von Hand eingetragen'
-					)}
-				</li>
-				<li class="flex items-center gap-1.5">
-					<span class="size-2.5 rounded-[2px] border border-dashed border-ok bg-ok-soft"></span>{t(
-						'Gerät erkannt'
-					)}
-				</li>
-				<li class="flex items-center gap-1.5">
-					<span class="size-2.5 rounded-[2px]" style="background:{CABLE_COLORS[1].css}"></span>{t(
-						'Patchkabel (in seiner Farbe)'
-					)}
-				</li>
-				<li class="flex items-center gap-1.5">
-					<span class="size-2.5 rounded-[2px] border border-ok bg-surface"></span>{t('Link aktiv (SNMP)')}
-				</li>
-				<li class="flex items-center gap-1.5">
-					<span class="size-2.5 rounded-[2px] border border-border-strong bg-surface-2"></span>{t('frei')}
-				</li>
+			<ul
+				class="mt-3 flex w-0 min-w-full flex-wrap gap-x-4 gap-y-1.5 text-xs text-fg-muted"
+				aria-label={t('Legende')}
+			>
+				{#each [{ state: 'device', text: t('Gerät von Hand eingetragen') }, { state: 'cable', text: t('Patchkabel (in seiner Farbe)'), color: CABLE_COLORS[4].css }, { state: 'detected', text: t('Gerät erkannt') }, { state: 'up', text: t('Link aktiv (SNMP)') }, { state: 'free', text: t('frei') }] as l (l.state)}
+					<li class="flex items-center gap-1.5">
+						<span class="legend-chip"
+							><PortSocket state={l.state as 'device'} color={l.color} width={15} /></span
+						>{l.text}
+					</li>
+				{/each}
 			</ul>
 		</div>
 
@@ -363,3 +353,12 @@
 	<ItemFormModal bind:open={itemOpen} {rack} item={editItem} {slot} {racks} onsaved={changed} />
 	<CableModal bind:open={cableOpen} {rack} from={cableFrom} to={cableTo} {racks} onsaved={changed} />
 {/if}
+
+<style>
+	.legend-chip {
+		display: inline-flex;
+		padding: 3px 4px;
+		border-radius: 3px;
+		background: #23272c;
+	}
+</style>

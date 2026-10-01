@@ -124,6 +124,9 @@ func TestRackValidation(t *testing.T) {
 	if err != nil || len(list) != 1 || list[0].Items != 1 || list[0].UsedUnits != 2 {
 		t.Fatalf("list: %+v %v", list, err)
 	}
+	if l := list[0].Layout; len(l) != 1 || l[0].Kind != KindShelf || l[0].Position != 20 || l[0].Height != 2 || l[0].Cols != 6 {
+		t.Fatalf("layout: %+v", l)
+	}
 }
 
 func TestPlacement(t *testing.T) {

@@ -2065,6 +2065,18 @@ export interface RackMount {
 	unit: number;
 }
 
+export interface RackPlace {
+	col: number;
+	cols: number;
+	face: string;
+	fullDepth: boolean;
+	height: number;
+	kind: string;
+	online: boolean;
+	position: number;
+	type?: string;
+}
+
 export interface RackPort {
 	cables: RackPortCable[];
 	detected: RackDetected[];
@@ -2119,6 +2131,7 @@ export interface RackSummary {
 	height: number;
 	id: number;
 	items: number;
+	layout: RackPlace[];
 	location: string;
 	name: string;
 	notes: string;
