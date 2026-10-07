@@ -96,9 +96,10 @@ async function elevenlabs(lines, i, file) {
 			body: JSON.stringify({
 				text: lines[i].text,
 				model_id: env('ELEVENLABS_MODEL_ID', 'eleven_multilingual_v2'),
-				// neighbouring lines keep intonation consistent across the separate files
-				previous_text: lines[i - 1]?.text,
-				next_text: lines[i + 1]?.text,
+				// no previous_text/next_text: the model sometimes speaks the start of next_text at the
+				// end of a clip, which is then heard cut off at every scene change. A fixed seed keeps
+				// the delivery consistent across the separate files instead.
+				seed: 4242,
 				voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.25, use_speaker_boost: true }
 			})
 		}
