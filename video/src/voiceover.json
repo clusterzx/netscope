@@ -1,0 +1,79 @@
+{
+	"de": [
+		{
+			"id": "hook",
+			"text": "Wie viele Geräte hängen gerade in deinem Netzwerk? Und was läuft eigentlich auf ihnen?"
+		},
+		{
+			"id": "questions",
+			"text": "Was ist es? Wo hängt es? Was läuft darauf – und seit wann? Was hat sich geändert? Ist es erreichbar … und ist es verwundbar?"
+		},
+		{ "id": "reveal", "text": "NetScope beantwortet diese Fragen. Für jedes Gerät in deinem Netzwerk." },
+		{
+			"id": "discovery",
+			"text": "Fünfzehn Scanner finden alles, was im Netz hängt: per ARP, nmap, SNMP, mDNS und mehr – mit Diensten, Versionen und Betriebssystem."
+		},
+		{
+			"id": "sources",
+			"text": "Dazu Importe aus Proxmox, OPNsense, UniFi oder deiner Fritzbox. Und ein Agent für Linux und Windows, der auch hinter NAT funktioniert."
+		},
+		{
+			"id": "inventory",
+			"text": "Alles landet in einem Inventar, mit kompletter Änderungshistorie. Neuer Port, neues Zertifikat, neues Gerät: Du siehst es sofort."
+		},
+		{
+			"id": "vulns",
+			"text": "Schwachstellen werden gegen eine lokale Kopie der NVD abgeglichen und nach CISA KEV und EPSS priorisiert. So weißt du, was zuerst dran ist."
+		},
+		{
+			"id": "topology",
+			"text": "Topologie, Health-Checks und Racks zeigen, wie alles zusammenhängt – vom Switch-Port bis zur Netzwerkdose."
+		},
+		{
+			"id": "alerts",
+			"text": "Und wenn etwas passiert, meldet sich NetScope: per Telegram, Notify, E-Mail, Webhook oder n8n."
+		},
+		{
+			"id": "selfhosted",
+			"text": "Selbst gehostet. Ein einziges Binary. Keine Cloud. Deine Daten bleiben bei dir."
+		},
+		{ "id": "outro", "text": "NetScope. Kenne dein Netzwerk." }
+	],
+	"en": [
+		{
+			"id": "hook",
+			"text": "How many devices are on your network right now? And what is actually running on them?"
+		},
+		{
+			"id": "questions",
+			"text": "What is it? Where is it? What runs on it – and since when? What changed? Is it reachable … and is it vulnerable?"
+		},
+		{ "id": "reveal", "text": "NetScope answers these questions. For every device on your network." },
+		{
+			"id": "discovery",
+			"text": "Fifteen scanners find everything on the wire: ARP, nmap, SNMP, mDNS and more – with services, versions and operating systems."
+		},
+		{
+			"id": "sources",
+			"text": "Plus imports from Proxmox, OPNsense, UniFi or your Fritzbox. And an agent for Linux and Windows that works even behind NAT."
+		},
+		{
+			"id": "inventory",
+			"text": "Everything lands in one inventory, with a complete change history. A new port, a new certificate, a new device: you see it instantly."
+		},
+		{
+			"id": "vulns",
+			"text": "Vulnerabilities are matched against a local copy of the NVD and prioritised by CISA KEV and EPSS. So you know what to fix first."
+		},
+		{
+			"id": "topology",
+			"text": "Topology, health checks and racks show how everything connects – from the switch port to the wall socket."
+		},
+		{
+			"id": "alerts",
+			"text": "And when something happens, NetScope lets you know: via Telegram, Notify, e-mail, webhook or n8n."
+		},
+		{ "id": "selfhosted", "text": "Self-hosted. A single binary. No cloud. Your data stays with you." },
+		{ "id": "outro", "text": "NetScope. Know your network." }
+	]
+}

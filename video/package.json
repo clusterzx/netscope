@@ -1,0 +1,31 @@
+{
+	"name": "netscope-video",
+	"private": true,
+	"type": "module",
+	"description": "NetScope intro video (Remotion) with an ElevenLabs voice-over",
+	"scripts": {
+		"studio": "remotion studio",
+		"voiceover:de": "node scripts/voiceover.mjs --lang de",
+		"voiceover:en": "node scripts/voiceover.mjs --lang en",
+		"sound": "node scripts/sound.mjs",
+		"render:de": "remotion render NetScopeIntro-de out/netscope-intro-de.mp4",
+		"render:en": "remotion render NetScopeIntro-en out/netscope-intro-en.mp4",
+		"format": "prettier --write .",
+		"lint": "prettier --check . && tsc --noEmit"
+	},
+	"dependencies": {
+		"@fontsource-variable/inter": "^5.2.5",
+		"@fontsource/jetbrains-mono": "^5.2.5",
+		"@remotion/cli": "4.0.533",
+		"@remotion/fonts": "^4.0.533",
+		"@remotion/media": "4.0.533",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"remotion": "4.0.533"
+	},
+	"devDependencies": {
+		"@types/react": "^19.1.0",
+		"prettier": "^3.9.9",
+		"typescript": "^5.8.3"
+	}
+}

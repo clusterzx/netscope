@@ -7,3 +7,4 @@ web/.svelte-kit
 internal/webui/dist
 *.test
 *.exe
+video
