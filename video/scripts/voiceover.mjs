@@ -20,14 +20,27 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// KEY=value lines; values may be quoted, unquoted values may carry a trailing " # comment"
 function loadDotEnv() {
 	const file = path.join(root, '.env');
 	if (!fs.existsSync(file)) return;
-	for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-		const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-		if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+	for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+		const m = line.match(/^\s*([A-Z0-9_]+)\s*=(.*)$/);
+		if (!m || process.env[m[1]] !== undefined) continue;
+		const value = m[2].trim();
+		const quoted = value.match(/^(["'])(.*?)\1/);
+		process.env[m[1]] = quoted ? quoted[2] : value.replace(/(^|\s+)#.*$/, '').trim();
 	}
 }
+
+const env = (name, fallback) => process.env[name]?.trim() || fallback;
+
+// runs the Remotion CLI (ffmpeg/ffprobe ship with it) through node, so no shell is needed on Windows
+const remotion = (...args) =>
+	spawnSync(process.execPath, [path.join(root, 'node_modules/@remotion/cli/remotion-cli.js'), ...args], {
+		cwd: root,
+		encoding: 'utf8'
+	});
 
 function args() {
 	const out = { lang: 'de', engine: undefined, only: undefined };
@@ -44,53 +57,45 @@ function args() {
 // loudness-normalise to -16 LUFS / -1.5 dBTP so every engine and voice sits at the same level
 // in the mix (ffmpeg that ships with Remotion)
 function normalize(input, output) {
-	const r = spawnSync(
-		'npx',
-		[
-			'remotion',
-			'ffmpeg',
-			'-y',
-			'-loglevel',
-			'error',
-			'-i',
-			input,
-			'-af',
-			'loudnorm=I=-16:TP=-1.5:LRA=11',
-			'-ar',
-			'44100',
-			'-ac',
-			'1',
-			output
-		],
-		{ cwd: root, encoding: 'utf8' }
+	const r = remotion(
+		'ffmpeg',
+		'-y',
+		'-loglevel',
+		'error',
+		'-i',
+		input,
+		'-af',
+		'loudnorm=I=-16:TP=-1.5:LRA=11',
+		'-ar',
+		'44100',
+		'-ac',
+		'1',
+		output
 	);
-	if (r.status !== 0) throw new Error(`could not normalise ${input}: ${r.stderr}`);
+	if (r.status !== 0) throw new Error(`could not normalise ${input}: ${r.error ?? r.stderr}`);
 }
 
 // duration in seconds, measured with the ffprobe that ships with Remotion
 function duration(file) {
-	const r = spawnSync(
-		'npx',
-		['remotion', 'ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file],
-		{ cwd: root, encoding: 'utf8' }
-	);
-	const d = parseFloat(r.stdout);
-	if (!Number.isFinite(d)) throw new Error(`could not measure ${file}: ${r.stderr || r.stdout}`);
+	const r = remotion('ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file);
+	// the CLI may print notices before the value; the duration is the last number
+	const d = parseFloat((r.stdout ?? '').trim().split(/\s+/).pop());
+	if (!Number.isFinite(d)) throw new Error(`could not measure ${file}: ${r.error ?? (r.stderr || r.stdout)}`);
 	return d;
 }
 
 async function elevenlabs(lines, i, file) {
-	const key = process.env.ELEVENLABS_API_KEY;
+	const key = env('ELEVENLABS_API_KEY');
 	if (!key) throw new Error('ELEVENLABS_API_KEY is not set (environment or video/.env)');
-	const voice = process.env.ELEVENLABS_VOICE_ID || 'nPczCjzI2devNBz1zQrb';
+	const voice = env('ELEVENLABS_VOICE_ID', 'nPczCjzI2devNBz1zQrb');
 	const res = await fetch(
-		`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`,
+		`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`,
 		{
 			method: 'POST',
 			headers: { 'xi-api-key': key, 'content-type': 'application/json' },
 			body: JSON.stringify({
 				text: lines[i].text,
-				model_id: process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2',
+				model_id: env('ELEVENLABS_MODEL_ID', 'eleven_multilingual_v2'),
 				// neighbouring lines keep intonation consistent across the separate files
 				previous_text: lines[i - 1]?.text,
 				next_text: lines[i + 1]?.text,
@@ -104,13 +109,13 @@ async function elevenlabs(lines, i, file) {
 }
 
 function piper(lines, i, file) {
-	const model = process.env.PIPER_MODEL;
+	const model = env('PIPER_MODEL');
 	if (!model) throw new Error('PIPER_MODEL is not set (path to a Piper .onnx voice)');
-	const r = spawnSync(process.env.PIPER_BIN || 'piper', ['-m', model, '-f', file, '--length-scale', '0.95'], {
+	const r = spawnSync(env('PIPER_BIN', 'piper'), ['-m', model, '-f', file, '--length-scale', '0.95'], {
 		input: lines[i].text,
 		encoding: 'utf8'
 	});
-	if (r.status !== 0) throw new Error(`piper failed: ${r.stderr}`);
+	if (r.status !== 0) throw new Error(`piper failed: ${r.error ?? r.stderr}`);
 	return { engine: 'piper', voice: path.basename(model, '.onnx') };
 }
 
@@ -120,7 +125,7 @@ async function main() {
 	const script = JSON.parse(fs.readFileSync(path.join(root, 'src/voiceover.json'), 'utf8'));
 	const lines = script[opt.lang];
 	if (!lines) throw new Error(`no voice-over text for language "${opt.lang}"`);
-	const engine = opt.engine || (process.env.ELEVENLABS_API_KEY ? 'elevenlabs' : 'piper');
+	const engine = opt.engine || (env('ELEVENLABS_API_KEY') ? 'elevenlabs' : 'piper');
 
 	const dir = path.join(root, 'public/voiceover', opt.lang);
 	fs.mkdirSync(dir, { recursive: true });
