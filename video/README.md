@@ -47,5 +47,9 @@ andere Stimme wählt, erzeugt nur das Voice-over neu (`node scripts/voiceover.mj
 - **Icons und Farben** kommen aus der Web-UI (`web/src/lib/components/ui/icons.ts`, Dark-Theme).
 - **Chrome:** Remotion lädt beim ersten Render eine Headless-Chrome herunter; eine vorhandene lässt sich
   mit `REMOTION_BROWSER_EXECUTABLE=/pfad/zu/chrome` verwenden.
+- **GPU:** `npm run render:de:gpu` lässt Chrome die Bilder mit der Grafikkarte zeichnen (`--gl=angle`,
+  jede GPU; ohne GPU fällt Chrome auf Software zurück). `npm run render:de:nvidia` kodiert zusätzlich
+  mit NVENC – nur mit NVIDIA-Karte, sonst bricht der Render ab. NVENC arbeitet mit fester Bitrate
+  (16 Mbit/s) statt CRF.
 
 Die gezeigten Daten (Geräte, CVEs mit CVSS/EPSS, Benachrichtigungen) sind Beispielwerte.
